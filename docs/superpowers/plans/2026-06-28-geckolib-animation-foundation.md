@@ -50,7 +50,7 @@ Add `geckolib_version=5.5.3` to `gradle.properties`.
 
 - [ ] **Step 2: Add GeckoLib Maven repository**
 
-Add a `maven` block named `GeckoLib` to `repositories` with URL `https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/` and group filter `com.geckolib`.
+Add a `maven` block named `GeckoLib` to `repositories` with URL `https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/` and group filter `software.bernie.geckolib`.
 
 - [ ] **Step 3: Add NeoForge GeckoLib dependency**
 
