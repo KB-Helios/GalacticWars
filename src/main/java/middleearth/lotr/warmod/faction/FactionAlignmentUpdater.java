@@ -18,9 +18,8 @@ public final class FactionAlignmentUpdater {
         Objects.requireNonNull(catalog, "catalog");
         Objects.requireNonNull(sourceFaction, "sourceFaction");
         Objects.requireNonNull(rule, "rule");
-        if (!catalog.contains(sourceFaction)) {
-            throw new IllegalArgumentException("Unknown source faction: " + sourceFaction);
-        }
+        FactionDefinition sourceDefinition = catalog.definition(sourceFaction)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown source faction: " + sourceFaction));
 
         FactionAlignment updated = alignment;
         ArrayList<FactionAlignmentChange> changes = new ArrayList<>();
@@ -28,22 +27,35 @@ public final class FactionAlignmentUpdater {
         updated = direct.alignment();
         changes.addAll(direct.changes());
 
-        for (FactionId candidate : catalog.definitions().keySet()) {
-            if (candidate.equals(sourceFaction)) {
-                continue;
-            }
-            FactionRelation relation = catalog.relation(sourceFaction, candidate);
-            int delta = switch (relation) {
-                case ALLY -> rule.allyDelta();
-                case ENEMY -> rule.enemyDelta();
-                case SELF, NEUTRAL -> 0;
-            };
-            AlignmentApplication application = applyDelta(updated, candidate, delta, rule.reasonCode());
+        for (FactionId ally : sourceDefinition.allies()) {
+            AlignmentApplication application = applyRelatedDelta(
+                    updated, catalog, sourceFaction, ally, rule.allyDelta(), rule.reasonCode());
+            updated = application.alignment();
+            changes.addAll(application.changes());
+        }
+
+        for (FactionId enemy : sourceDefinition.enemies()) {
+            AlignmentApplication application = applyRelatedDelta(
+                    updated, catalog, sourceFaction, enemy, rule.enemyDelta(), rule.reasonCode());
             updated = application.alignment();
             changes.addAll(application.changes());
         }
 
         return new FactionAlignmentUpdateResult(updated, changes);
+    }
+
+    private static AlignmentApplication applyRelatedDelta(
+            FactionAlignment alignment,
+            FactionCatalog catalog,
+            FactionId sourceFaction,
+            FactionId relatedFaction,
+            int delta,
+            String reasonCode
+    ) {
+        if (relatedFaction.equals(sourceFaction) || !catalog.contains(relatedFaction)) {
+            return new AlignmentApplication(alignment, List.of());
+        }
+        return applyDelta(alignment, relatedFaction, delta, reasonCode);
     }
 
     private static AlignmentApplication applyDelta(

@@ -11,6 +11,7 @@ public final class FactionAlignmentUpdaterTest {
     public static void main(String[] args) {
         helpingFactionPropagatesToAlliesAndEnemies();
         harmingFactionPropagatesToAlliesAndEnemies();
+        ignoresUnregisteredAlliesAndEnemies();
         rejectsInvalidRules();
 
         System.out.println("FactionAlignmentUpdaterTest passed");
@@ -53,6 +54,32 @@ public final class FactionAlignmentUpdaterTest {
         assertChange(result.changes().get(0), "gondor", 20, -12, 8, "harm_faction");
         assertChange(result.changes().get(1), "rohan", 8, -5, 3, "harm_faction");
         assertChange(result.changes().get(2), "mordor", -3, 7, 4, "harm_faction");
+    }
+
+    private static void ignoresUnregisteredAlliesAndEnemies() {
+        FactionDefinition gondor = new FactionDefinition(
+                FactionId.of("gondor"),
+                "Gondor",
+                25,
+                10,
+                12,
+                Set.of(FactionId.of("missing_ally")),
+                Set.of(FactionId.of("missing_enemy")));
+        LinkedHashMap<FactionId, FactionDefinition> definitions = new LinkedHashMap<>();
+        definitions.put(gondor.id(), gondor);
+        FactionCatalog catalog = new FactionCatalog(definitions);
+
+        FactionAlignmentUpdateResult result = FactionAlignmentUpdater.apply(
+                FactionAlignment.empty(playerId()),
+                catalog,
+                gondor.id(),
+                new FactionAlignmentRule(3, 2, -2, "isolated_event"));
+
+        assertEquals(3, result.alignment().score(FactionId.of("gondor")), "isolated source changed");
+        assertEquals(0, result.alignment().score(FactionId.of("missing_ally")), "missing ally unchanged");
+        assertEquals(0, result.alignment().score(FactionId.of("missing_enemy")), "missing enemy unchanged");
+        assertEquals(1, result.changes().size(), "isolated change count");
+        assertChange(result.changes().get(0), "gondor", 0, 3, 3, "isolated_event");
     }
 
     private static void rejectsInvalidRules() {
