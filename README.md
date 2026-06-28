@@ -28,3 +28,7 @@ Build with the included Gradle wrapper:
 ```bash
 ./gradlew build
 ```
+
+Animated entity work uses GeckoLib 5.5.3 for NeoForge 26.2. The dependency is
+declared in Gradle and in the generated NeoForge mod metadata so clients and
+servers load it before animated Middle-earth entities are introduced.

@@ -9,3 +9,7 @@ Code or assets ported from `quentin452/The-Lord-of-the-Rings` are derived from G
 ## Recruits Reference
 
 `talhanation/recruits` is All Rights Reserved. It is used only as behavioral reference unless explicit permission or a compatible license is provided. Do not copy its source files, assets, UI, packet names, or class structure into this project.
+
+## Third-Party Runtime Libraries
+
+GeckoLib is used as an MIT-licensed runtime dependency for future animated Middle-earth entities and models. Keep GeckoLib code and assets as an external dependency; do not vendor its source into this repository.
