@@ -18,7 +18,7 @@ public final class GeckoLibDependencyMetadataTest {
         assertContains(gradleProperties, "geckolib_version=5.5.3", "GeckoLib version property");
         assertContains(buildGradle, "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/", "GeckoLib Maven repository");
         assertContains(buildGradle,
-                "implementation \"com.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}\"",
+                "implementation \"software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}\"",
                 "GeckoLib NeoForge dependency");
         assertContains(modMetadata, "modId=\"geckolib\"", "GeckoLib mod metadata dependency");
         assertContains(modMetadata, "versionRange=\"[${geckolib_version},)\"", "GeckoLib metadata version range");
