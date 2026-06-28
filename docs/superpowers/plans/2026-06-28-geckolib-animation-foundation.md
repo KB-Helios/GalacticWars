@@ -57,7 +57,7 @@ Add a `maven` block named `GeckoLib` to `repositories` with URL `https://dl.clou
 Add:
 
 ```groovy
-implementation "com.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
+implementation "software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
 ```
 
 - [ ] **Step 4: Add mod metadata dependency**
