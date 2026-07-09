@@ -84,7 +84,10 @@ import java.util.Optional;
 
 public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity {
     public static final int HIRE_COST_EMERALDS = 25;
-    private static final int WORKSITE_SCAN_RADIUS = 4;
+    private static final int DEFAULT_WORK_RADIUS = 8;
+    private static final int MIN_WORK_RADIUS = 2;
+    private static final int MAX_WORK_RADIUS = 32;
+    private static final int WORK_RADIUS_STEP = 2;
     private static final List<String> MERCHANT_TRADE_GOODS = List.of(
             "minecraft:wheat",
             "minecraft:cod",
@@ -109,6 +112,8 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
             SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_BASE_PROGRESS =
             SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_WORK_RADIUS =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<String> DATA_RESOURCE_ACTION =
             SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> DATA_RESOURCE_ITEM =
@@ -122,6 +127,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
     private ResourceInventory carriedResources = ResourceInventory.empty();
     private ResourceInventory storageResources = ResourceInventory.empty();
     private int starterBaseCompletedBlocks;
+    private int workRadius = DEFAULT_WORK_RADIUS;
 
     public MiddleEarthRecruitEntity(EntityType<? extends TamableAnimal> entityType, Level level) {
         super(entityType, level);
@@ -169,6 +175,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         entityData.define(DATA_STORAGE_RESOURCE_COUNT, 0);
         entityData.define(DATA_CARRIED_RESOURCE_COUNT, 0);
         entityData.define(DATA_BASE_PROGRESS, 0);
+        entityData.define(DATA_WORK_RADIUS, DEFAULT_WORK_RADIUS);
         entityData.define(DATA_RESOURCE_ACTION, "");
         entityData.define(DATA_RESOURCE_ITEM, "");
     }
@@ -192,6 +199,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         output.putString("WorkerCarriedResources", encodeResources(this.carriedResources));
         output.putString("WorkerStorageResources", encodeResources(this.storageResources));
         output.putInt("StarterBaseCompletedBlocks", this.starterBaseCompletedBlocks);
+        output.putInt("WorkRadius", this.workRadius);
         if (this.workTarget != null) {
             output.putInt("WorkTargetX", this.workTarget.getX());
             output.putInt("WorkTargetY", this.workTarget.getY());
@@ -223,6 +231,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         this.carriedResources = decodeResources(input.getStringOr("WorkerCarriedResources", ""));
         this.storageResources = decodeResources(input.getStringOr("WorkerStorageResources", ""));
         this.starterBaseCompletedBlocks = Math.max(0, input.getIntOr("StarterBaseCompletedBlocks", 0));
+        this.setWorkRadius(input.getIntOr("WorkRadius", DEFAULT_WORK_RADIUS));
         if (input.getInt("WorkTargetX").isPresent()
                 && input.getInt("WorkTargetY").isPresent()
                 && input.getInt("WorkTargetZ").isPresent()) {
@@ -316,6 +325,9 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         int displayedBaseProgress = this.level().isClientSide()
                 ? this.entityData.get(DATA_BASE_PROGRESS)
                 : this.starterBaseCompletedBlocks;
+        int displayedWorkRadius = this.level().isClientSide()
+                ? this.entityData.get(DATA_WORK_RADIUS)
+                : this.workRadius;
         lines.add(Component.translatable(
                 "screen.kingdomwarsmiddleearth.recruit.status.command",
                 Component.literal(this.getRecruitCommand().name().toLowerCase())));
@@ -332,6 +344,9 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         lines.add(Component.translatable(
                 "screen.kingdomwarsmiddleearth.recruit.status.worksite",
                 targetLabel(displayedWorkTarget)));
+        lines.add(Component.translatable(
+                "screen.kingdomwarsmiddleearth.recruit.status.work_radius",
+                displayedWorkRadius));
         lines.add(Component.translatable(
                 "screen.kingdomwarsmiddleearth.recruit.status.storage",
                 targetLabel(displayedStorageTarget),
@@ -420,6 +435,20 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                     this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
                 }
                 player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.worksite.clear"));
+                yield true;
+            }
+            case RecruitCommandMenu.BUTTON_WORK_RADIUS_DECREASE -> {
+                this.adjustWorkRadius(-WORK_RADIUS_STEP);
+                player.sendSystemMessage(Component.translatable(
+                        "message.kingdomwarsmiddleearth.recruit.worksite.radius",
+                        this.workRadius));
+                yield true;
+            }
+            case RecruitCommandMenu.BUTTON_WORK_RADIUS_INCREASE -> {
+                this.adjustWorkRadius(WORK_RADIUS_STEP);
+                player.sendSystemMessage(Component.translatable(
+                        "message.kingdomwarsmiddleearth.recruit.worksite.radius",
+                        this.workRadius));
                 yield true;
             }
             case RecruitCommandMenu.BUTTON_SET_STORAGE -> {
@@ -737,8 +766,9 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         if (this.workTarget == null) {
             return Optional.empty();
         }
-        BlockPos min = this.workTarget.offset(-WORKSITE_SCAN_RADIUS, -1, -WORKSITE_SCAN_RADIUS);
-        BlockPos max = this.workTarget.offset(WORKSITE_SCAN_RADIUS, 3, WORKSITE_SCAN_RADIUS);
+        int radius = this.worksiteScanRadius();
+        BlockPos min = this.workTarget.offset(-radius, -1, -radius);
+        BlockPos max = this.workTarget.offset(radius, 3, radius);
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             BlockState state = this.level().getBlockState(pos);
             if (isHarvestableFor(profession, state)) {
@@ -752,8 +782,9 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         if (this.workTarget == null) {
             return Optional.empty();
         }
-        BlockPos min = this.workTarget.offset(-WORKSITE_SCAN_RADIUS, -1, -WORKSITE_SCAN_RADIUS);
-        BlockPos max = this.workTarget.offset(WORKSITE_SCAN_RADIUS, 1, WORKSITE_SCAN_RADIUS);
+        int radius = this.worksiteScanRadius();
+        BlockPos min = this.workTarget.offset(-radius, -1, -radius);
+        BlockPos max = this.workTarget.offset(radius, 1, radius);
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             if (this.level().getBlockState(pos).getBlock() == Blocks.WATER) {
                 return Optional.of(pos.immutable());
@@ -766,8 +797,9 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         if (this.workTarget == null) {
             return Optional.empty();
         }
-        BlockPos min = this.workTarget.offset(-WORKSITE_SCAN_RADIUS, -1, -WORKSITE_SCAN_RADIUS);
-        BlockPos max = this.workTarget.offset(WORKSITE_SCAN_RADIUS, 3, WORKSITE_SCAN_RADIUS);
+        int radius = this.worksiteScanRadius();
+        BlockPos min = this.workTarget.offset(-radius, -1, -radius);
+        BlockPos max = this.workTarget.offset(radius, 3, radius);
         AABB animalPen = new AABB(
                 min.getX(),
                 min.getY(),
@@ -776,6 +808,10 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                 max.getY() + 1.0,
                 max.getZ() + 1.0);
         return this.level().getEntitiesOfClass(Animal.class, animalPen, Animal::isAlive).stream().findFirst();
+    }
+
+    private int worksiteScanRadius() {
+        return Math.max(MIN_WORK_RADIUS, Math.min(MAX_WORK_RADIUS, this.workRadius));
     }
 
     private static boolean isHarvestableFor(WorkerProfession profession, BlockState state) {
@@ -876,6 +912,16 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         this.syncRecruitStatusState();
     }
 
+    private void adjustWorkRadius(int delta) {
+        this.setWorkRadius(this.workRadius + delta);
+    }
+
+    private void setWorkRadius(int radius) {
+        this.workRadius = Math.max(MIN_WORK_RADIUS, Math.min(MAX_WORK_RADIUS, radius));
+        this.entityData.set(DATA_WORK_RADIUS, this.workRadius);
+        this.syncRecruitStatusState();
+    }
+
     private void syncRecruitStatusState() {
         this.entityData.set(DATA_WORK_TARGET, Optional.ofNullable(this.workTarget));
         this.entityData.set(DATA_STORAGE_TARGET, Optional.ofNullable(this.storageTarget));
@@ -883,6 +929,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         this.entityData.set(DATA_STORAGE_RESOURCE_COUNT, this.storageResources.totalCount());
         this.entityData.set(DATA_CARRIED_RESOURCE_COUNT, this.carriedResources.totalCount());
         this.entityData.set(DATA_BASE_PROGRESS, this.starterBaseCompletedBlocks);
+        this.entityData.set(DATA_WORK_RADIUS, this.workRadius);
         Optional<WorkerResourceDecision> decision = this.planResourceDecision();
         this.entityData.set(DATA_RESOURCE_ACTION, decision
                 .map(value -> value.action().name().toLowerCase())
@@ -925,7 +972,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                         this.workTarget.getX(),
                         this.workTarget.getY(),
                         this.workTarget.getZ(),
-                        8));
+                        this.workRadius));
     }
 
     private Optional<WorkerLogisticsRoute> createCourierRoute() {
@@ -944,7 +991,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                         this.workTarget.getX(),
                         this.workTarget.getY(),
                         this.workTarget.getZ(),
-                        8)));
+                        this.workRadius)));
     }
 
     private void applyWorkerEquipment(WorkerProfession profession) {

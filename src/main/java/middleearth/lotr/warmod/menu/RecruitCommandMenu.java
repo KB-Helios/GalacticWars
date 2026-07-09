@@ -25,6 +25,8 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     public static final int BUTTON_CLEAR_WORKSITE = 9;
     public static final int BUTTON_SET_STORAGE = 10;
     public static final int BUTTON_BUILD_STARTER_KEEP = 11;
+    public static final int BUTTON_WORK_RADIUS_DECREASE = 12;
+    public static final int BUTTON_WORK_RADIUS_INCREASE = 13;
     public static final int BUTTON_ASSIGN_FARMER = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID;
     public static final int BUTTON_ASSIGN_LUMBERJACK = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 1;
     public static final int BUTTON_ASSIGN_FISHERMAN = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 2;

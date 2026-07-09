@@ -51,7 +51,7 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
         boolean tame = entity instanceof MiddleEarthRecruitEntity recruit && recruit.isTame();
 
         int x = (this.width - BUTTON_WIDTH) / 2;
-        int y = Math.max(8, (this.height - ((ownedByPlayer ? 11 : 1) * (BUTTON_HEIGHT + GAP))) / 2);
+        int y = Math.max(8, (this.height - ((ownedByPlayer ? 13 : 1) * (BUTTON_HEIGHT + GAP))) / 2);
         if (!tame) {
             this.addButton(x, y, "screen.kingdomwarsmiddleearth.recruit.hire", RecruitCommandMenu.BUTTON_HIRE);
             return;
@@ -79,6 +79,8 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
         this.addButton(commandX, y + 8 * (BUTTON_HEIGHT + GAP), "screen.kingdomwarsmiddleearth.recruit.worksite.clear", RecruitCommandMenu.BUTTON_CLEAR_WORKSITE);
         this.addButton(commandX, y + 9 * (BUTTON_HEIGHT + GAP), "screen.kingdomwarsmiddleearth.recruit.storage.set", RecruitCommandMenu.BUTTON_SET_STORAGE);
         this.addButton(commandX, y + 10 * (BUTTON_HEIGHT + GAP), "screen.kingdomwarsmiddleearth.recruit.base.starter_keep", RecruitCommandMenu.BUTTON_BUILD_STARTER_KEEP);
+        this.addButton(commandX, y + 11 * (BUTTON_HEIGHT + GAP), "screen.kingdomwarsmiddleearth.recruit.worksite.radius.decrease", RecruitCommandMenu.BUTTON_WORK_RADIUS_DECREASE);
+        this.addButton(commandX, y + 12 * (BUTTON_HEIGHT + GAP), "screen.kingdomwarsmiddleearth.recruit.worksite.radius.increase", RecruitCommandMenu.BUTTON_WORK_RADIUS_INCREASE);
 
         int[] workerProfessionButtonIds = RecruitCommandMenu.workerProfessionButtonIds();
         for (int i = 0; i < workerProfessionButtonIds.length; i++) {

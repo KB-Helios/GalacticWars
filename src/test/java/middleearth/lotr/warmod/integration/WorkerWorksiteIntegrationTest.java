@@ -23,6 +23,8 @@ public final class WorkerWorksiteIntegrationTest {
         assertContains(menu, "BUTTON_SET_WORKSITE", "set worksite button");
         assertContains(menu, "BUTTON_RETURN_WORKSITE", "return worksite button");
         assertContains(menu, "BUTTON_CLEAR_WORKSITE", "clear worksite button");
+        assertContains(menu, "BUTTON_WORK_RADIUS_DECREASE", "decrease work radius button");
+        assertContains(menu, "BUTTON_WORK_RADIUS_INCREASE", "increase work radius button");
     }
 
     private static void recruitPersistsWorksiteAndUsesWorkCommand() throws IOException {
@@ -32,9 +34,15 @@ public final class WorkerWorksiteIntegrationTest {
         assertContains(actions, "WORK_AT_SITE", "work command action");
         assertContains(entity, "workTarget", "work target field");
         assertContains(entity, "\"WorkTargetX\"", "work target save x");
+        assertContains(entity, "\"WorkRadius\"", "work radius save key");
+        assertContains(entity, "DATA_WORK_RADIUS", "synched work radius");
+        assertContains(entity, "WorkerWorksite(\n                        area,\n                        this.workTarget.getX(),\n                        this.workTarget.getY(),\n                        this.workTarget.getZ(),\n                        this.workRadius)", "worksite uses recruit radius");
+        assertContains(entity, "worksiteScanRadius()", "scan uses configured work radius");
         assertContains(entity, "BUTTON_SET_WORKSITE", "set worksite handling");
         assertContains(entity, "BUTTON_RETURN_WORKSITE", "return worksite handling");
         assertContains(entity, "BUTTON_CLEAR_WORKSITE", "clear worksite handling");
+        assertContains(entity, "BUTTON_WORK_RADIUS_DECREASE", "decrease radius handling");
+        assertContains(entity, "BUTTON_WORK_RADIUS_INCREASE", "increase radius handling");
         assertContains(entity, "WorkerTaskPlanner.plan", "task planner hook");
     }
 
@@ -44,6 +52,8 @@ public final class WorkerWorksiteIntegrationTest {
         assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.worksite.set", "set worksite screen label");
         assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.worksite.return", "return worksite screen label");
         assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.worksite.clear", "clear worksite screen label");
+        assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.worksite.radius.decrease", "decrease radius screen label");
+        assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.worksite.radius.increase", "increase radius screen label");
     }
 
     private static void languageContainsWorksiteMessages() throws IOException {
@@ -52,10 +62,14 @@ public final class WorkerWorksiteIntegrationTest {
         assertContains(language, "\"screen.kingdomwarsmiddleearth.recruit.worksite.set\"", "set label translation");
         assertContains(language, "\"screen.kingdomwarsmiddleearth.recruit.worksite.return\"", "return label translation");
         assertContains(language, "\"screen.kingdomwarsmiddleearth.recruit.worksite.clear\"", "clear label translation");
+        assertContains(language, "\"screen.kingdomwarsmiddleearth.recruit.worksite.radius.decrease\"", "decrease radius label translation");
+        assertContains(language, "\"screen.kingdomwarsmiddleearth.recruit.worksite.radius.increase\"", "increase radius label translation");
+        assertContains(language, "\"screen.kingdomwarsmiddleearth.recruit.status.work_radius\"", "work radius status translation");
         assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.worksite.set\"", "set message translation");
         assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.worksite.return\"", "return message translation");
         assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.worksite.missing\"", "missing message translation");
         assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.worksite.clear\"", "clear message translation");
+        assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.worksite.radius\"", "radius message translation");
     }
 
     private static String read(String path) throws IOException {
