@@ -19,7 +19,8 @@ public final class RecruitStatusGuiIntegrationTest {
     private static void screenRendersRecruitStatusPanel() throws IOException {
         String screen = read("src/main/java/middleearth/lotr/warmod/client/gui/RecruitCommandScreen.java");
 
-        assertContains(screen, "GuiGraphics", "gui graphics render parameter");
+        assertContains(screen, "GuiGraphicsExtractor", "gui graphics extraction parameter");
+        assertContains(screen, "extractRenderState", "status extraction method");
         assertContains(screen, "drawRecruitStatusPanel", "status panel method");
         assertContains(screen, "recruit.recruitStatusLines()", "entity status lines");
         assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.status.title", "status title label");

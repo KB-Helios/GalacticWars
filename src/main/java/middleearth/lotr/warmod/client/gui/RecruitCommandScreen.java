@@ -2,7 +2,7 @@ package middleearth.lotr.warmod.client.gui;
 
 import middleearth.lotr.warmod.entity.MiddleEarthRecruitEntity;
 import middleearth.lotr.warmod.menu.RecruitCommandMenu;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.MenuAccess;
@@ -93,12 +93,12 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         if (this.minecraft != null && this.minecraft.level != null) {
             Entity entity = this.minecraft.level.getEntity(this.menu.recruitEntityId());
             if (entity instanceof MiddleEarthRecruitEntity recruit) {
-                this.drawRecruitStatusPanel(guiGraphics, recruit);
+                this.drawRecruitStatusPanel(graphics, recruit);
             }
         }
     }
@@ -127,14 +127,14 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 .build());
     }
 
-    private void drawRecruitStatusPanel(GuiGraphics guiGraphics, MiddleEarthRecruitEntity recruit) {
+    private void drawRecruitStatusPanel(GuiGraphicsExtractor graphics, MiddleEarthRecruitEntity recruit) {
         int x = Math.max(8, (this.width - (BUTTON_WIDTH * 2 + COLUMN_GAP)) / 2);
         int y = 8;
-        guiGraphics.drawString(this.font, Component.translatable("screen.kingdomwarsmiddleearth.recruit.status.title"), x, y, STATUS_COLOR);
+        graphics.text(this.font, Component.translatable("screen.kingdomwarsmiddleearth.recruit.status.title"), x, y, STATUS_COLOR);
         List<Component> statusLines = recruit.recruitStatusLines();
         int lineY = y + 12;
         for (Component line : statusLines) {
-            guiGraphics.drawString(this.font, line, x, lineY, STATUS_MUTED_COLOR);
+            graphics.text(this.font, line, x, lineY, STATUS_MUTED_COLOR);
             lineY += 10;
         }
     }
