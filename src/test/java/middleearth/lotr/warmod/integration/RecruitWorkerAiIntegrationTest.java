@@ -13,6 +13,7 @@ public final class RecruitWorkerAiIntegrationTest {
         recruitPersistsWorkerResourceState();
         recruitCanAdvanceWorkerCycle();
         recruitHarvestsRealWorksiteBlocks();
+        recruitRunsConcreteProfessionWork();
         recruitUsesCourierLogisticsPlanner();
         workerGoalDelegatesToRecruitCycle();
 
@@ -59,6 +60,20 @@ public final class RecruitWorkerAiIntegrationTest {
         assertContains(entity, "Blocks.STONE", "miner target block");
         assertContains(entity, "Blocks.WHEAT", "farmer target block");
         assertContains(entity, "state.canBeReplaced()", "builder can place through replaceable blocks");
+    }
+
+    private static void recruitRunsConcreteProfessionWork() throws IOException {
+        String entity = read("src/main/java/middleearth/lotr/warmod/entity/MiddleEarthRecruitEntity.java");
+
+        assertContains(entity, "tryPerformProfessionWork", "profession-specific work hook");
+        assertContains(entity, "tryFishAtWorksite", "fisherman water work");
+        assertContains(entity, "Blocks.WATER", "fisherman water target");
+        assertContains(entity, "tryGatherFromAnimalPen", "animal farmer pen work");
+        assertContains(entity, "Animal.class", "animal farmer nearby animal scan");
+        assertContains(entity, "tryCookFromStorage", "cook storage recipe");
+        assertContains(entity, "\"minecraft:wheat\", 3", "cook wheat recipe cost");
+        assertContains(entity, "tryTradeGoodsForEmeralds", "merchant trade work");
+        assertContains(entity, "\"minecraft:emerald\"", "merchant emerald output");
     }
 
     private static void recruitUsesCourierLogisticsPlanner() throws IOException {

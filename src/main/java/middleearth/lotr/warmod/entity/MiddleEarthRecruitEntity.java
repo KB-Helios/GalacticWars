@@ -73,6 +73,7 @@ import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -83,6 +84,14 @@ import java.util.Optional;
 
 public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity {
     public static final int HIRE_COST_EMERALDS = 25;
+    private static final int WORKSITE_SCAN_RADIUS = 4;
+    private static final List<String> MERCHANT_TRADE_GOODS = List.of(
+            "minecraft:wheat",
+            "minecraft:cod",
+            "minecraft:leather",
+            "minecraft:bread",
+            "minecraft:oak_log",
+            "minecraft:cobblestone");
 
     private static final EntityDataAccessor<Integer> DATA_COMMAND =
             SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
@@ -615,8 +624,12 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
 
         WorkerResourceDecision decision = this.planResourceDecision().orElseThrow();
         if (decision.action() == WorkerResourceAction.GATHER_RESOURCE) {
-            if (this.tryHarvestWorksiteResource(this.getWorkerProfession().orElseThrow(), decision)) {
+            WorkerProfession profession = this.getWorkerProfession().orElseThrow();
+            if (this.tryPerformProfessionWork(profession, decision)) {
                 return true;
+            }
+            if (requiresConcreteProfessionWork(profession)) {
+                return false;
             }
             this.carriedResources = this.carriedResources.withAdded(decision.itemId(), decision.quantity());
             this.syncRecruitStatusState();
@@ -651,6 +664,56 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         return true;
     }
 
+    private boolean tryPerformProfessionWork(WorkerProfession profession, WorkerResourceDecision decision) {
+        return switch (profession) {
+            case FISHERMAN -> this.tryFishAtWorksite(decision);
+            case ANIMAL_FARMER -> this.tryGatherFromAnimalPen(decision);
+            case COOK -> this.tryCookFromStorage();
+            case MERCHANT -> this.tryTradeGoodsForEmeralds();
+            default -> this.tryHarvestWorksiteResource(profession, decision);
+        };
+    }
+
+    private boolean tryFishAtWorksite(WorkerResourceDecision decision) {
+        if (this.findWaterTarget().isEmpty()) {
+            return false;
+        }
+        this.carriedResources = this.carriedResources.withAdded(decision.itemId(), decision.quantity());
+        this.syncRecruitStatusState();
+        return true;
+    }
+
+    private boolean tryGatherFromAnimalPen(WorkerResourceDecision decision) {
+        if (this.findNearbyAnimal().isEmpty()) {
+            return false;
+        }
+        this.carriedResources = this.carriedResources.withAdded(decision.itemId(), decision.quantity());
+        this.syncRecruitStatusState();
+        return true;
+    }
+
+    private boolean tryCookFromStorage() {
+        if (!this.storageResources.hasAtLeast("minecraft:wheat", 3)) {
+            return false;
+        }
+        this.storageResources = this.storageResources.withRemoved("minecraft:wheat", 3);
+        this.carriedResources = this.carriedResources.withAdded("minecraft:bread", 1);
+        this.syncRecruitStatusState();
+        return true;
+    }
+
+    private boolean tryTradeGoodsForEmeralds() {
+        for (String itemId : MERCHANT_TRADE_GOODS) {
+            if (this.storageResources.count(itemId) > 0) {
+                this.storageResources = this.storageResources.withRemoved(itemId, 1);
+                this.carriedResources = this.carriedResources.withAdded("minecraft:emerald", 1);
+                this.syncRecruitStatusState();
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean tryHarvestWorksiteResource(WorkerProfession profession, WorkerResourceDecision decision) {
         Optional<BlockPos> target = this.findHarvestTarget(profession);
         if (target.isEmpty()) {
@@ -674,9 +737,8 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         if (this.workTarget == null) {
             return Optional.empty();
         }
-        int radius = 4;
-        BlockPos min = this.workTarget.offset(-radius, -1, -radius);
-        BlockPos max = this.workTarget.offset(radius, 3, radius);
+        BlockPos min = this.workTarget.offset(-WORKSITE_SCAN_RADIUS, -1, -WORKSITE_SCAN_RADIUS);
+        BlockPos max = this.workTarget.offset(WORKSITE_SCAN_RADIUS, 3, WORKSITE_SCAN_RADIUS);
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             BlockState state = this.level().getBlockState(pos);
             if (isHarvestableFor(profession, state)) {
@@ -684,6 +746,36 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
             }
         }
         return Optional.empty();
+    }
+
+    private Optional<BlockPos> findWaterTarget() {
+        if (this.workTarget == null) {
+            return Optional.empty();
+        }
+        BlockPos min = this.workTarget.offset(-WORKSITE_SCAN_RADIUS, -1, -WORKSITE_SCAN_RADIUS);
+        BlockPos max = this.workTarget.offset(WORKSITE_SCAN_RADIUS, 1, WORKSITE_SCAN_RADIUS);
+        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+            if (this.level().getBlockState(pos).getBlock() == Blocks.WATER) {
+                return Optional.of(pos.immutable());
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Animal> findNearbyAnimal() {
+        if (this.workTarget == null) {
+            return Optional.empty();
+        }
+        BlockPos min = this.workTarget.offset(-WORKSITE_SCAN_RADIUS, -1, -WORKSITE_SCAN_RADIUS);
+        BlockPos max = this.workTarget.offset(WORKSITE_SCAN_RADIUS, 3, WORKSITE_SCAN_RADIUS);
+        AABB animalPen = new AABB(
+                min.getX(),
+                min.getY(),
+                min.getZ(),
+                max.getX() + 1.0,
+                max.getY() + 1.0,
+                max.getZ() + 1.0);
+        return this.level().getEntitiesOfClass(Animal.class, animalPen, Animal::isAlive).stream().findFirst();
     }
 
     private static boolean isHarvestableFor(WorkerProfession profession, BlockState state) {
@@ -699,6 +791,13 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                     && cropBlock.isMaxAge(state);
             default -> false;
         };
+    }
+
+    private static boolean requiresConcreteProfessionWork(WorkerProfession profession) {
+        return profession == WorkerProfession.FISHERMAN
+                || profession == WorkerProfession.ANIMAL_FARMER
+                || profession == WorkerProfession.COOK
+                || profession == WorkerProfession.MERCHANT;
     }
 
     private void depositCarriedResources() {
