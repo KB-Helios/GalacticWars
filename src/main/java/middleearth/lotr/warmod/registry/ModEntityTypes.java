@@ -18,6 +18,10 @@ public final class ModEntityTypes {
             registerRecruit("rohan_recruit");
     public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> MORDOR_ORC_RECRUIT =
             registerRecruit("mordor_orc_recruit");
+    public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> DWARF_RECRUIT =
+            registerRecruit("dwarf_recruit");
+    public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> ELF_RECRUIT =
+            registerRecruit("elf_recruit");
 
     private ModEntityTypes() {
     }

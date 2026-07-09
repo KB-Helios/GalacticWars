@@ -29,6 +29,8 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.GONDOR_RECRUIT_SPAWN_EGG.get());
                         output.accept(ModItems.ROHAN_RECRUIT_SPAWN_EGG.get());
                         output.accept(ModItems.MORDOR_ORC_RECRUIT_SPAWN_EGG.get());
+                        output.accept(ModItems.DWARF_RECRUIT_SPAWN_EGG.get());
+                        output.accept(ModItems.ELF_RECRUIT_SPAWN_EGG.get());
                     })
                     .build());
 

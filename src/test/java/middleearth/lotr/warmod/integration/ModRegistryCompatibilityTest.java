@@ -12,7 +12,7 @@ public final class ModRegistryCompatibilityTest {
         spawnEggUsesDeferredItemIdInjection();
         spawnEggModelUsesCurrentItemModelFormat();
         registeredItemsHaveItemModelDefinitions();
-        recruitRendererUsesSoldierHumanoidLayer();
+        recruitRendererUsesGeckoLibRenderer();
 
         System.out.println("ModRegistryCompatibilityTest passed");
     }
@@ -52,16 +52,22 @@ public final class ModRegistryCompatibilityTest {
         assertRegularFile("src/main/resources/assets/kingdomwarsmiddleearth/textures/item/gondor_recruit_spawn_egg.png");
     }
 
-    private static void recruitRendererUsesSoldierHumanoidLayer() throws IOException {
+    private static void recruitRendererUsesGeckoLibRenderer() throws IOException {
         String renderer = Files.readString(Path.of(
                 "src/main/java/middleearth/lotr/warmod/client/render/MiddleEarthRecruitRenderer.java"));
 
         assertContains(renderer,
-                "context.bakeLayer(ModelLayers.PLAYER)",
-                "recruit renderer should use a player-shaped soldier humanoid layer");
+                "extends GeoEntityRenderer",
+                "recruit renderer should use GeckoLib's entity renderer");
+        assertContains(renderer,
+                "EntityType<MiddleEarthRecruitEntity>",
+                "recruit renderer should bind each recruit variant to its registered entity type");
         assertNotContains(renderer,
                 "context.bakeLayer(ModelLayers.ZOMBIE)",
                 "recruit renderer must not use the zombie layer for soldiers");
+        assertNotContains(renderer,
+                "HumanoidMobRenderer",
+                "recruit renderer must not use vanilla mob humanoid rendering for GeckoLib recruits");
     }
 
     private static void assertContains(String haystack, String needle, String label) {

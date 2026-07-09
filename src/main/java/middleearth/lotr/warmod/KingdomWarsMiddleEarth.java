@@ -51,12 +51,16 @@ public class KingdomWarsMiddleEarth {
         registerRecruitAttributes(event, ModEntityTypes.GONDOR_RECRUIT.get());
         registerRecruitAttributes(event, ModEntityTypes.ROHAN_RECRUIT.get());
         registerRecruitAttributes(event, ModEntityTypes.MORDOR_ORC_RECRUIT.get());
+        registerRecruitAttributes(event, ModEntityTypes.DWARF_RECRUIT.get());
+        registerRecruitAttributes(event, ModEntityTypes.ELF_RECRUIT.get());
     }
 
     private void registerSpawnPlacements(RegisterSpawnPlacementsEvent event) {
         registerRecruitSpawnPlacement(event, ModEntityTypes.GONDOR_RECRUIT.get());
         registerRecruitSpawnPlacement(event, ModEntityTypes.ROHAN_RECRUIT.get());
         registerRecruitSpawnPlacement(event, ModEntityTypes.MORDOR_ORC_RECRUIT.get());
+        registerRecruitSpawnPlacement(event, ModEntityTypes.DWARF_RECRUIT.get());
+        registerRecruitSpawnPlacement(event, ModEntityTypes.ELF_RECRUIT.get());
     }
 
     private static void registerRecruitAttributes(

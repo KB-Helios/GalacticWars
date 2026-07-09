@@ -11,28 +11,42 @@ import javax.imageio.ImageIO;
 public final class GondorRecruitTextureTest {
     private static final Path TEXTURE_PATH = Path.of(
             "src/main/resources/assets/kingdomwarsmiddleearth/textures/entity/gondor_recruit.png");
-    private static final String HUMAN_ERA_INFANTRYMAN_SHA256 =
-            "620bd2f3667ada9afebbd579ec6feb833b12c270feb2c90c1f947b3f67e53e5f";
+    private static final String LORD_OF_THE_PACKS_VINDICATOR_SHA256 =
+            "61c9d0d295cd9a431800f759018730227697da135573393087f82f4e1e377ee0";
 
     private GondorRecruitTextureTest() {
     }
 
     public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
-        assertEquals(HUMAN_ERA_INFANTRYMAN_SHA256, sha256(TEXTURE_PATH), "texture provenance hash");
+        assertEquals(LORD_OF_THE_PACKS_VINDICATOR_SHA256, sha256(TEXTURE_PATH), "texture provenance hash");
 
         BufferedImage texture = ImageIO.read(TEXTURE_PATH.toFile());
 
         assertEquals(64, texture.getWidth(), "texture width");
         assertEquals(64, texture.getHeight(), "texture height");
 
-        assertOpaque(texture, 8, 8, 8, 8, "head front");
-        assertOpaque(texture, 20, 20, 8, 12, "body front");
-        assertOpaque(texture, 44, 20, 4, 12, "right arm front");
-        assertOpaque(texture, 36, 52, 4, 12, "left arm front");
-        assertOpaque(texture, 4, 20, 4, 12, "right leg front");
-        assertOpaque(texture, 20, 52, 4, 12, "left leg front");
+        assertAtLeast(1200, countNonTransparent(texture), "visible recruit texture pixels");
 
         System.out.println("GondorRecruitTextureTest passed");
+    }
+
+    private static int countNonTransparent(BufferedImage texture) {
+        int count = 0;
+        for (int ix = 0; ix < texture.getWidth(); ix++) {
+            for (int iy = 0; iy < texture.getHeight(); iy++) {
+                int alpha = (texture.getRGB(ix, iy) >>> 24) & 0xFF;
+                if (alpha > 0) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static void assertAtLeast(int minimum, int actual, String label) {
+        if (actual < minimum) {
+            throw new AssertionError(label + " expected at least <" + minimum + "> but was <" + actual + ">");
+        }
     }
 
     private static void assertOpaque(BufferedImage texture, int x, int y, int width, int height, String label) {

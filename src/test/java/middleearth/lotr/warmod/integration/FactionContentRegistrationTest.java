@@ -8,7 +8,9 @@ public final class FactionContentRegistrationTest {
     private static final String[] ENTITY_IDS = {
             "gondor_recruit",
             "rohan_recruit",
-            "mordor_orc_recruit"
+            "mordor_orc_recruit",
+            "dwarf_recruit",
+            "elf_recruit"
     };
     private static final String[] FACTION_ITEMS = {
             "gondor_steel_ingot",

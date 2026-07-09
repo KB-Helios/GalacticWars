@@ -34,6 +34,12 @@ public final class ModItems {
     public static final DeferredItem<SpawnEggItem> MORDOR_ORC_RECRUIT_SPAWN_EGG =
             ITEMS.registerItem("mordor_orc_recruit_spawn_egg",
                     properties -> new SpawnEggItem(properties.spawnEgg(ModEntityTypes.MORDOR_ORC_RECRUIT.get())));
+    public static final DeferredItem<SpawnEggItem> DWARF_RECRUIT_SPAWN_EGG =
+            ITEMS.registerItem("dwarf_recruit_spawn_egg",
+                    properties -> new SpawnEggItem(properties.spawnEgg(ModEntityTypes.DWARF_RECRUIT.get())));
+    public static final DeferredItem<SpawnEggItem> ELF_RECRUIT_SPAWN_EGG =
+            ITEMS.registerItem("elf_recruit_spawn_egg",
+                    properties -> new SpawnEggItem(properties.spawnEgg(ModEntityTypes.ELF_RECRUIT.get())));
 
     private ModItems() {
     }

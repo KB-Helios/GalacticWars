@@ -25,6 +25,7 @@ public final class AssetReferenceIntegrityTest {
         itemDefinitionsReferenceExistingItemModels();
         modelsReferenceExistingModTextures();
         recruitRenderTexturesExist();
+        geckoRecruitAssetsExist();
         biomeSpawnModifiersReferenceRegisteredEntities();
         builtJarContainsModAssetsAndData();
 
@@ -69,13 +70,27 @@ public final class AssetReferenceIntegrityTest {
         String client = Files.readString(Path.of("src/main/java/middleearth/lotr/warmod/KingdomWarsMiddleEarthClient.java"));
         String renderer = Files.readString(Path.of("src/main/java/middleearth/lotr/warmod/client/render/MiddleEarthRecruitRenderer.java"));
 
-        assertContains(renderer, "this(context, \"gondor_recruit\")", "gondor recruit renderer default texture");
-        assertContains(client, "\"rohan_recruit\"", "rohan recruit renderer texture");
-        assertContains(client, "\"mordor_orc_recruit\"", "mordor recruit renderer texture");
+        assertContains(renderer, "GeoEntityRenderer", "GeckoLib recruit renderer");
+        assertContains(client, "ModEntityTypes.GONDOR_RECRUIT.get()", "gondor recruit renderer");
+        assertContains(client, "ModEntityTypes.ROHAN_RECRUIT.get()", "rohan recruit renderer");
+        assertContains(client, "ModEntityTypes.MORDOR_ORC_RECRUIT.get()", "mordor recruit renderer");
+        assertContains(client, "ModEntityTypes.DWARF_RECRUIT.get()", "dwarf recruit renderer");
+        assertContains(client, "ModEntityTypes.ELF_RECRUIT.get()", "elf recruit renderer");
 
         assertRegularFile(MOD_ASSET_ROOT.resolve("textures/entity/gondor_recruit.png"), "gondor recruit texture");
         assertRegularFile(MOD_ASSET_ROOT.resolve("textures/entity/rohan_recruit.png"), "rohan recruit texture");
         assertRegularFile(MOD_ASSET_ROOT.resolve("textures/entity/mordor_orc_recruit.png"), "mordor recruit texture");
+        assertRegularFile(MOD_ASSET_ROOT.resolve("textures/entity/dwarf_recruit.png"), "dwarf recruit texture");
+        assertRegularFile(MOD_ASSET_ROOT.resolve("textures/entity/elf_recruit.png"), "elf recruit texture");
+    }
+
+    private static void geckoRecruitAssetsExist() {
+        for (String recruit : Set.of("gondor_recruit", "rohan_recruit", "mordor_orc_recruit", "dwarf_recruit", "elf_recruit")) {
+            assertRegularFile(MOD_ASSET_ROOT.resolve("geckolib/models/entity/" + recruit + ".geo.json"),
+                    "GeckoLib model " + recruit);
+            assertRegularFile(MOD_ASSET_ROOT.resolve("geckolib/animations/entity/" + recruit + ".animation.json"),
+                    "GeckoLib animation " + recruit);
+        }
     }
 
     private static void biomeSpawnModifiersReferenceRegisteredEntities() throws IOException {
@@ -83,6 +98,8 @@ public final class AssetReferenceIntegrityTest {
         assertContains(entities, "\"gondor_recruit\"", "gondor recruit entity registration");
         assertContains(entities, "\"rohan_recruit\"", "rohan recruit entity registration");
         assertContains(entities, "\"mordor_orc_recruit\"", "mordor recruit entity registration");
+        assertContains(entities, "\"dwarf_recruit\"", "dwarf recruit entity registration");
+        assertContains(entities, "\"elf_recruit\"", "elf recruit entity registration");
 
         try (Stream<Path> files = Files.walk(MOD_DATA_ROOT.resolve("neoforge/biome_modifier"))) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {

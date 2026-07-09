@@ -34,13 +34,21 @@ public class KingdomWarsMiddleEarthClient {
 
     @SubscribeEvent
     static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
-        event.registerEntityRenderer(ModEntityTypes.GONDOR_RECRUIT.get(), MiddleEarthRecruitRenderer::new);
+        event.registerEntityRenderer(
+                ModEntityTypes.GONDOR_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.GONDOR_RECRUIT.get()));
         event.registerEntityRenderer(
                 ModEntityTypes.ROHAN_RECRUIT.get(),
-                context -> new MiddleEarthRecruitRenderer(context, "rohan_recruit"));
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.ROHAN_RECRUIT.get()));
         event.registerEntityRenderer(
                 ModEntityTypes.MORDOR_ORC_RECRUIT.get(),
-                context -> new MiddleEarthRecruitRenderer(context, "mordor_orc_recruit"));
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.MORDOR_ORC_RECRUIT.get()));
+        event.registerEntityRenderer(
+                ModEntityTypes.DWARF_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.DWARF_RECRUIT.get()));
+        event.registerEntityRenderer(
+                ModEntityTypes.ELF_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.ELF_RECRUIT.get()));
     }
 
     @SubscribeEvent

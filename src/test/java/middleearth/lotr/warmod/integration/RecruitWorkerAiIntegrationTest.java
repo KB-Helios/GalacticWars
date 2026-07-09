@@ -45,6 +45,7 @@ public final class RecruitWorkerAiIntegrationTest {
         assertContains(entity, "WorkerResourceAction.DEPOSIT_TO_STORAGE", "deposit action handling");
         assertContains(entity, "KingdomBaseBuildAction.PLACE_BLOCK", "base place action handling");
         assertContains(entity, "completeNextStarterBaseBlock", "base placement method");
+        assertContains(entity, "this.level().isClientSide()", "server-only worker cycle guard");
     }
 
     private static void recruitHarvestsRealWorksiteBlocks() throws IOException {
@@ -57,6 +58,7 @@ public final class RecruitWorkerAiIntegrationTest {
         assertContains(entity, "Blocks.OAK_LOG", "lumberjack target block");
         assertContains(entity, "Blocks.STONE", "miner target block");
         assertContains(entity, "Blocks.WHEAT", "farmer target block");
+        assertContains(entity, "state.canBeReplaced()", "builder can place through replaceable blocks");
     }
 
     private static void recruitUsesCourierLogisticsPlanner() throws IOException {

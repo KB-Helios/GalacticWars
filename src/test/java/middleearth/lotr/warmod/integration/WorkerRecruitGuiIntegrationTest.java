@@ -56,6 +56,8 @@ public final class WorkerRecruitGuiIntegrationTest {
         assertContains(entity, "DATA_WORKER_PROFESSION", "synched worker profession");
         assertContains(entity, "WorkerProfessionCatalog.professionForButton(buttonId)", "button to profession mapping");
         assertContains(entity, "setWorkerProfession", "profession setter");
+        assertContains(entity, "resumeWorkAfterProfessionAssignment", "profession assignment resumes work");
+        assertContains(entity, "RecruitmentAction.WORK_AT_SITE", "profession assignment can activate work mode");
         assertContains(entity, "\"WorkerProfession\"", "profession save data");
         assertContains(entity, "applyWorkerEquipment", "role equipment application");
     }
@@ -64,6 +66,10 @@ public final class WorkerRecruitGuiIntegrationTest {
         String screen = read("src/main/java/middleearth/lotr/warmod/client/gui/RecruitCommandScreen.java");
 
         assertContains(screen, "workerProfessionButtonIds", "screen uses menu role buttons");
+        assertContains(
+                screen,
+                "Entity entity = (this.minecraft != null && this.minecraft.level != null)",
+                "screen init null-safe entity lookup");
         for (String key : PROFESSION_TRANSLATIONS) {
             assertContains(screen, key, "screen role key " + key);
         }

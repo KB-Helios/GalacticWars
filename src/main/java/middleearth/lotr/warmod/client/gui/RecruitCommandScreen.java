@@ -41,8 +41,11 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
     @Override
     protected void init() {
         super.init();
-        Entity entity = this.minecraft.level.getEntity(this.menu.recruitEntityId());
+        Entity entity = (this.minecraft != null && this.minecraft.level != null)
+                ? this.minecraft.level.getEntity(this.menu.recruitEntityId())
+                : null;
         boolean ownedByPlayer = entity instanceof MiddleEarthRecruitEntity recruit
+                && this.minecraft != null
                 && this.minecraft.player != null
                 && recruit.isOwnedBy(this.minecraft.player);
         boolean tame = entity instanceof MiddleEarthRecruitEntity recruit && recruit.isTame();

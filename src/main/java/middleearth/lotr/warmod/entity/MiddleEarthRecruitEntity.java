@@ -1,6 +1,12 @@
 package middleearth.lotr.warmod.entity;
 
+import com.geckolib.animatable.GeoEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.constant.DefaultAnimations;
+import com.geckolib.util.GeckoLibUtil;
 import middleearth.lotr.warmod.entity.ai.RecruitMoveToCommandGoal;
+import middleearth.lotr.warmod.entity.ai.RecruitCompanionGoal;
 import middleearth.lotr.warmod.entity.ai.RecruitWorkerGoal;
 import middleearth.lotr.warmod.menu.RecruitCommandMenu;
 import middleearth.lotr.warmod.menu.RecruitCommandMenuProvider;
@@ -41,11 +47,12 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EntityReference;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
-import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
@@ -74,14 +81,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class MiddleEarthRecruitEntity extends TamableAnimal {
+public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity {
     public static final int HIRE_COST_EMERALDS = 25;
 
     private static final EntityDataAccessor<Integer> DATA_COMMAND =
             SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_WORKER_PROFESSION =
             SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Optional<BlockPos>> DATA_WORK_TARGET =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
+    private static final EntityDataAccessor<Optional<BlockPos>> DATA_STORAGE_TARGET =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
+    private static final EntityDataAccessor<Optional<BlockPos>> DATA_BASE_TARGET =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
+    private static final EntityDataAccessor<Integer> DATA_STORAGE_RESOURCE_COUNT =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_CARRIED_RESOURCE_COUNT =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_BASE_PROGRESS =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<String> DATA_RESOURCE_ACTION =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> DATA_RESOURCE_ITEM =
+            SynchedEntityData.defineId(MiddleEarthRecruitEntity.class, EntityDataSerializers.STRING);
 
+    private final AnimatableInstanceCache geoCache = GeckoLibUtil.createInstanceCache(this);
     private @Nullable BlockPos moveTarget;
     private @Nullable BlockPos workTarget;
     private @Nullable BlockPos storageTarget;
@@ -108,17 +132,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.05, true));
         this.goalSelector.addGoal(2, new RecruitMoveToCommandGoal(this, 1.0));
-        this.goalSelector.addGoal(3, new FollowOwnerGoal(this, 1.0, 8.0F, 3.0F) {
-            @Override
-            public boolean canUse() {
-                return MiddleEarthRecruitEntity.this.shouldFollowOwner() && super.canUse();
-            }
-
-            @Override
-            public boolean canContinueToUse() {
-                return MiddleEarthRecruitEntity.this.shouldFollowOwner() && super.canContinueToUse();
-            }
-        });
+        this.goalSelector.addGoal(3, new RecruitCompanionGoal(this, 1.0));
         this.goalSelector.addGoal(4, new RecruitWorkerGoal(this));
         this.goalSelector.addGoal(7, new WaterAvoidingRandomStrollGoal(this, 0.8));
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 8.0F));
@@ -140,6 +154,25 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         super.defineSynchedData(entityData);
         entityData.define(DATA_COMMAND, RecruitmentAction.FOLLOW_OWNER.ordinal());
         entityData.define(DATA_WORKER_PROFESSION, -1);
+        entityData.define(DATA_WORK_TARGET, Optional.empty());
+        entityData.define(DATA_STORAGE_TARGET, Optional.empty());
+        entityData.define(DATA_BASE_TARGET, Optional.empty());
+        entityData.define(DATA_STORAGE_RESOURCE_COUNT, 0);
+        entityData.define(DATA_CARRIED_RESOURCE_COUNT, 0);
+        entityData.define(DATA_BASE_PROGRESS, 0);
+        entityData.define(DATA_RESOURCE_ACTION, "");
+        entityData.define(DATA_RESOURCE_ITEM, "");
+    }
+
+    @Override
+    public void registerControllers(final AnimatableManager.ControllerRegistrar controllers) {
+        controllers.add(DefaultAnimations.genericWalkRunIdleController());
+        controllers.add(DefaultAnimations.genericAttackAnimation(DefaultAnimations.ATTACK_SWING));
+    }
+
+    @Override
+    public AnimatableInstanceCache getAnimatableInstanceCache() {
+        return this.geoCache;
     }
 
     @Override
@@ -184,26 +217,26 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         if (input.getInt("WorkTargetX").isPresent()
                 && input.getInt("WorkTargetY").isPresent()
                 && input.getInt("WorkTargetZ").isPresent()) {
-            this.workTarget = new BlockPos(
+            this.setWorkTarget(new BlockPos(
                     input.getIntOr("WorkTargetX", this.blockPosition().getX()),
                     input.getIntOr("WorkTargetY", this.blockPosition().getY()),
-                    input.getIntOr("WorkTargetZ", this.blockPosition().getZ()));
+                    input.getIntOr("WorkTargetZ", this.blockPosition().getZ())));
         }
         if (input.getInt("StorageTargetX").isPresent()
                 && input.getInt("StorageTargetY").isPresent()
                 && input.getInt("StorageTargetZ").isPresent()) {
-            this.storageTarget = new BlockPos(
+            this.setStorageTarget(new BlockPos(
                     input.getIntOr("StorageTargetX", this.blockPosition().getX()),
                     input.getIntOr("StorageTargetY", this.blockPosition().getY()),
-                    input.getIntOr("StorageTargetZ", this.blockPosition().getZ()));
+                    input.getIntOr("StorageTargetZ", this.blockPosition().getZ())));
         }
         if (input.getInt("BaseTargetX").isPresent()
                 && input.getInt("BaseTargetY").isPresent()
                 && input.getInt("BaseTargetZ").isPresent()) {
-            this.baseTarget = new BlockPos(
+            this.setBaseTarget(new BlockPos(
                     input.getIntOr("BaseTargetX", this.blockPosition().getX()),
                     input.getIntOr("BaseTargetY", this.blockPosition().getY()),
-                    input.getIntOr("BaseTargetZ", this.blockPosition().getZ()));
+                    input.getIntOr("BaseTargetZ", this.blockPosition().getZ())));
         }
         if (input.getInt("MoveTargetX").isPresent()
                 && input.getInt("MoveTargetY").isPresent()
@@ -213,6 +246,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
                     input.getIntOr("MoveTargetY", this.blockPosition().getY()),
                     input.getIntOr("MoveTargetZ", this.blockPosition().getZ()));
         }
+        this.syncRecruitStatusState();
     }
 
     @Override
@@ -264,6 +298,15 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
 
     public List<Component> recruitStatusLines() {
         ArrayList<Component> lines = new ArrayList<>();
+        BlockPos displayedWorkTarget = this.displayedTarget(DATA_WORK_TARGET, this.workTarget);
+        BlockPos displayedStorageTarget = this.displayedTarget(DATA_STORAGE_TARGET, this.storageTarget);
+        BlockPos displayedBaseTarget = this.displayedTarget(DATA_BASE_TARGET, this.baseTarget);
+        int displayedStorageCount = this.level().isClientSide()
+                ? this.entityData.get(DATA_STORAGE_RESOURCE_COUNT)
+                : this.storageResources.totalCount();
+        int displayedBaseProgress = this.level().isClientSide()
+                ? this.entityData.get(DATA_BASE_PROGRESS)
+                : this.starterBaseCompletedBlocks;
         lines.add(Component.translatable(
                 "screen.kingdomwarsmiddleearth.recruit.status.command",
                 Component.literal(this.getRecruitCommand().name().toLowerCase())));
@@ -272,22 +315,22 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
                 this.getWorkerProfession()
                         .map(profession -> Component.translatable(profession.translationKey()))
                         .orElseGet(() -> Component.translatable("screen.kingdomwarsmiddleearth.recruit.status.none"))));
-        this.planResourceDecision().ifPresent(decision -> lines.add(Component.translatable(
+        this.displayedResourceStatus().ifPresent(resourceStatus -> lines.add(Component.translatable(
                 "screen.kingdomwarsmiddleearth.recruit.status.resource_action",
                 Component.translatable("screen.kingdomwarsmiddleearth.recruit.workaction."
-                        + decision.action().name().toLowerCase()),
-                decision.itemId().isBlank() ? Component.literal("-") : Component.literal(decision.itemId()))));
+                        + resourceStatus.action()),
+                resourceStatus.itemId().isBlank() ? Component.literal("-") : Component.literal(resourceStatus.itemId()))));
         lines.add(Component.translatable(
                 "screen.kingdomwarsmiddleearth.recruit.status.worksite",
-                targetLabel(this.workTarget)));
+                targetLabel(displayedWorkTarget)));
         lines.add(Component.translatable(
                 "screen.kingdomwarsmiddleearth.recruit.status.storage",
-                targetLabel(this.storageTarget),
-                this.storageResources.totalCount()));
-        if (this.baseTarget != null) {
+                targetLabel(displayedStorageTarget),
+                displayedStorageCount));
+        if (displayedBaseTarget != null) {
             lines.add(Component.translatable(
                     "screen.kingdomwarsmiddleearth.recruit.status.base_progress",
-                    this.starterBaseCompletedBlocks,
+                    displayedBaseProgress,
                     KingdomBaseBlueprint.starterKeep().placements().size()));
             this.planKingdomWorkOrder().ifPresent(order -> lines.add(Component.translatable(
                     "screen.kingdomwarsmiddleearth.recruit.status.kingdom_order",
@@ -312,7 +355,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         Optional<WorkerProfession> profession = WorkerProfessionCatalog.professionForButton(buttonId);
         if (profession.isPresent()) {
             this.setWorkerProfession(profession.get());
-            this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
+            this.resumeWorkAfterProfessionAssignment();
             player.sendSystemMessage(Component.translatable(
                     "message.kingdomwarsmiddleearth.recruit.profession",
                     Component.translatable(profession.get().translationKey())));
@@ -342,7 +385,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
                     player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.worksite.missing_profession"));
                     yield false;
                 }
-                this.workTarget = player.blockPosition();
+                this.setWorkTarget(player.blockPosition());
                 this.moveTarget = this.workTarget;
                 this.setRecruitCommand(RecruitmentAction.WORK_AT_SITE);
                 WorkerTaskDecision decision = this.planWorkerTask().orElseThrow();
@@ -363,7 +406,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
                 yield true;
             }
             case RecruitCommandMenu.BUTTON_CLEAR_WORKSITE -> {
-                this.workTarget = null;
+                this.setWorkTarget(null);
                 if (this.getRecruitCommand() == RecruitmentAction.WORK_AT_SITE) {
                     this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
                 }
@@ -371,14 +414,14 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
                 yield true;
             }
             case RecruitCommandMenu.BUTTON_SET_STORAGE -> {
-                this.storageTarget = player.blockPosition();
+                this.setStorageTarget(player.blockPosition());
                 player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.storage.set"));
                 yield true;
             }
             case RecruitCommandMenu.BUTTON_BUILD_STARTER_KEEP -> {
                 this.setWorkerProfession(WorkerProfession.BUILDER);
-                this.baseTarget = player.blockPosition();
-                this.workTarget = this.baseTarget;
+                this.setBaseTarget(player.blockPosition());
+                this.setWorkTarget(this.baseTarget);
                 this.moveTarget = this.baseTarget;
                 this.setRecruitCommand(RecruitmentAction.WORK_AT_SITE);
                 KingdomBaseBuildDecision buildDecision = this.planStarterBaseBuild().orElseThrow();
@@ -415,7 +458,34 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         return this.isTame()
                 && (this.getRecruitCommand() == RecruitmentAction.MOVE_TO_POSITION
                 || this.getRecruitCommand() == RecruitmentAction.WORK_AT_SITE)
-                && this.moveTarget != null;
+                && this.moveTarget != null
+                && this.distanceToMoveTargetSqr() > 4.0;
+    }
+
+    public double distanceToMoveTargetSqr() {
+        if (this.moveTarget == null) {
+            return 0.0;
+        }
+        return this.distanceToSqr(
+                this.moveTarget.getX() + 0.5,
+                this.moveTarget.getY(),
+                this.moveTarget.getZ() + 0.5);
+    }
+
+    public boolean shouldUseCompanionAi() {
+        RecruitmentAction command = this.getRecruitCommand();
+        return this.isTame()
+                && !this.isOrderedToSit()
+                && (command == RecruitmentAction.FOLLOW_OWNER || command == RecruitmentAction.PROTECT_OWNER)
+                && this.getRecruitOwner().isPresent();
+    }
+
+    public Optional<LivingEntity> getRecruitOwner() {
+        EntityReference<LivingEntity> ownerReference = this.getOwnerReference();
+        if (ownerReference == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(EntityReference.getLivingEntity(ownerReference, this.level()));
     }
 
     public Optional<WorkerProfession> getWorkerProfession() {
@@ -430,6 +500,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
     public void setWorkerProfession(WorkerProfession profession) {
         this.entityData.set(DATA_WORKER_PROFESSION, profession.ordinal());
         this.applyWorkerEquipment(profession);
+        this.syncRecruitStatusState();
     }
 
     public Optional<WorkerTaskDecision> planWorkerTask() {
@@ -505,7 +576,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
     }
 
     public boolean performWorkerCycle() {
-        if (!this.shouldRunWorkerCycle()) {
+        if (!this.shouldRunWorkerCycle() || this.level().isClientSide()) {
             return false;
         }
         if (this.getWorkerProfession().orElseThrow() == WorkerProfession.BUILDER && this.baseTarget != null) {
@@ -516,6 +587,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
             if (buildDecision.action() == KingdomBaseBuildAction.GATHER_SUPPLIES) {
                 this.carriedResources = this.carriedResources.withAdded(buildDecision.itemId(), 1);
                 this.depositCarriedResources();
+                this.syncRecruitStatusState();
                 return true;
             }
             return false;
@@ -525,14 +597,17 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
             if (decision.action() == WorkerResourceAction.WITHDRAW_FROM_STORAGE) {
                 this.storageResources = this.storageResources.withRemoved(decision.itemId(), decision.quantity());
                 this.carriedResources = this.carriedResources.withAdded(decision.itemId(), decision.quantity());
+                this.syncRecruitStatusState();
                 return true;
             }
             if (decision.action() == WorkerResourceAction.DELIVER_TO_WORKSITE) {
                 this.carriedResources = this.carriedResources.withRemoved(decision.itemId(), decision.quantity());
+                this.syncRecruitStatusState();
                 return true;
             }
             if (decision.action() == WorkerResourceAction.DEPOSIT_TO_STORAGE) {
                 this.depositCarriedResources();
+                this.syncRecruitStatusState();
                 return true;
             }
             return false;
@@ -544,10 +619,12 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
                 return true;
             }
             this.carriedResources = this.carriedResources.withAdded(decision.itemId(), decision.quantity());
+            this.syncRecruitStatusState();
             return true;
         }
         if (decision.action() == WorkerResourceAction.DEPOSIT_TO_STORAGE) {
             this.depositCarriedResources();
+            this.syncRecruitStatusState();
             return true;
         }
         return false;
@@ -563,12 +640,14 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
             return false;
         }
         BlockPos placeAt = this.baseTarget.offset(placement.x(), placement.y(), placement.z());
-        if (!this.level().isEmptyBlock(placeAt)) {
+        BlockState state = this.level().getBlockState(placeAt);
+        if (!state.isAir() && !state.canBeReplaced()) {
             return false;
         }
         this.level().setBlock(placeAt, block.get().defaultBlockState(), 3);
         this.storageResources = this.storageResources.withRemoved(placement.itemId(), 1);
         this.starterBaseCompletedBlocks++;
+        this.syncRecruitStatusState();
         return true;
     }
 
@@ -587,6 +666,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
             this.level().destroyBlock(harvestAt, true, this, 16);
         }
         this.carriedResources = this.carriedResources.withAdded(decision.itemId(), decision.quantity());
+        this.syncRecruitStatusState();
         return true;
     }
 
@@ -626,6 +706,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
             this.storageResources = this.storageResources.withAdded(entry.getKey(), entry.getValue());
         }
         this.carriedResources = ResourceInventory.empty();
+        this.syncRecruitStatusState();
     }
 
     private boolean tryHire(ServerPlayer player) {
@@ -666,6 +747,72 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         if (command != RecruitmentAction.ATTACK_TARGET) {
             this.setTarget(null);
         }
+        this.syncRecruitStatusState();
+    }
+
+    private void resumeWorkAfterProfessionAssignment() {
+        if (this.workTarget != null) {
+            this.moveTarget = this.workTarget;
+            this.setRecruitCommand(RecruitmentAction.WORK_AT_SITE);
+            return;
+        }
+        this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
+    }
+
+    private void setWorkTarget(@Nullable BlockPos target) {
+        this.workTarget = target;
+        this.entityData.set(DATA_WORK_TARGET, Optional.ofNullable(target));
+        this.syncRecruitStatusState();
+    }
+
+    private void setStorageTarget(@Nullable BlockPos target) {
+        this.storageTarget = target;
+        this.entityData.set(DATA_STORAGE_TARGET, Optional.ofNullable(target));
+        this.syncRecruitStatusState();
+    }
+
+    private void setBaseTarget(@Nullable BlockPos target) {
+        this.baseTarget = target;
+        this.entityData.set(DATA_BASE_TARGET, Optional.ofNullable(target));
+        this.syncRecruitStatusState();
+    }
+
+    private void syncRecruitStatusState() {
+        this.entityData.set(DATA_WORK_TARGET, Optional.ofNullable(this.workTarget));
+        this.entityData.set(DATA_STORAGE_TARGET, Optional.ofNullable(this.storageTarget));
+        this.entityData.set(DATA_BASE_TARGET, Optional.ofNullable(this.baseTarget));
+        this.entityData.set(DATA_STORAGE_RESOURCE_COUNT, this.storageResources.totalCount());
+        this.entityData.set(DATA_CARRIED_RESOURCE_COUNT, this.carriedResources.totalCount());
+        this.entityData.set(DATA_BASE_PROGRESS, this.starterBaseCompletedBlocks);
+        Optional<WorkerResourceDecision> decision = this.planResourceDecision();
+        this.entityData.set(DATA_RESOURCE_ACTION, decision
+                .map(value -> value.action().name().toLowerCase())
+                .orElse(""));
+        this.entityData.set(DATA_RESOURCE_ITEM, decision
+                .map(WorkerResourceDecision::itemId)
+                .orElse(""));
+    }
+
+    private @Nullable BlockPos displayedTarget(
+            EntityDataAccessor<Optional<BlockPos>> accessor,
+            @Nullable BlockPos serverValue
+    ) {
+        if (!this.level().isClientSide()) {
+            return serverValue;
+        }
+        return this.entityData.get(accessor).orElse(null);
+    }
+
+    private Optional<ResourceStatus> displayedResourceStatus() {
+        if (this.level().isClientSide()) {
+            String action = this.entityData.get(DATA_RESOURCE_ACTION);
+            if (action.isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(new ResourceStatus(action, this.entityData.get(DATA_RESOURCE_ITEM)));
+        }
+        return this.planResourceDecision()
+                .map(decision -> new ResourceStatus(decision.action().name().toLowerCase(), decision.itemId()));
     }
 
     private Optional<WorkerWorksite> createWorksite(WorkerProfession profession) {
@@ -716,12 +863,6 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         this.setItemSlot(EquipmentSlot.MAINHAND, heldItem);
     }
 
-    private boolean shouldFollowOwner() {
-        RecruitmentAction command = this.getRecruitCommand();
-        return this.isTame()
-                && (command == RecruitmentAction.FOLLOW_OWNER || command == RecruitmentAction.PROTECT_OWNER);
-    }
-
     private static int emeraldCount(ServerPlayer player) {
         return player.getInventory().clearOrCountMatchingItems(
                 stack -> stack.is(Items.EMERALD),
@@ -756,14 +897,26 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
         for (String part : encoded.split(",")) {
             String[] pieces = part.split("=", 2);
             if (pieces.length == 2) {
+                String itemId = pieces[0].trim();
+                if (dropMalformedResourceEntry(itemId)) {
+                    continue;
+                }
                 try {
-                    resources.put(pieces[0], Integer.parseInt(pieces[1]));
+                    resources.put(itemId, Math.max(0, Integer.parseInt(pieces[1].trim())));
                 } catch (NumberFormatException ignored) {
-                    resources.remove(pieces[0]);
+                    resources.remove(itemId);
                 }
             }
         }
-        return new ResourceInventory(resources);
+        try {
+            return new ResourceInventory(resources);
+        } catch (RuntimeException ignored) {
+            return ResourceInventory.empty();
+        }
+    }
+
+    private static boolean dropMalformedResourceEntry(String itemId) {
+        return itemId == null || itemId.isBlank();
     }
 
     private static Component targetLabel(@Nullable BlockPos target) {
@@ -780,5 +933,8 @@ public class MiddleEarthRecruitEntity extends TamableAnimal {
             case "minecraft:oak_planks" -> Optional.of(Blocks.OAK_PLANKS);
             default -> Optional.empty();
         };
+    }
+
+    private record ResourceStatus(String action, String itemId) {
     }
 }
