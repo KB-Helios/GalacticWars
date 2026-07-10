@@ -26,7 +26,7 @@ public record SettlementRecord(
 ) {
     public SettlementRecord {
         Objects.requireNonNull(id, "id");
-        dimensionId = normalize(dimensionId, "dimensionId");
+        dimensionId = KingdomCodecs.normalize(dimensionId, "dimensionId");
         if (claimRadius < 8 || claimRadius > 256) {
             throw new IllegalArgumentException("claimRadius must be between 8 and 256");
         }
@@ -64,7 +64,7 @@ public record SettlementRecord(
     }
 
     public boolean hasCommanderSlot() {
-        return buildProjects.stream().anyMatch(project -> project.blueprintId().equals("starter_keep"));
+        return buildProjects.stream().anyMatch(project -> project.blueprintId().equals(middleearth.lotr.warmod.settlement.KingdomBaseBlueprint.STARTER_KEEP_ID));
     }
 
     public boolean containsCompletedProject(BuildProject project) {
@@ -161,14 +161,5 @@ public record SettlementRecord(
     ) {
         return new SettlementRecord(id, dimensionId, hallX, hallY, hallZ, claimRadius, housingCapacity,
                 recruits, commander, policy, worksites, buildProjects, workOrders, campaigns, nextRevision);
-    }
-
-    private static String normalize(String value, String label) {
-        Objects.requireNonNull(value, label);
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.isEmpty()) {
-            throw new IllegalArgumentException(label + " cannot be blank");
-        }
-        return normalized;
     }
 }

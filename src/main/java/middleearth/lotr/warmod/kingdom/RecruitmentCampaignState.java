@@ -18,7 +18,7 @@ public enum RecruitmentCampaignState {
         try {
             return valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
-            return CANCELLED;
+            return RESERVED;
         }
     }
 }

@@ -15,7 +15,7 @@ public class MiddleEarthRecruitRenderer<R extends EntityRenderState & GeoRenderS
             EntityType<MiddleEarthRecruitEntity> entityType
     ) {
         super(context, entityType);
-        this.withRenderLayer(new ItemInHandGeoLayer<>(context, this));
+        this.withRenderLayer(new ItemInHandGeoLayer<>(this));
         this.withScale(1.0F);
     }
 }

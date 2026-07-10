@@ -6,12 +6,21 @@ import java.util.List;
 import net.minecraft.core.UUIDUtil;
 
 final class KingdomCodecs {
+    static String normalize(String value, String label) {
+        java.util.Objects.requireNonNull(value, label);
+        String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(label + " cannot be blank");
+        }
+        return normalized;
+    }
+
     static final Codec<CommanderPolicy> COMMANDER_POLICY = RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.optionalFieldOf("automatic_recruitment", false).forGetter(CommanderPolicy::automaticRecruitment),
-            Codec.INT.optionalFieldOf("target_recruit_count", 4).forGetter(CommanderPolicy::targetRecruitCount),
-            Codec.INT.optionalFieldOf("maximum_campaign_spend", 64).forGetter(CommanderPolicy::maximumCampaignSpend),
-            Codec.INT.optionalFieldOf("minimum_treasury_reserve", 16).forGetter(CommanderPolicy::minimumTreasuryReserve),
-            Codec.INT.optionalFieldOf("campaign_delay_ticks", 24000).forGetter(CommanderPolicy::campaignDelayTicks)
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("target_recruit_count", 4).forGetter(CommanderPolicy::targetRecruitCount),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("maximum_campaign_spend", 64).forGetter(CommanderPolicy::maximumCampaignSpend),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("minimum_treasury_reserve", 16).forGetter(CommanderPolicy::minimumTreasuryReserve),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("campaign_delay_ticks", 24000).forGetter(CommanderPolicy::campaignDelayTicks)
     ).apply(instance, CommanderPolicy::new));
 
     static final Codec<RecruitmentCampaign> RECRUITMENT_CAMPAIGN = RecordCodecBuilder.create(instance -> instance.group(
@@ -32,8 +41,8 @@ final class KingdomCodecs {
             Codec.INT.fieldOf("x").forGetter(WorksiteRecord::x),
             Codec.INT.fieldOf("y").forGetter(WorksiteRecord::y),
             Codec.INT.fieldOf("z").forGetter(WorksiteRecord::z),
-            Codec.INT.fieldOf("radius").forGetter(WorksiteRecord::radius),
-            Codec.INT.optionalFieldOf("capacity", 1).forGetter(WorksiteRecord::capacity)
+            Codec.intRange(0, Integer.MAX_VALUE).fieldOf("radius").forGetter(WorksiteRecord::radius),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("capacity", 1).forGetter(WorksiteRecord::capacity)
     ).apply(instance, WorksiteRecord::new));
 
     static final Codec<BuildProject> BUILD_PROJECT = RecordCodecBuilder.create(instance -> instance.group(
@@ -58,7 +67,7 @@ final class KingdomCodecs {
             Codec.INT.fieldOf("target_y").forGetter(WorkOrder::targetY),
             Codec.INT.fieldOf("target_z").forGetter(WorkOrder::targetZ),
             Codec.STRING.optionalFieldOf("resource_id", "").forGetter(WorkOrder::resourceId),
-            Codec.INT.optionalFieldOf("quantity", 0).forGetter(WorkOrder::quantity)
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("quantity", 0).forGetter(WorkOrder::quantity)
     ).apply(instance, WorkOrder::new));
 
     static final Codec<SettlementRecord> SETTLEMENT = RecordCodecBuilder.create(instance -> instance.group(
@@ -67,8 +76,8 @@ final class KingdomCodecs {
             Codec.INT.fieldOf("hall_x").forGetter(SettlementRecord::hallX),
             Codec.INT.fieldOf("hall_y").forGetter(SettlementRecord::hallY),
             Codec.INT.fieldOf("hall_z").forGetter(SettlementRecord::hallZ),
-            Codec.INT.optionalFieldOf("claim_radius", 48).forGetter(SettlementRecord::claimRadius),
-            Codec.INT.optionalFieldOf("housing_capacity", 4).forGetter(SettlementRecord::housingCapacity),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("claim_radius", 48).forGetter(SettlementRecord::claimRadius),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("housing_capacity", 4).forGetter(SettlementRecord::housingCapacity),
             UUIDUtil.CODEC.listOf().optionalFieldOf("recruit_ids", List.of()).forGetter(SettlementRecord::recruitIds),
             UUIDUtil.CODEC.optionalFieldOf("commander_id").forGetter(SettlementRecord::commanderId),
             COMMANDER_POLICY.optionalFieldOf("commander_policy", CommanderPolicy.defaults()).forGetter(SettlementRecord::commanderPolicy),
@@ -76,7 +85,7 @@ final class KingdomCodecs {
             BUILD_PROJECT.listOf().optionalFieldOf("build_projects", List.of()).forGetter(SettlementRecord::buildProjects),
             WORK_ORDER.listOf().optionalFieldOf("work_orders", List.of()).forGetter(SettlementRecord::workOrders),
             RECRUITMENT_CAMPAIGN.listOf().optionalFieldOf("recruitment_campaigns", List.of()).forGetter(SettlementRecord::recruitmentCampaigns),
-            Codec.INT.optionalFieldOf("revision", 0).forGetter(SettlementRecord::revision)
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("revision", 0).forGetter(SettlementRecord::revision)
     ).apply(instance, SettlementRecord::new));
 
     static final Codec<KingdomRecord> KINGDOM_RECORD = RecordCodecBuilder.create(instance -> instance.group(

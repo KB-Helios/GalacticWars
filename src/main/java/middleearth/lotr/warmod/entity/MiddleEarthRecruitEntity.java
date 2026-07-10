@@ -1165,12 +1165,16 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                 0,
                 completedPlacements,
                 "");
-        KingdomSavedData.get(serverLevel).completeBuildProject(
+        boolean success = KingdomSavedData.get(serverLevel).completeBuildProject(
                 this.getOwnerReference().getUUID(),
                 project,
                 blueprint.housingReward(),
                 blueprint.worksiteType(),
                 blueprint.worksiteCapacity());
+        if (!success) {
+            this.blockWorker("kingdom_link_missing");
+            return;
+        }
         this.workerCooldownTicks = 100;
         this.setBaseTarget(null);
         this.setWorkTarget(null);
@@ -1715,16 +1719,18 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         Optional<RecruitmentCampaign> activeCampaign = kingdom.settlement().recruitmentCampaigns().stream()
                 .filter(RecruitmentCampaign::active)
                 .findFirst();
+        boolean campaignAlreadyAdjusted = false;
         if (activeCampaign.isPresent() && elapsedGameTime > 40L) {
             data.replaceCampaign(ownerId, activeCampaign.get().delay(elapsedGameTime - 20L));
             kingdom = data.kingdomForOwner(ownerId).orElse(kingdom);
             activeCampaign = kingdom.settlement().recruitmentCampaigns().stream()
                     .filter(RecruitmentCampaign::active)
                     .findFirst();
+            campaignAlreadyAdjusted = true;
         }
         Optional<KingdomHallBlockEntity> hallOptional = this.findKingdomHall(serverLevel, kingdom);
         if (hallOptional.isEmpty()) {
-            if (activeCampaign.isPresent()) {
+            if (activeCampaign.isPresent() && !campaignAlreadyAdjusted) {
                 data.replaceCampaign(ownerId, activeCampaign.get().delay(elapsedGameTime));
             }
             return;
