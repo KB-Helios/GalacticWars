@@ -80,6 +80,9 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
         this.addButton(professionX, y + 8 * (BUTTON_HEIGHT + GAP),
                 "screen.kingdomwarsmiddleearth.recruit.base.cancel",
                 RecruitCommandMenu.BUTTON_CANCEL_BUILD);
+        this.addButton(professionX, y + 9 * (BUTTON_HEIGHT + GAP),
+                "screen.kingdomwarsmiddleearth.recruit.base.rotate",
+                RecruitCommandMenu.BUTTON_ROTATE_BLUEPRINT);
 
         int[] workerProfessionButtonIds = RecruitCommandMenu.workerProfessionButtonIds();
         for (int i = 0; i < workerProfessionButtonIds.length; i++) {
@@ -104,6 +107,11 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 y + 2 * (BUTTON_HEIGHT + GAP),
                 "screen.kingdomwarsmiddleearth.recruit.commander.recruit",
                 RecruitCommandMenu.BUTTON_START_RECRUITMENT);
+        this.addButton(
+                kingdomX,
+                y + 3 * (BUTTON_HEIGHT + GAP),
+                "screen.kingdomwarsmiddleearth.recruit.commander.formation",
+                RecruitCommandMenu.BUTTON_CYCLE_FORMATION);
         this.addButton(
                 kingdomX,
                 y + 4 * (BUTTON_HEIGHT + GAP),

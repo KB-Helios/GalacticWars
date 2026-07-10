@@ -12,6 +12,7 @@ public final class FactionAlignmentUpdaterTest {
         helpingFactionPropagatesToAlliesAndEnemies();
         harmingFactionPropagatesToAlliesAndEnemies();
         ignoresUnregisteredAlliesAndEnemies();
+        clampsAlignmentScores();
         rejectsInvalidRules();
 
         System.out.println("FactionAlignmentUpdaterTest passed");
@@ -91,6 +92,14 @@ public final class FactionAlignmentUpdaterTest {
                 FactionId.of("gondor"), 1, 0, 1, "no_change"), "zero change delta");
         assertThrows(IllegalArgumentException.class, () -> new FactionAlignmentChange(
                 FactionId.of("gondor"), 1, 2, 4, "bad_math"), "inconsistent change math");
+    }
+
+    private static void clampsAlignmentScores() {
+        FactionAlignment alignment = FactionAlignment.empty(playerId())
+                .withAddedScore(FactionId.of("gondor"), 500)
+                .withAddedScore(FactionId.of("mordor"), -500);
+        assertEquals(100, alignment.score(FactionId.of("gondor")), "positive clamp");
+        assertEquals(-100, alignment.score(FactionId.of("mordor")), "negative clamp");
     }
 
     private static FactionCatalog testCatalog() {

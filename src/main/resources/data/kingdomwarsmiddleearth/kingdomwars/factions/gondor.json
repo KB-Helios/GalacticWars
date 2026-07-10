@@ -1,6 +1,7 @@
 {
   "id": "kingdomwarsmiddleearth:gondor",
   "display_name": "Gondor",
+  "selection_order": 0,
   "hire_cost": 25,
   "minimum_hiring_alignment": 10,
   "max_owned_recruits": 12,
@@ -9,5 +10,11 @@
   ],
   "enemies": [
     "kingdomwarsmiddleearth:mordor"
-  ]
+  ],
+  "pledge": {
+    "token_item": "kingdomwarsmiddleearth:gondor_faction_token",
+    "direct_delta": 10,
+    "ally_delta": 2,
+    "enemy_delta": -5
+  }
 }

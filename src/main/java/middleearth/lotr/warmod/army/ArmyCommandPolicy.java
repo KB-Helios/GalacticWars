@@ -14,14 +14,15 @@ public final class ArmyCommandPolicy {
             FactionId unitFaction,
             int minimumAlignment
     ) {
+        return canIssue(command, group);
+    }
+
+    public static ArmyCommandValidation canIssue(ArmyCommand command, ArmyGroupState group) {
         if (command == null) {
             return ArmyCommandValidation.rejected("missing_command");
         }
         if (group == null) {
             return ArmyCommandValidation.rejected("missing_group");
-        }
-        if (unitFaction == null) {
-            return ArmyCommandValidation.rejected("unknown_faction");
         }
         if (!group.ownerId().equals(command.issuedBy())) {
             return ArmyCommandValidation.rejected("not_owner");
@@ -29,14 +30,8 @@ public final class ArmyCommandPolicy {
         if (!group.groupId().equals(command.groupId())) {
             return ArmyCommandValidation.rejected("group_mismatch");
         }
-        if (alignment == null || !alignment.playerId().equals(command.issuedBy())) {
-            return ArmyCommandValidation.rejected("unknown_player");
-        }
         if (group.recruitIds().isEmpty()) {
             return ArmyCommandValidation.rejected("empty_group");
-        }
-        if (alignment.score(unitFaction) < minimumAlignment) {
-            return ArmyCommandValidation.rejected("alignment_too_low");
         }
         if (!hasValidPayload(command)) {
             return ArmyCommandValidation.rejected("invalid_payload");

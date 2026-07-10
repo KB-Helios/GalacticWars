@@ -2,9 +2,22 @@
   "id": "kingdomwarsmiddleearth:mordor_orc",
   "display_name": "Mordor Orc",
   "faction": "kingdomwarsmiddleearth:mordor",
+  "entity_type": "kingdomwarsmiddleearth:mordor_orc_recruit",
   "role": "brute",
   "hire_cost": 20,
-  "max_health": 22,
-  "attack_damage": 5,
+  "attributes": {
+    "max_health": 22,
+    "attack_damage": 5,
+    "movement_speed": 0.27,
+    "follow_range": 24.0,
+    "armor": 1.0
+  },
+  "equipment": {
+    "main_hand": "kingdomwarsmiddleearth:mordor_iron_sword",
+    "head": "kingdomwarsmiddleearth:mordor_iron_helmet",
+    "chest": "kingdomwarsmiddleearth:mordor_iron_chestplate",
+    "legs": "kingdomwarsmiddleearth:mordor_iron_leggings",
+    "feet": "kingdomwarsmiddleearth:mordor_iron_boots"
+  },
   "default_formation": "column"
 }

@@ -1,12 +1,21 @@
 {
   "id": "kingdomwarsmiddleearth:mordor",
   "display_name": "Mordor",
+  "selection_order": 2,
   "hire_cost": 30,
   "minimum_hiring_alignment": 15,
   "max_owned_recruits": 16,
   "allies": [],
   "enemies": [
     "kingdomwarsmiddleearth:gondor",
-    "kingdomwarsmiddleearth:rohan"
-  ]
+    "kingdomwarsmiddleearth:rohan",
+    "kingdomwarsmiddleearth:dwarf",
+    "kingdomwarsmiddleearth:elf"
+  ],
+  "pledge": {
+    "token_item": "kingdomwarsmiddleearth:mordor_faction_token",
+    "direct_delta": 10,
+    "ally_delta": 2,
+    "enemy_delta": -5
+  }
 }

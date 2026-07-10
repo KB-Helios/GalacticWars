@@ -5,7 +5,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import middleearth.lotr.warmod.settlement.KingdomBaseBlueprint;
+import middleearth.lotr.warmod.workforce.WorkerProfession;
+import middleearth.lotr.warmod.workforce.WorkerProfessionCatalog;
 
 public record SettlementRecord(
         UUID id,
@@ -22,6 +25,7 @@ public record SettlementRecord(
         List<BuildProject> buildProjects,
         List<WorkOrder> workOrders,
         List<RecruitmentCampaign> recruitmentCampaigns,
+        SettlementRewards rewards,
         int revision
 ) {
     public SettlementRecord {
@@ -38,17 +42,42 @@ public record SettlementRecord(
         commanderId = commanderId == null ? Optional.empty() : commanderId;
         Objects.requireNonNull(commanderPolicy, "commanderPolicy");
         worksites = List.copyOf(Objects.requireNonNull(worksites, "worksites"));
+        if (worksites.stream().noneMatch(worksite -> worksite.type().equals("frontier"))) {
+            java.util.ArrayList<WorksiteRecord> migratedWorksites = new java.util.ArrayList<>(worksites);
+            migratedWorksites.add(frontierWorksite(id, dimensionId, hallX, hallY, hallZ));
+            worksites = List.copyOf(migratedWorksites);
+        }
         buildProjects = List.copyOf(Objects.requireNonNull(buildProjects, "buildProjects"));
         workOrders = List.copyOf(Objects.requireNonNull(workOrders, "workOrders"));
         recruitmentCampaigns = List.copyOf(Objects.requireNonNull(recruitmentCampaigns, "recruitmentCampaigns"));
+        Objects.requireNonNull(rewards, "rewards");
         if (revision < 0) {
             throw new IllegalArgumentException("revision cannot be negative");
         }
     }
 
     public static SettlementRecord create(String dimensionId, int x, int y, int z) {
-        return new SettlementRecord(UUID.randomUUID(), dimensionId, x, y, z, 48, 4,
-                List.of(), Optional.empty(), CommanderPolicy.defaults(), List.of(), List.of(), List.of(), List.of(), 0);
+        UUID settlementId = UUID.randomUUID();
+        WorksiteRecord frontier = frontierWorksite(settlementId, dimensionId, x, y, z);
+        return new SettlementRecord(settlementId, dimensionId, x, y, z, 48, 4,
+                List.of(), Optional.empty(), CommanderPolicy.defaults(), List.of(frontier), List.of(), List.of(),
+                List.of(), SettlementRewards.none(), 0);
+    }
+
+    private static WorksiteRecord frontierWorksite(
+            UUID settlementId,
+            String dimensionId,
+            int x,
+            int y,
+            int z
+    ) {
+        UUID worksiteId = UUID.nameUUIDFromBytes(
+                (settlementId + ":frontier").getBytes(StandardCharsets.UTF_8));
+        return new WorksiteRecord(
+                worksiteId, "frontier", dimensionId, x, y, z, 32, 2,
+                WorkerProfessionCatalog.enabledProfessions().stream()
+                        .map(definition -> definition.profession()).toList(),
+                Optional.empty(), List.of(), List.of());
     }
 
     public boolean hasHousingSpace() {
@@ -64,11 +93,12 @@ public record SettlementRecord(
     }
 
     public boolean hasCommanderSlot() {
-        return buildProjects.stream().anyMatch(project -> project.blueprintId().equals(KingdomBaseBlueprint.STARTER_KEEP_ID));
+        return rewards.commanderSlots() > 0;
     }
 
     public boolean containsCompletedProject(BuildProject project) {
-        return buildProjects.stream().anyMatch(existing -> existing.blueprintId().equals(project.blueprintId())
+        return buildProjects.stream().anyMatch(existing -> existing.state() == BuildProjectState.COMPLETED
+                && existing.blueprintId().equals(project.blueprintId())
                 && existing.dimensionId().equals(project.dimensionId())
                 && existing.originX() == project.originX()
                 && existing.originY() == project.originY()
@@ -92,13 +122,26 @@ public record SettlementRecord(
         LinkedHashSet<UUID> updated = new LinkedHashSet<>(recruitIds);
         updated.remove(recruitId);
         Optional<UUID> updatedCommander = commanderId.filter(id -> !id.equals(recruitId));
-        return copy(List.copyOf(updated), updatedCommander, commanderPolicy, recruitmentCampaigns, revision + 1);
+        SettlementRecord removed = copy(
+                List.copyOf(updated), updatedCommander, commanderPolicy, recruitmentCampaigns, revision + 1)
+                .releaseWorksite(recruitId);
+        for (WorkOrder workOrder : List.copyOf(removed.workOrders())) {
+            if (workOrder.assignedRecruitId().filter(recruitId::equals).isPresent() && !workOrder.state().terminal()) {
+                removed = removed.withWorkOrder(workOrder.release(), false);
+            }
+        }
+        return removed;
     }
 
     public SettlementRecord withHallLocation(String dimensionId, int x, int y, int z) {
+        List<WorksiteRecord> relocatedWorksites = worksites.stream()
+                .map(worksite -> worksite.type().equals("frontier")
+                        ? worksite.withLocation(dimensionId, x, y, z)
+                        : worksite)
+                .toList();
         return new SettlementRecord(id, dimensionId, x, y, z, claimRadius, housingCapacity,
-                recruitIds, commanderId, commanderPolicy, worksites, buildProjects, workOrders,
-                recruitmentCampaigns, revision + 1);
+                recruitIds, commanderId, commanderPolicy, relocatedWorksites, buildProjects, workOrders,
+                recruitmentCampaigns, rewards, revision + 1);
     }
 
     public SettlementRecord withCommander(UUID recruitId) {
@@ -139,34 +182,270 @@ public record SettlementRecord(
         return this;
     }
 
+    /**
+     * Compatibility entry point for older callers. Reward arguments are ignored so callers cannot mint
+     * authoritative rewards; completion still requires a stored, fully progressed built-in project.
+     */
+    @Deprecated
     public SettlementRecord withCompletedProject(
             BuildProject project,
             int housingReward,
             String worksiteType,
             int worksiteCapacity
     ) {
+        KingdomBaseBlueprint definition = KingdomBaseBlueprint.byId(project.blueprintId()).orElse(null);
+        return definition == null ? this : withCompletedProject(project, definition);
+    }
+
+    public Optional<WorksiteRecord> assignedWorksite(UUID recruitId) {
+        return worksites.stream().filter(worksite -> worksite.assignmentIds().contains(recruitId)).findFirst();
+    }
+
+    public Optional<WorkOrder> workOrder(UUID workOrderId) {
+        return workOrders.stream().filter(workOrder -> workOrder.id().equals(workOrderId)).findFirst();
+    }
+
+    public SettlementRecord reserveWorksite(UUID recruitId, WorkerProfession profession) {
+        return reserveWorksite(recruitId, profession, Optional.empty());
+    }
+
+    public SettlementRecord reserveWorksite(
+            UUID recruitId,
+            WorkerProfession profession,
+            Optional<UUID> preferredProjectId
+    ) {
+        Objects.requireNonNull(preferredProjectId, "preferredProjectId");
+        Optional<WorksiteRecord> existing = assignedWorksite(recruitId);
+        if (existing.filter(worksite -> worksite.accepts(profession))
+                .filter(worksite -> preferredProjectId.isEmpty()
+                        || worksite.sourceProjectId().equals(preferredProjectId))
+                .isPresent()) {
+            return this;
+        }
+        WorksiteRecord available = worksites.stream()
+                .filter(worksite -> worksite.accepts(profession) && worksite.hasCapacity())
+                .filter(worksite -> preferredProjectId.isEmpty()
+                        || worksite.sourceProjectId().equals(preferredProjectId))
+                .findFirst().orElse(null);
+        if (available == null) {
+            return this;
+        }
+        java.util.ArrayList<WorksiteRecord> updated = new java.util.ArrayList<>(worksites.size());
+        for (WorksiteRecord worksite : worksites) {
+            WorksiteRecord next = worksite.release(recruitId);
+            if (worksite.id().equals(available.id())) {
+                next = next.assign(recruitId);
+            }
+            updated.add(next);
+        }
+        List<WorkOrder> releasedOrders = workOrders.stream()
+                .map(order -> order.assignedRecruitId().filter(recruitId::equals).isPresent()
+                        && !order.state().terminal() ? order.release() : order)
+                .toList();
+        return withOperationalState(List.copyOf(updated), buildProjects, releasedOrders, revision + 1);
+    }
+
+    public SettlementRecord configureAssignedFrontierWorksite(
+            UUID recruitId,
+            String dimensionId,
+            int x,
+            int y,
+            int z,
+            int radius
+    ) {
+        WorksiteRecord assigned = assignedWorksite(recruitId)
+                .filter(worksite -> worksite.type().equals("frontier"))
+                .orElse(null);
+        if (assigned == null) {
+            return this;
+        }
+        java.util.ArrayList<WorksiteRecord> updated = new java.util.ArrayList<>(worksites.size());
+        for (WorksiteRecord worksite : worksites) {
+            updated.add(worksite.id().equals(assigned.id())
+                    ? worksite.withLocationAndRadius(dimensionId, x, y, z, radius)
+                    : worksite);
+        }
+        return withOperationalState(List.copyOf(updated), buildProjects, workOrders, revision + 1);
+    }
+
+    public SettlementRecord releaseWorksite(UUID recruitId) {
+        java.util.ArrayList<WorksiteRecord> updated = new java.util.ArrayList<>(worksites.size());
+        boolean changed = false;
+        for (WorksiteRecord worksite : worksites) {
+            WorksiteRecord next = worksite.release(recruitId);
+            changed |= next != worksite;
+            updated.add(next);
+        }
+        return changed ? withOperationalState(List.copyOf(updated), buildProjects, workOrders, revision + 1) : this;
+    }
+
+    public SettlementRecord releaseWorkerAssignments(UUID recruitId) {
+        java.util.ArrayList<WorksiteRecord> updatedWorksites = new java.util.ArrayList<>(worksites.size());
+        boolean changed = false;
+        for (WorksiteRecord worksite : worksites) {
+            WorksiteRecord next = worksite.release(recruitId);
+            changed |= next != worksite;
+            updatedWorksites.add(next);
+        }
+        java.util.ArrayList<WorkOrder> updatedOrders = new java.util.ArrayList<>(workOrders.size());
+        for (WorkOrder workOrder : workOrders) {
+            WorkOrder next = workOrder.assignedRecruitId().filter(recruitId::equals).isPresent()
+                    && !workOrder.state().terminal()
+                    ? workOrder.release()
+                    : workOrder;
+            changed |= next != workOrder;
+            updatedOrders.add(next);
+        }
+        return changed
+                ? withOperationalState(List.copyOf(updatedWorksites), buildProjects,
+                        List.copyOf(updatedOrders), revision + 1)
+                : this;
+    }
+
+    SettlementRecord withNewBuildProject(BuildProject project) {
         Objects.requireNonNull(project, "project");
-        if (containsCompletedProject(project)) {
+        if (project.revision() != 0 || project.state() != BuildProjectState.ACTIVE
+                || !project.completedPlacements().isEmpty()
+                || buildProjects.stream().anyMatch(existing -> existing.id().equals(project.id()))) {
+            return this;
+        }
+        java.util.ArrayList<BuildProject> updated = new java.util.ArrayList<>(buildProjects);
+        updated.add(project);
+        List<WorksiteRecord> updatedWorksites = reconcileBuilderWorksite(worksites, project);
+        return withOperationalState(List.copyOf(updatedWorksites), List.copyOf(updated), workOrders, revision + 1);
+    }
+
+    SettlementRecord replaceBuildProject(BuildProject project) {
+        Objects.requireNonNull(project, "project");
+        java.util.ArrayList<BuildProject> updated = new java.util.ArrayList<>(buildProjects);
+        for (int index = 0; index < updated.size(); index++) {
+            BuildProject current = updated.get(index);
+            if (!current.id().equals(project.id())) {
+                continue;
+            }
+            if (!current.sameAuthority(project)
+                    || current.revision() + 1 != project.revision()
+                    || current.state() == BuildProjectState.COMPLETED
+                    || current.state() == BuildProjectState.CANCELLED
+                    || project.state() == BuildProjectState.COMPLETED) {
+                return this;
+            }
+            updated.set(index, project);
+            List<WorksiteRecord> updatedWorksites = reconcileBuilderWorksite(worksites, project);
+            return withOperationalState(updatedWorksites, List.copyOf(updated), workOrders, revision + 1);
+        }
+        return this;
+    }
+
+    public SettlementRecord withWorkOrder(WorkOrder workOrder, boolean allowInsert) {
+        java.util.ArrayList<WorkOrder> updated = new java.util.ArrayList<>(workOrders);
+        for (int index = 0; index < updated.size(); index++) {
+            WorkOrder current = updated.get(index);
+            if (current.id().equals(workOrder.id())) {
+                if (current.revision() != workOrder.revision() - 1) {
+                    return this;
+                }
+                updated.set(index, workOrder);
+                return withOperationalState(worksites, buildProjects, List.copyOf(updated), revision + 1);
+            }
+        }
+        if (!allowInsert || workOrder.revision() != 0) {
+            return this;
+        }
+        updated.add(workOrder);
+        return withOperationalState(worksites, buildProjects, List.copyOf(updated), revision + 1);
+    }
+
+    public SettlementRecord withCompletedProject(BuildProject project, KingdomBaseBlueprint blueprint) {
+        Objects.requireNonNull(project, "project");
+        Objects.requireNonNull(blueprint, "blueprint");
+        BuildProject stored = buildProjects.stream()
+                .filter(existing -> existing.id().equals(project.id()))
+                .findFirst()
+                .orElse(null);
+        if (stored == null
+                || !stored.equals(project)
+                || stored.state() == BuildProjectState.COMPLETED
+                || stored.state() == BuildProjectState.CANCELLED
+                || !stored.blueprintId().equals(blueprint.id())
+                || !stored.definitionHash().equals(blueprint.definitionHash())
+                || !blueprint.supportsRotationSteps(stored.rotationSteps())
+                || !stored.hasAllPlacements(blueprint.placements().size())
+                || containsCompletedProject(project)) {
             return this;
         }
         java.util.ArrayList<BuildProject> projects = new java.util.ArrayList<>(buildProjects);
-        projects.add(project);
-        java.util.ArrayList<WorksiteRecord> updatedWorksites = new java.util.ArrayList<>(worksites);
-        if (worksiteType != null && !worksiteType.isBlank() && worksiteCapacity > 0) {
+        for (int index = 0; index < projects.size(); index++) {
+            if (projects.get(index).id().equals(stored.id())) {
+                projects.set(index, stored.complete());
+                break;
+            }
+        }
+        java.util.ArrayList<WorksiteRecord> updatedWorksites = new java.util.ArrayList<>(worksites.stream()
+                .filter(worksite -> worksite.sourceProjectId().filter(project.id()::equals).isEmpty())
+                .toList());
+        List<StorageEndpoint> storageEndpoints = blueprint.storageEndpoints(project);
+        if (!blueprint.worksiteType().isBlank() && blueprint.worksiteCapacity() > 0) {
+            List<WorkerProfession> accepted = WorkerProfession.byId(blueprint.worksiteType())
+                    .map(List::of).orElse(List.of());
             updatedWorksites.add(new WorksiteRecord(
-                    UUID.randomUUID(),
-                    worksiteType,
+                    projectWorksiteId(project, "completed:" + blueprint.worksiteType()),
+                    blueprint.worksiteType(),
                     project.dimensionId(),
                     project.originX(),
                     project.originY(),
                     project.originZ(),
                     8,
-                    worksiteCapacity));
+                    blueprint.worksiteCapacity(),
+                    accepted,
+                    Optional.of(project.id()),
+                    List.of(),
+                    storageEndpoints));
+        } else if (!storageEndpoints.isEmpty()) {
+            updatedWorksites.add(new WorksiteRecord(
+                    projectWorksiteId(project, "completed:storage"),
+                    "storage",
+                    project.dimensionId(),
+                    project.originX(),
+                    project.originY(),
+                    project.originZ(),
+                    8,
+                    1,
+                    List.of(),
+                    Optional.of(project.id()),
+                    List.of(),
+                    storageEndpoints));
         }
         return new SettlementRecord(id, dimensionId, hallX, hallY, hallZ, claimRadius,
-                Math.addExact(housingCapacity, Math.max(0, housingReward)), recruitIds, commanderId,
+                Math.addExact(housingCapacity, blueprint.housingReward()), recruitIds, commanderId,
                 commanderPolicy, List.copyOf(updatedWorksites), List.copyOf(projects), workOrders,
-                recruitmentCampaigns, revision + 1);
+                recruitmentCampaigns,
+                rewards.add(blueprint.storageSlotReward(), blueprint.commanderSlotReward()),
+                revision + 1);
+    }
+
+    private List<WorksiteRecord> reconcileBuilderWorksite(
+            List<WorksiteRecord> currentWorksites,
+            BuildProject project
+    ) {
+        java.util.ArrayList<WorksiteRecord> updated = new java.util.ArrayList<>(currentWorksites.stream()
+                .filter(worksite -> project.state() != BuildProjectState.CANCELLED
+                        || worksite.sourceProjectId().filter(project.id()::equals).isEmpty())
+                .toList());
+        if ((project.state() == BuildProjectState.ACTIVE || project.state() == BuildProjectState.BLOCKED)
+                && updated.stream().noneMatch(worksite -> worksite.sourceProjectId()
+                        .filter(project.id()::equals).isPresent())) {
+            updated.add(new WorksiteRecord(
+                    projectWorksiteId(project, "active:builder"), "builder", project.dimensionId(),
+                    project.originX(), project.originY(), project.originZ(), 16, 1,
+                    List.of(WorkerProfession.BUILDER), Optional.of(project.id()), List.of(), List.of()));
+        }
+        return List.copyOf(updated);
+    }
+
+    private UUID projectWorksiteId(BuildProject project, String role) {
+        return UUID.nameUUIDFromBytes(
+                (id + ":" + project.id() + ":" + role).getBytes(StandardCharsets.UTF_8));
     }
 
     private SettlementRecord copy(
@@ -177,6 +456,17 @@ public record SettlementRecord(
             int nextRevision
     ) {
         return new SettlementRecord(id, dimensionId, hallX, hallY, hallZ, claimRadius, housingCapacity,
-                recruits, commander, policy, worksites, buildProjects, workOrders, campaigns, nextRevision);
+                recruits, commander, policy, worksites, buildProjects, workOrders, campaigns, rewards, nextRevision);
+    }
+
+    private SettlementRecord withOperationalState(
+            List<WorksiteRecord> updatedWorksites,
+            List<BuildProject> updatedProjects,
+            List<WorkOrder> updatedOrders,
+            int nextRevision
+    ) {
+        return new SettlementRecord(id, dimensionId, hallX, hallY, hallZ, claimRadius, housingCapacity,
+                recruitIds, commanderId, commanderPolicy, updatedWorksites, updatedProjects, updatedOrders,
+                recruitmentCampaigns, rewards, nextRevision);
     }
 }

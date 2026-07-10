@@ -1,6 +1,7 @@
 {
   "id": "kingdomwarsmiddleearth:rohan",
   "display_name": "Rohan",
+  "selection_order": 1,
   "hire_cost": 20,
   "minimum_hiring_alignment": 8,
   "max_owned_recruits": 10,
@@ -9,5 +10,11 @@
   ],
   "enemies": [
     "kingdomwarsmiddleearth:mordor"
-  ]
+  ],
+  "pledge": {
+    "token_item": "kingdomwarsmiddleearth:rohan_faction_token",
+    "direct_delta": 10,
+    "ally_delta": 2,
+    "enemy_delta": -5
+  }
 }

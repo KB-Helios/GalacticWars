@@ -10,7 +10,10 @@ public record FactionAlignment(UUID playerId, Map<FactionId, Integer> scores) {
     public FactionAlignment {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(scores, "scores");
-        scores = Collections.unmodifiableMap(new LinkedHashMap<>(scores));
+        LinkedHashMap<FactionId, Integer> clamped = new LinkedHashMap<>();
+        scores.forEach((faction, score) -> clamped.put(
+                Objects.requireNonNull(faction, "faction"), clamp(Objects.requireNonNull(score, "score"))));
+        scores = Collections.unmodifiableMap(clamped);
     }
 
     public static FactionAlignment empty(UUID playerId) {
@@ -24,7 +27,11 @@ public record FactionAlignment(UUID playerId, Map<FactionId, Integer> scores) {
     public FactionAlignment withAddedScore(FactionId factionId, int delta) {
         Objects.requireNonNull(factionId, "factionId");
         LinkedHashMap<FactionId, Integer> updatedScores = new LinkedHashMap<>(scores);
-        updatedScores.merge(factionId, delta, Integer::sum);
+        updatedScores.put(factionId, clamp((long) score(factionId) + delta));
         return new FactionAlignment(playerId, updatedScores);
+    }
+
+    private static int clamp(long score) {
+        return (int) Math.max(-100L, Math.min(100L, score));
     }
 }

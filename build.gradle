@@ -239,6 +239,15 @@ tasks.register('generateRecruitTextures', JavaExec) {
     workingDir = project.projectDir
 }
 
+tasks.register('generateContentAssets', JavaExec) {
+    group = 'kingdomwars assets'
+    description = 'Regenerates survival-content models, recipes, loot tables, tags, and project-owned pixel art.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass.set('middleearth.lotr.warmod.integration.ContentAssetGenerator')
+    workingDir = project.projectDir
+}
+
 tasks.named('check') {
     dependsOn tasks.named('runHarnesses')
 }

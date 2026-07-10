@@ -24,6 +24,9 @@ public final class ModRegistryCompatibilityTest {
         assertContains(modItems,
                 "ITEMS.registerItem(\"gondor_recruit_spawn_egg\"",
                 "spawn egg registration must use DeferredRegister.Items#registerItem");
+        assertContains(modItems,
+                "new RecruitSpawnEggItem(ModEntityTypes.GONDOR_RECRUIT.get(), properties)",
+                "spawn egg registration must retain an explicit recruit type fallback");
         assertNotContains(modItems,
                 "new SpawnEggItem(new Item.Properties()",
                 "spawn egg registration must not bypass Item.Properties#setId");

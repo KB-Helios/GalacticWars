@@ -1,0 +1,136 @@
+package middleearth.lotr.warmod.kingdom;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import middleearth.lotr.warmod.army.ArmyFormation;
+import middleearth.lotr.warmod.army.ArmyGroupLifecycleState;
+import middleearth.lotr.warmod.army.ArmyGroupRecord;
+import middleearth.lotr.warmod.army.ArmyLocation;
+import middleearth.lotr.warmod.workforce.WorkerProfession;
+
+public final class ArmyWorkforcePersistenceTest {
+    private ArmyWorkforcePersistenceTest() {
+    }
+
+    public static void main(String[] args) {
+        armyMembershipOrderAndOrphaningPersistInDomainRecords();
+        worksiteCapacityAndAssignmentsAreAuthoritative();
+        projectSlotsAndAssignmentReleaseAreAtomic();
+        frontierWorksitesMigrateAndPersistConfiguration();
+        workOrdersUseGuardedRevisionedTransitions();
+        System.out.println("ArmyWorkforcePersistenceTest passed");
+    }
+
+    private static void armyMembershipOrderAndOrphaningPersistInDomainRecords() {
+        UUID owner = UUID.randomUUID();
+        UUID kingdom = UUID.randomUUID();
+        UUID commander = UUID.randomUUID();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        ArmyLocation anchor = new ArmyLocation("minecraft:overworld", 4, 64, 8);
+        ArmyGroupRecord group = ArmyGroupRecord.create(
+                owner, kingdom, commander, List.of(first, second, first), ArmyFormation.WEDGE, anchor, 100);
+        assertEquals(List.of(first, second), group.memberIds(), "ordered unique membership");
+        ArmyGroupRecord orphaned = group.orphan(anchor);
+        assertEquals(ArmyGroupLifecycleState.ORPHANED, orphaned.simulation().lifecycleState(), "orphan state");
+        assertEquals(group.memberIds(), orphaned.memberIds(), "orphan membership retention");
+        assertEquals(ArmyFormation.WEDGE, orphaned.order().formation(), "formation retention");
+    }
+
+    private static void worksiteCapacityAndAssignmentsAreAuthoritative() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        UUID third = UUID.randomUUID();
+        WorksiteRecord worksite = new WorksiteRecord(
+                UUID.randomUUID(), "farmer", "minecraft:overworld", 0, 64, 0, 8, 2,
+                List.of(WorkerProfession.FARMER), Optional.empty(), List.of(), List.of());
+        WorksiteRecord full = worksite.assign(first).assign(second);
+        assertTrue(!full.hasCapacity(), "two-slot capacity");
+        try {
+            full.assign(third);
+            throw new AssertionError("full worksite accepted third assignment");
+        } catch (IllegalStateException expected) {
+            // Expected.
+        }
+        assertTrue(full.release(first).hasCapacity(), "released capacity");
+    }
+
+    private static void workOrdersUseGuardedRevisionedTransitions() {
+        UUID recruit = UUID.randomUUID();
+        WorkOrder queued = new WorkOrder(
+                UUID.randomUUID(), WorkOrderType.BUILD, Optional.empty(), WorkOrderState.QUEUED,
+                Optional.empty(), Optional.of(UUID.randomUUID()), "minecraft:overworld", 0, 64, 0,
+                "minecraft:stone", 3, 0, "", 0);
+        WorkOrder claimed = queued.claim(recruit);
+        WorkOrder progressed = claimed.progress(2);
+        WorkOrder completed = progressed.progress(1);
+        assertEquals(1, claimed.revision(), "claim revision");
+        assertEquals(WorkOrderState.IN_PROGRESS, progressed.state(), "progress state");
+        assertEquals(WorkOrderState.COMPLETED, completed.state(), "completion state");
+        assertTrue(completed.release() == completed, "terminal order cannot be released");
+    }
+
+    private static void projectSlotsAndAssignmentReleaseAreAtomic() {
+        UUID settlementId = UUID.randomUUID();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        UUID builder = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        WorksiteRecord fullFrontier = new WorksiteRecord(
+                UUID.randomUUID(), "frontier", "minecraft:overworld", 0, 64, 0, 16, 2,
+                List.of(WorkerProfession.FARMER, WorkerProfession.BUILDER), Optional.empty(),
+                List.of(first, second), List.of());
+        WorksiteRecord projectSlot = new WorksiteRecord(
+                UUID.randomUUID(), "builder", "minecraft:overworld", 8, 64, 8, 16, 1,
+                List.of(WorkerProfession.BUILDER), Optional.of(projectId), List.of(), List.of());
+        SettlementRecord settlement = new SettlementRecord(
+                settlementId, "minecraft:overworld", 0, 64, 0, 48, 4,
+                List.of(first, second, builder), Optional.empty(), CommanderPolicy.defaults(),
+                List.of(fullFrontier, projectSlot), List.of(), List.of(), List.of(),
+                SettlementRewards.none(), 0);
+
+        SettlementRecord reserved = settlement.reserveWorksite(
+                builder, WorkerProfession.BUILDER, Optional.of(projectId));
+        WorksiteRecord assigned = reserved.assignedWorksite(builder).orElseThrow();
+        assertEquals(projectSlot.id(), assigned.id(), "project-specific builder slot");
+
+        WorkOrder queued = new WorkOrder(
+                UUID.randomUUID(), WorkOrderType.BUILD, Optional.empty(), WorkOrderState.QUEUED,
+                Optional.of(projectSlot.id()), Optional.of(projectId), "minecraft:overworld",
+                8, 64, 8, "minecraft:stone", 2, 0, "", 0);
+        WorkOrder claimed = queued.claim(builder);
+        SettlementRecord withOrder = reserved.withWorkOrder(queued, true).withWorkOrder(claimed, false);
+        SettlementRecord released = withOrder.releaseWorkerAssignments(builder);
+        assertTrue(released.assignedWorksite(builder).isEmpty(), "profession exit frees capacity");
+        assertEquals(WorkOrderState.QUEUED,
+                released.workOrder(queued.id()).orElseThrow().state(), "order released without deletion");
+    }
+
+    private static void frontierWorksitesMigrateAndPersistConfiguration() {
+        UUID worker = UUID.randomUUID();
+        WorksiteRecord legacySpecialized = new WorksiteRecord(
+                UUID.randomUUID(), "farmer", "minecraft:overworld", 10, 64, 10, 8, 1);
+        SettlementRecord migrated = new SettlementRecord(
+                UUID.randomUUID(), "minecraft:overworld", 0, 64, 0, 48, 4,
+                List.of(worker), Optional.empty(), CommanderPolicy.defaults(),
+                List.of(legacySpecialized), List.of(), List.of(), List.of(),
+                SettlementRewards.none(), 0);
+        assertTrue(migrated.worksites().stream().anyMatch(site -> site.type().equals("frontier")),
+                "legacy settlement receives frontier worksite");
+        SettlementRecord assigned = migrated.reserveWorksite(worker, WorkerProfession.BUILDER);
+        SettlementRecord configured = assigned.configureAssignedFrontierWorksite(
+                worker, "minecraft:overworld", 5, 65, 6, 12);
+        WorksiteRecord frontier = configured.assignedWorksite(worker).orElseThrow();
+        assertEquals(5, frontier.x(), "frontier x");
+        assertEquals(12, frontier.radius(), "frontier radius");
+    }
+
+    private static void assertEquals(Object expected, Object actual, String label) {
+        if (!expected.equals(actual)) throw new AssertionError(label + " expected " + expected + " but was " + actual);
+    }
+
+    private static void assertTrue(boolean value, String label) {
+        if (!value) throw new AssertionError(label);
+    }
+}

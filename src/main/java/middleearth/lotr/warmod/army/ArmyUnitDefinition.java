@@ -12,8 +12,27 @@ public record ArmyUnitDefinition(
         int hireCost,
         int maxHealth,
         int attackDamage,
-        ArmyFormation defaultFormation
+        ArmyFormation defaultFormation,
+        String entityTypeId,
+        double movementSpeed,
+        double followRange,
+        double armor,
+        ArmyEquipmentLoadout equipment
 ) {
+    public ArmyUnitDefinition(
+            ArmyUnitId id,
+            String displayName,
+            FactionId factionId,
+            ArmyUnitRole role,
+            int hireCost,
+            int maxHealth,
+            int attackDamage,
+            ArmyFormation defaultFormation
+    ) {
+        this(id, displayName, factionId, role, hireCost, maxHealth, attackDamage, defaultFormation,
+                "", 0.28D, 24.0D, 0.0D, ArmyEquipmentLoadout.empty());
+    }
+
     public ArmyUnitDefinition {
         Objects.requireNonNull(id, "id");
         displayName = requireNonBlank(displayName, "displayName");
@@ -23,11 +42,22 @@ public record ArmyUnitDefinition(
         requireNonNegative(maxHealth, "maxHealth");
         requireNonNegative(attackDamage, "attackDamage");
         Objects.requireNonNull(defaultFormation, "defaultFormation");
+        entityTypeId = entityTypeId == null ? "" : entityTypeId.trim().toLowerCase();
+        requireNonNegative(movementSpeed, "movementSpeed");
+        requireNonNegative(followRange, "followRange");
+        requireNonNegative(armor, "armor");
+        equipment = equipment == null ? ArmyEquipmentLoadout.empty() : equipment;
     }
 
     private static void requireNonNegative(int value, String label) {
         if (value < 0) {
             throw new IllegalArgumentException(label + " cannot be negative");
+        }
+    }
+
+    private static void requireNonNegative(double value, String label) {
+        if (!Double.isFinite(value) || value < 0.0D) {
+            throw new IllegalArgumentException(label + " cannot be negative or non-finite");
         }
     }
 

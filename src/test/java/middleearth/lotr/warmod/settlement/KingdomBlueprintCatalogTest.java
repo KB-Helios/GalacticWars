@@ -27,17 +27,29 @@ public final class KingdomBlueprintCatalogTest {
             validateDataResource(blueprint);
         }
         assertTrue(KingdomBaseBlueprint.byId("house").isPresent(), "house lookup");
-        assertEquals("starter_keep", KingdomBaseBlueprint.STARTER_KEEP_ID, "shared starter keep id");
+        assertTrue(KingdomBaseBlueprint.byId("kingdomwarsmiddleearth:house").isPresent(),
+                "canonical house lookup");
+        assertEquals("kingdomwarsmiddleearth:starter_keep", KingdomBaseBlueprint.STARTER_KEEP_ID,
+                "shared starter keep id");
         assertTrue(KingdomBaseBlueprint.byId("unknown").isEmpty(), "unknown lookup");
+        loaderConsumesAuthorityFields();
         System.out.println("KingdomBlueprintCatalogTest passed");
     }
 
+    private static void loaderConsumesAuthorityFields() throws IOException {
+        String manager = Files.readString(Path.of(
+                "src/main/java/middleearth/lotr/warmod/data/GameplayDataManager.java"));
+        assertContains(manager, "requiredObject(json, \"anchor\"", "loader anchor parsing");
+        assertContains(manager, "requiredArray(json, \"allowed_rotations\"", "loader rotation parsing");
+        assertContains(manager, "declares mismatched id", "resource id authority");
+    }
+
     private static void validateDataResource(KingdomBaseBlueprint blueprint) throws IOException {
-        Path file = BLUEPRINT_ROOT.resolve(blueprint.id() + ".json");
+        Path file = BLUEPRINT_ROOT.resolve(KingdomBaseBlueprint.path(blueprint.id()) + ".json");
         assertTrue(Files.isRegularFile(file), "data resource for " + blueprint.id());
         String json = Files.readString(file);
         assertContains(json, "\"schema_version\": 1", "schema version");
-        assertContains(json, "\"id\": \"kingdomwarsmiddleearth:" + blueprint.id() + "\"", "resource id");
+        assertContains(json, "\"id\": \"" + blueprint.id() + "\"", "resource id");
         assertContains(json, "\"anchor\"", "anchor");
         assertContains(json, "\"allowed_rotations\"", "rotation list");
         assertContains(json, "\"placements\"", "placements");

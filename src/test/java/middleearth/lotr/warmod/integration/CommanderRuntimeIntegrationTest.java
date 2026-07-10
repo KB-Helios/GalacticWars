@@ -16,7 +16,8 @@ public final class CommanderRuntimeIntegrationTest {
         assertContains(entity, "tryPromoteCommander", "commander promotion");
         assertContains(savedData, "hasCommanderSlot", "completed-keep commander gate");
         assertContains(entity, "linkLoadedSoldiersToCommander", "army group delegation");
-        assertContains(entity, "applyCommanderOrderToLoadedGroup", "commander group orders");
+        assertContains(entity, "persistArmyGroupOrder", "persistent commander group orders");
+        assertContains(savedData, "issueArmyOrder", "SavedData order authority");
         assertContains(entity, "reserveEmeralds", "atomic campaign reservation");
         assertContains(entity, "campaignDelayApplied", "large-gap campaign pause accounting");
         assertContains(entity, "remainingDelay", "single-application unloaded settlement delay");

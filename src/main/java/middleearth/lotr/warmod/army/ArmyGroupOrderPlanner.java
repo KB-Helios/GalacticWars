@@ -10,6 +10,15 @@ public final class ArmyGroupOrderPlanner {
     }
 
     public static List<ArmyGroupOrderAssignment> plan(ArmyGroupState group, ArmyFormation formation, int spacing) {
+        return plan(group, formation, spacing, null);
+    }
+
+    public static List<ArmyGroupOrderAssignment> plan(
+            ArmyGroupState group,
+            ArmyFormation formation,
+            int spacing,
+            ArmyPosition ownerAnchor
+    ) {
         Objects.requireNonNull(group, "group");
         Objects.requireNonNull(formation, "formation");
 
@@ -17,8 +26,12 @@ public final class ArmyGroupOrderPlanner {
         return switch (groupCommand.type()) {
             case MOVE_TO_POSITION -> planFormationCommand(group, formation, spacing, true);
             case HOLD_POSITION -> planFormationCommand(group, formation, spacing, false);
-            case FOLLOW_OWNER -> planDirectCommand(group, "follow_group_order");
-            case PROTECT_OWNER -> planDirectCommand(group, "protect_group_order");
+            case FOLLOW_OWNER -> ownerAnchor == null
+                    ? planDirectCommand(group, "follow_group_order")
+                    : planOwnerFormationCommand(group, formation, spacing, ownerAnchor, "follow_group_order");
+            case PROTECT_OWNER -> ownerAnchor == null
+                    ? planDirectCommand(group, "protect_group_order")
+                    : planOwnerFormationCommand(group, formation, spacing, ownerAnchor, "protect_group_order");
             case ATTACK_TARGET -> planDirectCommand(group, "attack_group_order");
             case CLEAR_TARGET -> planDirectCommand(group, "clear_group_order");
         };
@@ -53,6 +66,32 @@ public final class ArmyGroupOrderPlanner {
                     moveCommand ? "move_group_order" : "hold_group_order"));
         }
 
+        return List.copyOf(assignments);
+    }
+
+    private static List<ArmyGroupOrderAssignment> planOwnerFormationCommand(
+            ArmyGroupState group,
+            ArmyFormation formation,
+            int spacing,
+            ArmyPosition ownerAnchor,
+            String reasonCode
+    ) {
+        List<UUID> recruitIds = List.copyOf(group.recruitIds());
+        List<FormationSlot> slots = FormationPlanner.planSlots(formation, recruitIds.size(), spacing);
+        ArrayList<ArmyGroupOrderAssignment> assignments = new ArrayList<>(recruitIds.size());
+        for (int index = 0; index < recruitIds.size(); index++) {
+            FormationSlot slot = slots.get(index);
+            ArmyPosition assignedPosition = new ArmyPosition(
+                    ownerAnchor.x() + slot.sideOffset(),
+                    ownerAnchor.y(),
+                    ownerAnchor.z() + slot.forwardOffset());
+            assignments.add(new ArmyGroupOrderAssignment(
+                    recruitIds.get(index),
+                    copyForRecruit(group),
+                    assignedPosition,
+                    slot,
+                    reasonCode));
+        }
         return List.copyOf(assignments);
     }
 

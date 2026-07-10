@@ -42,6 +42,8 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     public static final int BUTTON_ASSIGN_COOK = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 6;
     public static final int BUTTON_ASSIGN_MERCHANT = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 7;
     public static final int BUTTON_ASSIGN_COURIER = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 8;
+    public static final int BUTTON_CYCLE_FORMATION = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 9;
+    public static final int BUTTON_ROTATE_BLUEPRINT = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 10;
 
     private final int recruitEntityId;
     private final Level level;
@@ -94,6 +96,9 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
 
     public static boolean isSupportedButton(int buttonId) {
         if (buttonId >= BUTTON_HIRE && buttonId <= BUTTON_CANCEL_BUILD) {
+            return true;
+        }
+        if (buttonId == BUTTON_CYCLE_FORMATION || buttonId == BUTTON_ROTATE_BLUEPRINT) {
             return true;
         }
         return WorkerProfessionCatalog.definitionForButton(buttonId)
