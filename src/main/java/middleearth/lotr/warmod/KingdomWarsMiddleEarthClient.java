@@ -1,7 +1,13 @@
 package middleearth.lotr.warmod;
 
+import middleearth.lotr.warmod.client.gui.RecruitCommandScreen;
+import middleearth.lotr.warmod.client.render.MiddleEarthRecruitRenderer;
+import middleearth.lotr.warmod.registry.ModEntityTypes;
+import middleearth.lotr.warmod.registry.ModMenuTypes;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
@@ -24,5 +30,29 @@ public class KingdomWarsMiddleEarthClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         KingdomWarsMiddleEarth.LOGGER.info("KingdomWars-Middle-Earth client foundation loaded.");
+    }
+
+    @SubscribeEvent
+    static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerEntityRenderer(
+                ModEntityTypes.GONDOR_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.GONDOR_RECRUIT.get()));
+        event.registerEntityRenderer(
+                ModEntityTypes.ROHAN_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.ROHAN_RECRUIT.get()));
+        event.registerEntityRenderer(
+                ModEntityTypes.MORDOR_ORC_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.MORDOR_ORC_RECRUIT.get()));
+        event.registerEntityRenderer(
+                ModEntityTypes.DWARF_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.DWARF_RECRUIT.get()));
+        event.registerEntityRenderer(
+                ModEntityTypes.ELF_RECRUIT.get(),
+                context -> new MiddleEarthRecruitRenderer<>(context, ModEntityTypes.ELF_RECRUIT.get()));
+    }
+
+    @SubscribeEvent
+    static void registerMenuScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenuTypes.RECRUIT_COMMAND.get(), RecruitCommandScreen::new);
     }
 }

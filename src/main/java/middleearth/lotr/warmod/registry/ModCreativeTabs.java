@@ -23,6 +23,14 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.MITHRIL_ORE.get());
                         output.accept(ModItems.MALLORN_LOG.get());
                         output.accept(ModItems.MITHRIL_INGOT.get());
+                        output.accept(ModItems.GONDOR_STEEL_INGOT.get());
+                        output.accept(ModItems.ROHAN_HORSEHAIR.get());
+                        output.accept(ModItems.MORDOR_IRON_SHARD.get());
+                        output.accept(ModItems.GONDOR_RECRUIT_SPAWN_EGG.get());
+                        output.accept(ModItems.ROHAN_RECRUIT_SPAWN_EGG.get());
+                        output.accept(ModItems.MORDOR_ORC_RECRUIT_SPAWN_EGG.get());
+                        output.accept(ModItems.DWARF_RECRUIT_SPAWN_EGG.get());
+                        output.accept(ModItems.ELF_RECRUIT_SPAWN_EGG.get());
                     })
                     .build());
 

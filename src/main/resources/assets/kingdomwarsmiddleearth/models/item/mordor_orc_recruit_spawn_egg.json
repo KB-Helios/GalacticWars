@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "kingdomwarsmiddleearth:item/mordor_orc_recruit_spawn_egg"
+  }
+}

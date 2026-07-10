@@ -2,6 +2,8 @@ package middleearth.lotr.warmod.registry;
 
 import middleearth.lotr.warmod.KingdomWarsMiddleEarth;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RotatedPillarBlock;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
@@ -15,7 +17,8 @@ public final class ModBlocks {
     public static final DeferredBlock<Block> MITHRIL_ORE =
             BLOCKS.registerSimpleBlock("mithril_ore", properties -> properties.mapColor(MapColor.STONE));
     public static final DeferredBlock<Block> MALLORN_LOG =
-            BLOCKS.registerSimpleBlock("mallorn_log", properties -> properties.mapColor(MapColor.STONE));
+            BLOCKS.registerBlock("mallorn_log", properties -> new RotatedPillarBlock(
+                    properties.mapColor(MapColor.COLOR_YELLOW).strength(2.0F).sound(SoundType.WOOD)));
 
     private ModBlocks() {
     }

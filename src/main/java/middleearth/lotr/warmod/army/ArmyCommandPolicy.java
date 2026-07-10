@@ -20,9 +20,6 @@ public final class ArmyCommandPolicy {
         if (group == null) {
             return ArmyCommandValidation.rejected("missing_group");
         }
-        if (alignment == null || !alignment.playerId().equals(command.issuedBy())) {
-            return ArmyCommandValidation.rejected("unknown_player");
-        }
         if (unitFaction == null) {
             return ArmyCommandValidation.rejected("unknown_faction");
         }
@@ -32,7 +29,7 @@ public final class ArmyCommandPolicy {
         if (!group.groupId().equals(command.groupId())) {
             return ArmyCommandValidation.rejected("group_mismatch");
         }
-        if (!alignment.playerId().equals(command.issuedBy())) {
+        if (alignment == null || !alignment.playerId().equals(command.issuedBy())) {
             return ArmyCommandValidation.rejected("unknown_player");
         }
         if (group.recruitIds().isEmpty()) {
