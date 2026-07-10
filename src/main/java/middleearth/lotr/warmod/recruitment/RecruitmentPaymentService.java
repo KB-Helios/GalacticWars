@@ -27,12 +27,17 @@ public final class RecruitmentPaymentService {
             return false;
         }
         int removed = 0;
-        for (ItemStack stack : player.getInventory().getNonEquipmentItems()) {
+        for (int i = 0; i < player.getInventory().items.size(); i++) {
+            ItemStack stack = player.getInventory().items.get(i);
             if (!stack.is(Items.EMERALD)) {
                 continue;
             }
             int taken = Math.min(amount - removed, stack.getCount());
-            stack.shrink(taken);
+            if (taken == stack.getCount()) {
+                player.getInventory().setItem(i, ItemStack.EMPTY);
+            } else {
+                stack.shrink(taken);
+            }
             removed += taken;
             if (removed == amount) {
                 break;
