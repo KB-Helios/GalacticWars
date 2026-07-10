@@ -31,6 +31,8 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     public static final int BUTTON_TOGGLE_AUTO_RECRUITMENT = 15;
     public static final int BUTTON_START_RECRUITMENT = 16;
     public static final int BUTTON_NEXT_BLUEPRINT = 17;
+    public static final int BUTTON_RETURN_TO_SOLDIER = 18;
+    public static final int BUTTON_CANCEL_BUILD = 19;
     public static final int BUTTON_ASSIGN_FARMER = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID;
     public static final int BUTTON_ASSIGN_LUMBERJACK = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 1;
     public static final int BUTTON_ASSIGN_FISHERMAN = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 2;
@@ -57,7 +59,10 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     @Override
     public boolean clickMenuButton(Player player, int buttonId) {
         Entity entity = this.level.getEntity(this.recruitEntityId);
-        if (player instanceof ServerPlayer serverPlayer && entity instanceof MiddleEarthRecruitEntity recruit) {
+        if (isSupportedButton(buttonId)
+                && this.stillValid(player)
+                && player instanceof ServerPlayer serverPlayer
+                && entity instanceof MiddleEarthRecruitEntity recruit) {
             return recruit.handleMenuButton(serverPlayer, buttonId);
         }
         return false;
@@ -71,7 +76,8 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         Entity entity = this.level.getEntity(this.recruitEntityId);
-        return entity instanceof MiddleEarthRecruitEntity
+        return player.level() == this.level
+                && entity instanceof MiddleEarthRecruitEntity
                 && entity.isAlive()
                 && player.distanceToSqr(entity) <= 64.0;
     }
@@ -84,5 +90,14 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
         return WorkerProfessionCatalog.enabledProfessions().stream()
                 .mapToInt(definition -> definition.commandButtonId())
                 .toArray();
+    }
+
+    public static boolean isSupportedButton(int buttonId) {
+        if (buttonId >= BUTTON_HIRE && buttonId <= BUTTON_CANCEL_BUILD) {
+            return true;
+        }
+        return WorkerProfessionCatalog.definitionForButton(buttonId)
+                .filter(definition -> WorkerProfessionCatalog.isEnabled(definition.profession()))
+                .isPresent();
     }
 }

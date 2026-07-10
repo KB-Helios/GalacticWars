@@ -22,7 +22,7 @@ public final class ModBlocks {
                     properties.mapColor(MapColor.COLOR_YELLOW).strength(2.0F).sound(SoundType.WOOD)));
     public static final DeferredBlock<KingdomHallBlock> KINGDOM_HALL =
             BLOCKS.registerBlock("kingdom_hall", properties -> new KingdomHallBlock(
-                    properties.mapColor(MapColor.STONE).strength(4.0F, 8.0F).sound(SoundType.STONE)));
+                    properties.mapColor(MapColor.STONE).strength(4.0F, 1200.0F).sound(SoundType.STONE)));
 
     private ModBlocks() {
     }

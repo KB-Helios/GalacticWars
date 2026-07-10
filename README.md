@@ -51,3 +51,17 @@ Build with the included Gradle wrapper:
 Animated entity work uses GeckoLib 5.5.3 for NeoForge 26.2. The dependency is
 declared in Gradle and in the generated NeoForge mod metadata so clients and
 servers load it before animated Middle-earth recruit entities.
+
+## Next milestones
+
+- Persist army groups and orders across chunk unloads, then connect the existing
+  formation, targeting, tactical, and command-policy planners to live recruits.
+- Load faction/unit costs, attributes, alliances, and alignment from the current
+  data resources instead of using shared runtime constants.
+- Enforce worksite capacity and persisted work orders, and load building
+  blueprints from their JSON resources.
+- Complete survival acquisition for the Kingdom Hall, Mallorn wood, Mithril,
+  and faction equipment before adding more decorative items.
+- Enable the remaining professions only after the current worker loop has full
+  runtime coverage; world generation, cavalry, ranged units, trading, quests,
+  and conquest remain later expansion work.

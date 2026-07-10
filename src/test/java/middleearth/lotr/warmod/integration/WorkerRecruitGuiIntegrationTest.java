@@ -48,6 +48,11 @@ public final class WorkerRecruitGuiIntegrationTest {
             assertContains(menu, constant, "menu button " + constant);
         }
         assertContains(menu, "workerProfessionButtonIds", "menu profession button list");
+        assertContains(menu, "BUTTON_RETURN_TO_SOLDIER", "return-to-soldier action");
+        assertContains(menu, "BUTTON_CANCEL_BUILD", "building cancellation action");
+        assertContains(menu, "isSupportedButton", "server button allowlist");
+        assertContains(menu, "this.stillValid(player)", "server menu distance validation");
+        assertContains(menu, "player.level() == this.level", "server menu dimension validation");
     }
 
     private static void recruitPersistsAndAppliesWorkerProfession() throws IOException {
@@ -62,6 +67,9 @@ public final class WorkerRecruitGuiIntegrationTest {
         assertContains(entity, "RecruitmentAction.WORK_AT_SITE", "profession assignment can activate work mode");
         assertContains(entity, "\"WorkerProfession\"", "profession save data");
         assertContains(entity, "applyWorkerEquipment", "role equipment application");
+        assertContains(entity, "tryReturnToSoldier", "safe worker contract exit");
+        assertContains(entity, "tryCancelBuilding", "safe building cancellation");
+        assertContains(entity, "workerInventoryIsEmpty", "carried-item contract exit guard");
     }
 
     private static void screenRendersProfessionButtons() throws IOException {
@@ -74,6 +82,8 @@ public final class WorkerRecruitGuiIntegrationTest {
                 "screen init null-safe entity lookup");
         assertContains(screen, "WorkerProfessionCatalog.definitionForButton", "dynamic profession label lookup");
         assertContains(screen, "RecruitCommandMenu.BUTTON_PROMOTE_COMMANDER", "commander promotion button");
+        assertContains(screen, "RecruitCommandMenu.BUTTON_RETURN_TO_SOLDIER", "return-to-soldier button");
+        assertContains(screen, "RecruitCommandMenu.BUTTON_CANCEL_BUILD", "cancel-building button");
     }
 
     private static void languageContainsProfessionLabels() throws IOException {
@@ -84,6 +94,8 @@ public final class WorkerRecruitGuiIntegrationTest {
         }
         assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.profession.need_emeralds\"", "profession cost failure message");
         assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.profession.contract\"", "profession contract message");
+        assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.soldier.returned\"", "soldier return message");
+        assertContains(language, "\"message.kingdomwarsmiddleearth.recruit.base.cancelled\"", "building cancellation message");
     }
 
     private static String read(String path) throws IOException {

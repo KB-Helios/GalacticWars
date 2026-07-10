@@ -21,6 +21,7 @@ import middleearth.lotr.warmod.menu.RecruitCommandMenu;
 import middleearth.lotr.warmod.menu.RecruitCommandMenuProvider;
 import middleearth.lotr.warmod.recruitment.RecruitmentAction;
 import middleearth.lotr.warmod.recruitment.RecruitDuty;
+import middleearth.lotr.warmod.recruitment.RecruitmentPaymentService;
 import middleearth.lotr.warmod.registry.ModBlocks;
 import middleearth.lotr.warmod.registry.ModBlockTags;
 import middleearth.lotr.warmod.registry.ModEntityTypes;
@@ -42,6 +43,7 @@ import middleearth.lotr.warmod.workforce.WorkerProfession;
 import middleearth.lotr.warmod.workforce.WorkerProfessionCatalog;
 import middleearth.lotr.warmod.workforce.WorkerProfessionDefinition;
 import middleearth.lotr.warmod.workforce.WorkerAssignment;
+import middleearth.lotr.warmod.workforce.WorkerContractService;
 import middleearth.lotr.warmod.workforce.WorkerPhase;
 import middleearth.lotr.warmod.workforce.WorkerResourceAction;
 import middleearth.lotr.warmod.workforce.WorkerResourceDecision;
@@ -64,7 +66,6 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntitySpawnReason;
@@ -169,6 +170,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
     private @Nullable BlockPos blacklistedWorkTarget;
     private int blacklistedWorkTargetTicks;
     private long lastCommanderCampaignGameTime;
+    private boolean deathResourcesReleased;
 
     public MiddleEarthRecruitEntity(EntityType<? extends TamableAnimal> entityType, Level level) {
         super(entityType, level);
@@ -388,12 +390,22 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
 
     @Override
     public void die(DamageSource damageSource) {
-        if (!this.level().isClientSide() && this.getRecruitDuty() == RecruitDuty.COMMANDER) {
-            this.cancelActiveCommanderCampaign("commander_lost");
-            if (this.level() instanceof ServerLevel serverLevel && this.getOwnerReference() != null) {
-                KingdomSavedData.get(serverLevel).clearCommander(
-                        this.getOwnerReference().getUUID(),
-                        this.getUUID());
+        if (!this.deathResourcesReleased && this.level() instanceof ServerLevel serverLevel) {
+            this.deathResourcesReleased = true;
+            List<ItemStack> carriedItems = this.workerInventory.stream().map(ItemStack::copy).toList();
+            this.workerInventory = NonNullList.withSize(9, ItemStack.EMPTY);
+            RecruitLifecycleService.dropCarriedItems(serverLevel, this, carriedItems);
+            EntityReference<LivingEntity> owner = this.getOwnerReference();
+            if (owner != null) {
+                UUID ownerId = owner.getUUID();
+                Optional<KingdomRecord> kingdom = KingdomSavedData.get(serverLevel).kingdomForOwner(ownerId);
+                boolean commander = this.getRecruitDuty() == RecruitDuty.COMMANDER;
+                RecruitLifecycleService.releaseSettlementState(
+                        serverLevel, ownerId, this.getUUID(), commander);
+                if (commander) {
+                    kingdom.flatMap(record -> this.findKingdomHall(serverLevel, record))
+                            .ifPresent(hall -> hall.settlePendingCampaignRefunds(serverLevel));
+                }
             }
         }
         super.die(damageSource);
@@ -545,11 +557,17 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
     }
 
     public boolean handleMenuButton(ServerPlayer player, int buttonId) {
+        if (player.level() != this.level()
+                || !this.isAlive()
+                || player.distanceToSqr(this) > 64.0
+                || !RecruitCommandMenu.isSupportedButton(buttonId)) {
+            return false;
+        }
         if (buttonId == RecruitCommandMenu.BUTTON_HIRE) {
             return this.tryHire(player);
         }
         if (!this.isOwnedBy(player)) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.not_owner"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.not_owner"));
             return false;
         }
         Optional<WorkerProfession> profession = WorkerProfessionCatalog.professionForButton(buttonId);
@@ -562,6 +580,8 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
             case RecruitCommandMenu.BUTTON_TOGGLE_AUTO_RECRUITMENT -> this.tryToggleAutomaticRecruitment(player);
             case RecruitCommandMenu.BUTTON_START_RECRUITMENT -> this.tryStartCommanderCampaign(player);
             case RecruitCommandMenu.BUTTON_NEXT_BLUEPRINT -> this.cycleSelectedBlueprint(player);
+            case RecruitCommandMenu.BUTTON_RETURN_TO_SOLDIER -> this.tryReturnToSoldier(player);
+            case RecruitCommandMenu.BUTTON_CANCEL_BUILD -> this.tryCancelBuilding(player);
             case RecruitCommandMenu.BUTTON_FOLLOW -> {
                 this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
                 this.applyCommanderOrderToLoadedGroup(RecruitmentAction.FOLLOW_OWNER, null);
@@ -756,6 +776,25 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
             this.setRecruitDuty(RecruitDuty.WORKER);
         }
         this.applyWorkerEquipment(profession);
+        this.syncRecruitStatusState();
+    }
+
+    private void clearWorkerProfession() {
+        this.entityData.set(DATA_WORKER_PROFESSION, -1);
+        this.setRecruitDuty(RecruitDuty.SOLDIER);
+        this.workerPhase = WorkerPhase.ACQUIRE_ORDER;
+        this.workerReason = "soldier_duty";
+        this.workerCooldownTicks = 0;
+        this.activeWorkTarget = null;
+        this.blacklistedWorkTarget = null;
+        this.blacklistedWorkTargetTicks = 0;
+        this.workOrderId = null;
+        this.setWorkTarget(null);
+        this.setStorageTarget(null);
+        this.setBaseTarget(null);
+        this.starterBaseCompletedBlocks = 0;
+        this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_SWORD));
+        this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
         this.syncRecruitStatusState();
     }
 
@@ -1061,7 +1100,8 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         NonNullList<ItemStack> nextInventory = this.copyWorkerInventory();
 
         if (profession == WorkerProfession.FARMER) {
-            if (!removeOneFromStacks(drops, Items.WHEAT_SEEDS)) {
+            if (!removeOneFromStacks(drops, Items.WHEAT_SEEDS)
+                    && !removeOneFromStacks(nextInventory, Items.WHEAT_SEEDS)) {
                 this.blockWorker("replant_seed_missing");
                 return;
             }
@@ -1266,7 +1306,11 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         if (owner == null) {
             return false;
         }
-        return KingdomSavedData.get(serverLevel).kingdomForOwner(owner.getUUID())
+        KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        if (!data.isHallActive(owner.getUUID())) {
+            return false;
+        }
+        return data.kingdomForOwner(owner.getUUID())
                 .map(KingdomRecord::settlement)
                 .filter(settlement -> settlement.dimensionId().equals(serverLevel.dimension().identifier().toString()))
                 .filter(settlement -> Math.abs(target.getX() - settlement.hallX()) <= settlement.claimRadius())
@@ -1453,7 +1497,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
 
     private boolean tryHire(ServerPlayer player) {
         if (this.isTame()) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.already_hired"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.already_hired"));
             return false;
         }
         if (!(this.level() instanceof ServerLevel serverLevel)) {
@@ -1462,7 +1506,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         KingdomSavedData kingdomData = KingdomSavedData.get(serverLevel);
         Optional<KingdomRecord> kingdom = kingdomData.kingdomForOwner(player.getUUID());
         if (kingdom.isEmpty()) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.kingdom_hall_required"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.kingdom_hall_required"));
             return false;
         }
         Optional<KingdomHallBlockEntity> hall = this.findKingdomHall(serverLevel, kingdom.get());
@@ -1470,7 +1514,9 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                 kingdom.get(),
                 this.recruitFactionId(),
                 HIRE_COST_EMERALDS,
-                player.hasInfiniteMaterials() ? Integer.MAX_VALUE : emeraldCount(player),
+                player.hasInfiniteMaterials()
+                        ? Integer.MAX_VALUE
+                        : RecruitmentPaymentService.emeraldCount(player),
                 hall.map(KingdomHallBlockEntity::upkeepPaid).orElse(false),
                 alliedFactionsFor(kingdom.get().factionId()));
         if (!eligibility.accepted()) {
@@ -1480,23 +1526,23 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
                 case "hostile_faction" -> "message.kingdomwarsmiddleearth.recruit.hostile_faction";
                 default -> "message.kingdomwarsmiddleearth.recruit.upkeep_unpaid";
             };
-            player.sendSystemMessage(eligibility.reasonCode().equals("insufficient_funds")
+            sendFeedback(player, eligibility.reasonCode().equals("insufficient_funds")
                     ? Component.translatable(translationKey, HIRE_COST_EMERALDS)
                     : Component.translatable(translationKey));
             return false;
         }
         if (!kingdomData.registerRecruit(player.getUUID(), this.getUUID())) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.housing_full"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.housing_full"));
             return false;
         }
-        if (!player.hasInfiniteMaterials()) {
-            player.getInventory().clearOrCountMatchingItems(
-                    stack -> stack.is(Items.EMERALD),
-                    HIRE_COST_EMERALDS,
-                    new SimpleContainer(0));
+        if (!RecruitmentPaymentService.withdrawEmeralds(player, HIRE_COST_EMERALDS)) {
+            kingdomData.unregisterRecruit(player.getUUID(), this.getUUID());
+            sendFeedback(player, Component.translatable(
+                    "message.kingdomwarsmiddleearth.recruit.payment_changed"));
+            return false;
         }
 
-        this.tame(player);
+        this.tameForContract(player);
         KingdomRecord registeredKingdom = kingdomData.kingdomForOwner(player.getUUID()).orElseThrow();
         this.kingdomId = registeredKingdom.id();
         this.settlementId = registeredKingdom.settlement().id();
@@ -1505,44 +1551,43 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         this.setTarget(null);
         this.navigation.stop();
         this.level().broadcastEntityEvent(this, (byte) 7);
-        player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.hired"));
+        sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.hired"));
         return true;
     }
 
     private boolean tryAssignWorkerProfession(ServerPlayer player, WorkerProfession profession) {
         if (!WorkerProfessionCatalog.isEnabled(profession)) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.profession.disabled"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.profession.disabled"));
             return false;
         }
         if (this.getRecruitDuty() == RecruitDuty.COMMANDER) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.worker"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.worker"));
             return false;
         }
         WorkerProfessionDefinition definition = WorkerProfessionCatalog.definition(profession).orElseThrow();
         int cost = definition.hireCostEmeralds();
         if (this.getWorkerProfession().filter(current -> current == profession).isPresent()) {
             this.resumeWorkAfterProfessionAssignment();
-            player.sendSystemMessage(Component.translatable(
+            sendFeedback(player, Component.translatable(
                     "message.kingdomwarsmiddleearth.recruit.profession",
                     Component.translatable(profession.translationKey())));
             return true;
         }
-        if (!player.hasInfiniteMaterials() && emeraldCount(player) < cost) {
-            player.sendSystemMessage(Component.translatable(
+        if (!player.hasInfiniteMaterials() && RecruitmentPaymentService.emeraldCount(player) < cost) {
+            sendFeedback(player, Component.translatable(
                     "message.kingdomwarsmiddleearth.recruit.profession.need_emeralds",
                     cost,
                     Component.translatable(profession.translationKey())));
             return false;
         }
-        if (!player.hasInfiniteMaterials()) {
-            player.getInventory().clearOrCountMatchingItems(
-                    stack -> stack.is(Items.EMERALD),
-                    cost,
-                    new SimpleContainer(0));
+        if (!RecruitmentPaymentService.withdrawEmeralds(player, cost)) {
+            sendFeedback(player, Component.translatable(
+                    "message.kingdomwarsmiddleearth.recruit.payment_changed"));
+            return false;
         }
         this.setWorkerProfession(profession);
         this.resumeWorkAfterProfessionAssignment();
-        player.sendSystemMessage(Component.translatable(
+        sendFeedback(player, Component.translatable(
                 "message.kingdomwarsmiddleearth.recruit.profession.contract",
                 Component.translatable(profession.translationKey()),
                 cost));
@@ -1569,6 +1614,47 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         return true;
     }
 
+    private boolean tryReturnToSoldier(ServerPlayer player) {
+        WorkerContractService.ExitDecision decision = WorkerContractService.evaluateExit(
+                this.getRecruitDuty(),
+                this.getWorkerProfession().isPresent(),
+                this.workerInventoryIsEmpty(),
+                this.baseTarget != null);
+        if (decision != WorkerContractService.ExitDecision.ACCEPTED) {
+            String translationKey = switch (decision) {
+                case NOT_WORKER -> "message.kingdomwarsmiddleearth.recruit.soldier.rejected";
+                case CARRIED_ITEMS -> "message.kingdomwarsmiddleearth.recruit.soldier.inventory";
+                case ACTIVE_BUILD -> "message.kingdomwarsmiddleearth.recruit.soldier.build_active";
+                case ACCEPTED -> throw new IllegalStateException("accepted exit handled below");
+            };
+            sendFeedback(player, Component.translatable(translationKey));
+            return false;
+        }
+        this.pauseWorkerNavigation();
+        this.clearWorkerProfession();
+        sendFeedback(player, Component.translatable(
+                "message.kingdomwarsmiddleearth.recruit.soldier.returned"));
+        return true;
+    }
+
+    private boolean tryCancelBuilding(ServerPlayer player) {
+        if (this.baseTarget == null) {
+            sendFeedback(player, Component.translatable(
+                    "message.kingdomwarsmiddleearth.recruit.base.cancel_missing"));
+            return false;
+        }
+        this.pauseWorkerNavigation();
+        this.setBaseTarget(null);
+        this.setWorkTarget(null);
+        this.starterBaseCompletedBlocks = 0;
+        this.workOrderId = null;
+        this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
+        this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "build_cancelled", null);
+        sendFeedback(player, Component.translatable(
+                "message.kingdomwarsmiddleearth.recruit.base.cancelled"));
+        return true;
+    }
+
     private KingdomBaseBlueprint selectedBlueprint() {
         String blueprintId = this.level().isClientSide()
                 ? this.entityData.get(DATA_SELECTED_BLUEPRINT)
@@ -1579,14 +1665,14 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
 
     private boolean tryPromoteCommander(ServerPlayer player) {
         if (this.getRecruitDuty() != RecruitDuty.SOLDIER || this.getWorkerProfession().isPresent()) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.worker"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.worker"));
             return false;
         }
         this.migrateLegacyKingdomLink();
         if (!(this.level() instanceof ServerLevel serverLevel)
                 || this.kingdomId == null
                 || !KingdomSavedData.get(serverLevel).promoteCommander(player.getUUID(), this.getUUID())) {
-            player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.rejected"));
+            sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.rejected"));
             return false;
         }
         this.setRecruitDuty(RecruitDuty.COMMANDER);
@@ -1595,7 +1681,7 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         }
         this.linkLoadedSoldiersToCommander(serverLevel, player.getUUID());
         this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
-        player.sendSystemMessage(Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.promoted"));
+        sendFeedback(player, Component.translatable("message.kingdomwarsmiddleearth.recruit.commander.promoted"));
         return true;
     }
 
@@ -1855,6 +1941,9 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
     }
 
     private Optional<KingdomHallBlockEntity> findKingdomHall(ServerLevel level, KingdomRecord kingdom) {
+        if (!KingdomSavedData.get(level).isHallActive(kingdom.ownerId())) {
+            return Optional.empty();
+        }
         if (!kingdom.settlement().dimensionId().equals(level.dimension().identifier().toString())) {
             return Optional.empty();
         }
@@ -1917,9 +2006,24 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
         };
     }
 
+    private void tameForContract(ServerPlayer player) {
+        if (player.connection == null) {
+            this.setOwnerReference(EntityReference.of(player));
+            this.setTame(true, true);
+            return;
+        }
+        this.tame(player);
+    }
+
+    private static void sendFeedback(ServerPlayer player, Component message) {
+        if (player.connection != null) {
+            player.sendSystemMessage(message);
+        }
+    }
+
     private void sendCampaignRejection(@Nullable ServerPlayer player, String reason) {
         if (player != null) {
-            player.sendSystemMessage(Component.translatable(
+            sendFeedback(player, Component.translatable(
                     "message.kingdomwarsmiddleearth.recruit.commander.campaign_rejected",
                     reason));
         }
@@ -2182,13 +2286,6 @@ public class MiddleEarthRecruitEntity extends TamableAnimal implements GeoEntity
             case COURIER -> new ItemStack(Items.CHEST);
         };
         this.setItemSlot(EquipmentSlot.MAINHAND, heldItem);
-    }
-
-    private static int emeraldCount(ServerPlayer player) {
-        return player.getInventory().clearOrCountMatchingItems(
-                stack -> stack.is(Items.EMERALD),
-                0,
-                new SimpleContainer(0));
     }
 
     private static RecruitmentAction parseCommand(String value) {
