@@ -72,9 +72,8 @@ public final class WorkerRecruitGuiIntegrationTest {
                 screen,
                 "Entity entity = (this.minecraft != null && this.minecraft.level != null)",
                 "screen init null-safe entity lookup");
-        for (String key : PROFESSION_TRANSLATIONS) {
-            assertContains(screen, key, "screen role key " + key);
-        }
+        assertContains(screen, "WorkerProfessionCatalog.definitionForButton", "dynamic profession label lookup");
+        assertContains(screen, "RecruitCommandMenu.BUTTON_PROMOTE_COMMANDER", "commander promotion button");
     }
 
     private static void languageContainsProfessionLabels() throws IOException {

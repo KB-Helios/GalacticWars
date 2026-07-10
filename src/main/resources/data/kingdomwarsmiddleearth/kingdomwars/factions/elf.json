@@ -1,0 +1,11 @@
+{
+  "id": "kingdomwarsmiddleearth:elf",
+  "display_name": "Elven Realm",
+  "hire_cost": 28,
+  "minimum_hiring_alignment": 10,
+  "max_owned_recruits": 10,
+  "allies": [],
+  "enemies": [
+    "kingdomwarsmiddleearth:mordor"
+  ]
+}

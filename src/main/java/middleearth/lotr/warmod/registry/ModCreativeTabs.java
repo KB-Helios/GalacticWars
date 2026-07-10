@@ -22,6 +22,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.MIDDLE_EARTH_STONE.get());
                         output.accept(ModItems.MITHRIL_ORE.get());
                         output.accept(ModItems.MALLORN_LOG.get());
+                        output.accept(ModItems.KINGDOM_HALL.get());
                         output.accept(ModItems.MITHRIL_INGOT.get());
                         output.accept(ModItems.GONDOR_STEEL_INGOT.get());
                         output.accept(ModItems.ROHAN_HORSEHAIR.get());

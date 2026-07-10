@@ -5,7 +5,9 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 import middleearth.lotr.warmod.entity.MiddleEarthRecruitEntity;
+import middleearth.lotr.warmod.gametest.ModGameTests;
 import middleearth.lotr.warmod.registry.ModBlocks;
+import middleearth.lotr.warmod.registry.ModBlockEntityTypes;
 import middleearth.lotr.warmod.registry.ModCreativeTabs;
 import middleearth.lotr.warmod.registry.ModEntityTypes;
 import middleearth.lotr.warmod.registry.ModItems;
@@ -31,8 +33,11 @@ public class KingdomWarsMiddleEarth {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerEntityAttributes);
         modEventBus.addListener(this::registerSpawnPlacements);
+        modEventBus.addListener(ModGameTests::registerTestFunctions);
+        modEventBus.addListener(ModGameTests::registerGameTests);
 
         ModBlocks.register(modEventBus);
+        ModBlockEntityTypes.register(modEventBus);
         ModEntityTypes.register(modEventBus);
         ModItems.register(modEventBus);
         ModMenuTypes.register(modEventBus);

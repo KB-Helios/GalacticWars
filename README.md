@@ -1,8 +1,8 @@
 
 # KingdomWars-Middle-Earth
 
-KingdomWars-Middle-Earth is a NeoForge 26.2 port foundation for Middle-earth
-content and clean-room army behavior.
+KingdomWars-Middle-Earth is a NeoForge 26.2 kingdom, workforce, recruitment,
+and clean-room army gameplay mod for Middle-earth.
 
 ## Scope
 
@@ -13,11 +13,29 @@ content and clean-room army behavior.
 - Keep registrations, gameplay systems, and resources modular enough for later
   biomes, factions, NPCs, structures, and command UI work.
 
+## Kingdom gameplay
+
+1. Place a Kingdom Hall and sneak-use it to choose Gondor, Rohan, Mordor,
+   dwarf, or elf before recruiting. Normal use opens its shared treasury and
+   stockpile.
+2. Hire an aligned recruit, then assign farmer, lumberjack, miner, courier, or
+   builder duty from the recruit screen. Aim at a loaded block inside the Hall
+   claim to assign worksites and real containers.
+3. Fund the Hall and worker containers with real items. Workers walk to their
+   targets, collect loot, consume tools and replanting materials, and deliver
+   their inventory without virtual resource counters.
+4. Select and queue the starter keep, house, storehouse, farm plot, lumber
+   camp, or mine-site blueprint. Completing buildings adds housing, storage,
+   worksite capacity, and the starter keep's commander slot.
+5. Promote one owned soldier after completing the starter keep. The commander
+   can issue group orders and run bounded recruitment campaigns that respect
+   faction alignment, housing, treasury reserve, upkeep, and campaign limits.
+
 ## Licensing
 
 The project metadata is GPL-3.0-only compatible because LOTR-derived material is
 based on GPLv3 source. `talhanation/recruits` is All Rights Reserved and is used
-only as behavior reference unless explicit compatible permission is provided.
+only as a clean-room behavior reference; its code and assets are not included.
 
 See `NOTICE.md` for attribution and source-use rules.
 
@@ -27,8 +45,9 @@ Build with the included Gradle wrapper:
 
 ```bash
 ./gradlew build
+./gradlew runGameTestServer
 ```
 
 Animated entity work uses GeckoLib 5.5.3 for NeoForge 26.2. The dependency is
 declared in Gradle and in the generated NeoForge mod metadata so clients and
-servers load it before animated Middle-earth entities are introduced.
+servers load it before animated Middle-earth recruit entities.

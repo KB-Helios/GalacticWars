@@ -36,7 +36,11 @@ public final class WorkerWorksiteIntegrationTest {
         assertContains(entity, "\"WorkTargetX\"", "work target save x");
         assertContains(entity, "\"WorkRadius\"", "work radius save key");
         assertContains(entity, "DATA_WORK_RADIUS", "synched work radius");
-        assertContains(entity, "WorkerWorksite(\n                        area,\n                        this.workTarget.getX(),\n                        this.workTarget.getY(),\n                        this.workTarget.getZ(),\n                        this.workRadius)", "worksite uses recruit radius");
+        String normalizedEntity = entity.replaceAll("\\s+", " ");
+        assertContains(
+                normalizedEntity,
+                "WorkerWorksite( area, this.workTarget.getX(), this.workTarget.getY(), this.workTarget.getZ(), this.workRadius)",
+                "worksite uses recruit radius");
         assertContains(entity, "worksiteScanRadius()", "scan uses configured work radius");
         assertContains(entity, "BUTTON_SET_WORKSITE", "set worksite handling");
         assertContains(entity, "BUTTON_RETURN_WORKSITE", "return worksite handling");

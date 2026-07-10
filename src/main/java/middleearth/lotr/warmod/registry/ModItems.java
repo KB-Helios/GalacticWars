@@ -17,6 +17,8 @@ public final class ModItems {
             ITEMS.registerSimpleBlockItem("mithril_ore", ModBlocks.MITHRIL_ORE);
     public static final DeferredItem<BlockItem> MALLORN_LOG =
             ITEMS.registerSimpleBlockItem("mallorn_log", ModBlocks.MALLORN_LOG);
+    public static final DeferredItem<BlockItem> KINGDOM_HALL =
+            ITEMS.registerSimpleBlockItem("kingdom_hall", ModBlocks.KINGDOM_HALL);
     public static final DeferredItem<Item> MITHRIL_INGOT =
             ITEMS.registerSimpleItem("mithril_ingot", properties -> properties);
     public static final DeferredItem<Item> GONDOR_STEEL_INGOT =

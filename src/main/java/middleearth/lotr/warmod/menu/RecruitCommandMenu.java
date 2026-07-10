@@ -27,6 +27,10 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     public static final int BUTTON_BUILD_STARTER_KEEP = 11;
     public static final int BUTTON_WORK_RADIUS_DECREASE = 12;
     public static final int BUTTON_WORK_RADIUS_INCREASE = 13;
+    public static final int BUTTON_PROMOTE_COMMANDER = 14;
+    public static final int BUTTON_TOGGLE_AUTO_RECRUITMENT = 15;
+    public static final int BUTTON_START_RECRUITMENT = 16;
+    public static final int BUTTON_NEXT_BLUEPRINT = 17;
     public static final int BUTTON_ASSIGN_FARMER = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID;
     public static final int BUTTON_ASSIGN_LUMBERJACK = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 1;
     public static final int BUTTON_ASSIGN_FISHERMAN = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 2;
@@ -77,16 +81,8 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     }
 
     public static int[] workerProfessionButtonIds() {
-        return new int[] {
-                BUTTON_ASSIGN_FARMER,
-                BUTTON_ASSIGN_LUMBERJACK,
-                BUTTON_ASSIGN_FISHERMAN,
-                BUTTON_ASSIGN_ANIMAL_FARMER,
-                BUTTON_ASSIGN_MINER,
-                BUTTON_ASSIGN_BUILDER,
-                BUTTON_ASSIGN_COOK,
-                BUTTON_ASSIGN_MERCHANT,
-                BUTTON_ASSIGN_COURIER
-        };
+        return WorkerProfessionCatalog.enabledProfessions().stream()
+                .mapToInt(definition -> definition.commandButtonId())
+                .toArray();
     }
 }

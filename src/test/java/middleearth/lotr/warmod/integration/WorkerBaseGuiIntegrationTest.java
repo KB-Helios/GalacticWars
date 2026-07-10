@@ -22,6 +22,7 @@ public final class WorkerBaseGuiIntegrationTest {
 
         assertContains(menu, "BUTTON_SET_STORAGE", "set storage button");
         assertContains(menu, "BUTTON_BUILD_STARTER_KEEP", "build starter keep button");
+        assertContains(menu, "BUTTON_NEXT_BLUEPRINT", "next blueprint button");
     }
 
     private static void screenRendersStorageAndBaseButtons() throws IOException {
@@ -29,6 +30,7 @@ public final class WorkerBaseGuiIntegrationTest {
 
         assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.storage.set", "set storage label");
         assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.base.starter_keep", "starter keep label");
+        assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.base.next", "next blueprint label");
     }
 
     private static void recruitPersistsStorageAndBaseTargets() throws IOException {
@@ -38,6 +40,8 @@ public final class WorkerBaseGuiIntegrationTest {
         assertContains(entity, "baseTarget", "base target field");
         assertContains(entity, "\"StorageTargetX\"", "storage target save x");
         assertContains(entity, "\"BaseTargetX\"", "base target save x");
+        assertContains(entity, "\"SelectedBlueprint\"", "selected blueprint save key");
+        assertContains(entity, "DATA_SELECTED_BLUEPRINT", "selected blueprint client sync");
         assertContains(entity, "KingdomBaseBuildPlanner.planNext", "base build planner hook");
         assertContains(entity, "WorkerResourcePlanner.plan", "resource planner hook");
     }

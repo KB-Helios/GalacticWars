@@ -2,6 +2,7 @@ package middleearth.lotr.warmod.workforce;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public final class WorkerProfessionCatalog {
     public static final int FIRST_COMMAND_BUTTON_ID = 20;
@@ -61,6 +62,12 @@ public final class WorkerProfessionCatalog {
                     16,
                     FIRST_COMMAND_BUTTON_ID + 8,
                     "minecraft:chest"));
+    private static final Set<WorkerProfession> ENABLED_PROFESSIONS = Set.of(
+            WorkerProfession.FARMER,
+            WorkerProfession.LUMBERJACK,
+            WorkerProfession.MINER,
+            WorkerProfession.BUILDER,
+            WorkerProfession.COURIER);
 
     private WorkerProfessionCatalog() {
     }
@@ -78,6 +85,7 @@ public final class WorkerProfessionCatalog {
     public static Optional<WorkerProfession> professionForButton(int buttonId) {
         return PROFESSIONS.stream()
                 .filter(definition -> definition.commandButtonId() == buttonId)
+                .filter(definition -> isEnabled(definition.profession()))
                 .map(WorkerProfessionDefinition::profession)
                 .findFirst();
     }
@@ -86,5 +94,15 @@ public final class WorkerProfessionCatalog {
         return PROFESSIONS.stream()
                 .filter(definition -> definition.commandButtonId() == buttonId)
                 .findFirst();
+    }
+
+    public static List<WorkerProfessionDefinition> enabledProfessions() {
+        return PROFESSIONS.stream()
+                .filter(definition -> isEnabled(definition.profession()))
+                .toList();
+    }
+
+    public static boolean isEnabled(WorkerProfession profession) {
+        return ENABLED_PROFESSIONS.contains(profession);
     }
 }

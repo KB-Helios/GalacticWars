@@ -25,8 +25,11 @@ public class RecruitWorkerGoal extends Goal {
 
     @Override
     public void tick() {
-        if (this.recruit.tickCount % 20 == 0) {
-            this.recruit.performWorkerCycle();
-        }
+        this.recruit.tickWorkerController();
+    }
+
+    @Override
+    public void stop() {
+        this.recruit.pauseWorkerNavigation();
     }
 }

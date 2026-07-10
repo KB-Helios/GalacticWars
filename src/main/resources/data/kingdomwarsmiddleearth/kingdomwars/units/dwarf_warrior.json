@@ -1,0 +1,10 @@
+{
+  "id": "kingdomwarsmiddleearth:dwarf_warrior",
+  "display_name": "Dwarf Warrior",
+  "faction": "kingdomwarsmiddleearth:dwarf",
+  "role": "infantry",
+  "hire_cost": 28,
+  "max_health": 28,
+  "attack_damage": 6,
+  "default_formation": "line"
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "kingdomwarsmiddleearth:mine_site",
+  "display_name": "Mine Site",
+  "anchor": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "allowed_rotations": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "placements": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "block": "kingdomwarsmiddleearth:middle_earth_stone",
+      "item": "kingdomwarsmiddleearth:middle_earth_stone"
+    }
+  ],
+  "rewards": {
+    "housing": 0,
+    "storage_slots": 0,
+    "worksite": "miner",
+    "worksite_capacity": 2,
+    "commander_slots": 0
+  }
+}

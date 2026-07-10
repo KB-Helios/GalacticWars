@@ -16,6 +16,8 @@ public final class AssetReferenceIntegrityTest {
     private static final Path MOD_DATA_ROOT = RESOURCE_ROOT.resolve("data/kingdomwarsmiddleearth");
     private static final Path BUILT_JAR = Path.of("build/libs/kingdomwarsmiddleearth-1.0.0.jar");
     private static final Pattern MOD_REFERENCE = Pattern.compile("\"(kingdomwarsmiddleearth:(?:block|item)/[^\"]+)\"");
+    private static final Pattern MOD_TEXTURE_REFERENCE = Pattern.compile(
+            "\"(?:all|side|top|bottom|front|back|particle|layer\\d+)\"\\s*:\\s*\"(kingdomwarsmiddleearth:(?:block|item)/[^\"]+)\"");
 
     private AssetReferenceIntegrityTest() {
     }
@@ -59,7 +61,7 @@ public final class AssetReferenceIntegrityTest {
     private static void modelsReferenceExistingModTextures() throws IOException {
         try (Stream<Path> files = Files.walk(MOD_ASSET_ROOT.resolve("models"))) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
-                for (String reference : referencesIn(file)) {
+                for (String reference : textureReferencesIn(file)) {
                     assertRegularFile(texturePath(reference), "model texture reference " + reference);
                 }
             }
@@ -140,6 +142,15 @@ public final class AssetReferenceIntegrityTest {
 
     private static Set<String> referencesIn(Path file) throws IOException {
         Matcher matcher = MOD_REFERENCE.matcher(Files.readString(file));
+        HashSet<String> references = new HashSet<>();
+        while (matcher.find()) {
+            references.add(matcher.group(1));
+        }
+        return references;
+    }
+
+    private static Set<String> textureReferencesIn(Path file) throws IOException {
+        Matcher matcher = MOD_TEXTURE_REFERENCE.matcher(Files.readString(file));
         HashSet<String> references = new HashSet<>();
         while (matcher.find()) {
             references.add(matcher.group(1));

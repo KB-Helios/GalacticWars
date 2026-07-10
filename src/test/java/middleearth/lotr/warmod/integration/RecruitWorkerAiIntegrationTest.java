@@ -10,11 +10,10 @@ public final class RecruitWorkerAiIntegrationTest {
 
     public static void main(String[] args) throws IOException {
         recruitRegistersWorkerGoal();
-        recruitPersistsWorkerResourceState();
-        recruitCanAdvanceWorkerCycle();
-        recruitHarvestsRealWorksiteBlocks();
-        recruitRunsConcreteProfessionWork();
-        recruitUsesCourierLogisticsPlanner();
+        recruitPersistsWorkerStateMachine();
+        recruitUsesRealLootAndInventoryTransactions();
+        recruitRequiresReachableClaimedTargets();
+        recruitImplementsEnabledProfessionHandlers();
         workerGoalDelegatesToRecruitCycle();
 
         System.out.println("RecruitWorkerAiIntegrationTest passed");
@@ -27,63 +26,53 @@ public final class RecruitWorkerAiIntegrationTest {
         assertContains(entity, "this.goalSelector.addGoal(4, new RecruitWorkerGoal(this));", "worker goal registration");
     }
 
-    private static void recruitPersistsWorkerResourceState() throws IOException {
+    private static void recruitPersistsWorkerStateMachine() throws IOException {
         String entity = read("src/main/java/middleearth/lotr/warmod/entity/MiddleEarthRecruitEntity.java");
 
-        assertContains(entity, "carriedResources", "carried resources field");
-        assertContains(entity, "storageResources", "storage resources field");
+        assertContains(entity, "workerInventory", "real worker inventory field");
+        assertContains(entity, "WorkerPhase workerPhase", "worker phase field");
+        assertContains(entity, "activeWorkTarget", "active target field");
         assertContains(entity, "starterBaseCompletedBlocks", "base completed block count field");
-        assertContains(entity, "\"WorkerCarriedResources\"", "carried resources save key");
-        assertContains(entity, "\"WorkerStorageResources\"", "storage resources save key");
+        assertContains(entity, "\"WorkerInventory\"", "worker inventory save key");
+        assertContains(entity, "\"WorkerPhase\"", "worker phase save key");
         assertContains(entity, "\"StarterBaseCompletedBlocks\"", "base progress save key");
     }
 
-    private static void recruitCanAdvanceWorkerCycle() throws IOException {
+    private static void recruitUsesRealLootAndInventoryTransactions() throws IOException {
         String entity = read("src/main/java/middleearth/lotr/warmod/entity/MiddleEarthRecruitEntity.java");
 
-        assertContains(entity, "performWorkerCycle", "worker cycle method");
-        assertContains(entity, "WorkerResourceAction.GATHER_RESOURCE", "gather action handling");
-        assertContains(entity, "WorkerResourceAction.DEPOSIT_TO_STORAGE", "deposit action handling");
-        assertContains(entity, "KingdomBaseBuildAction.PLACE_BLOCK", "base place action handling");
-        assertContains(entity, "completeNextStarterBaseBlock", "base placement method");
-        assertContains(entity, "this.level().isClientSide()", "server-only worker cycle guard");
+        assertContains(entity, "Block.getDrops", "loot table evaluation");
+        assertContains(entity, "destroyBlock(target, false", "single non-dropping world removal");
+        assertContains(entity, "mergeAll", "transactional inventory simulation");
+        assertContains(entity, "insertWorkerInventory", "real container deposit");
+        assertContains(entity, "withdrawSpecificItem", "real container withdrawal");
+        assertContains(entity, "tool.hurtAndBreak", "tool durability");
+        assertNotContains(entity, "this.carriedResources = this.carriedResources.withAdded(buildDecision.itemId(), 1)",
+                "conjured builder supplies");
     }
 
-    private static void recruitHarvestsRealWorksiteBlocks() throws IOException {
+    private static void recruitRequiresReachableClaimedTargets() throws IOException {
         String entity = read("src/main/java/middleearth/lotr/warmod/entity/MiddleEarthRecruitEntity.java");
 
-        assertContains(entity, "tryHarvestWorksiteResource", "world resource harvest method");
-        assertContains(entity, "findHarvestTarget", "worksite scan method");
-        assertContains(entity, "this.level().destroyBlock", "world block harvest call");
+        assertContains(entity, "tickWorkerNavigation", "worker-owned navigation");
+        assertContains(entity, "target_unreachable", "path failure reason");
+        assertContains(entity, "blacklistedWorkTarget", "unreachable target blacklist");
+        assertContains(entity, "interaction_out_of_reach", "interaction reach guard");
+        assertContains(entity, "canModifyWorkerTarget", "claim validation");
+        assertContains(entity, "scanBudget = Math.min(128", "bounded scan budget");
+        assertContains(entity, "Math.floorMod(this.getUUID().hashCode(), 4)", "staggered worker scans");
+        assertContains(entity, "this.level().isLoaded", "loaded chunk guard");
+    }
+
+    private static void recruitImplementsEnabledProfessionHandlers() throws IOException {
+        String entity = read("src/main/java/middleearth/lotr/warmod/entity/MiddleEarthRecruitEntity.java");
+
         assertContains(entity, "CropBlock", "farmer crop handling");
-        assertContains(entity, "Blocks.OAK_LOG", "lumberjack target block");
-        assertContains(entity, "Blocks.STONE", "miner target block");
-        assertContains(entity, "Blocks.WHEAT", "farmer target block");
-        assertContains(entity, "state.canBeReplaced()", "builder can place through replaceable blocks");
-    }
-
-    private static void recruitRunsConcreteProfessionWork() throws IOException {
-        String entity = read("src/main/java/middleearth/lotr/warmod/entity/MiddleEarthRecruitEntity.java");
-
-        assertContains(entity, "tryPerformProfessionWork", "profession-specific work hook");
-        assertContains(entity, "tryFishAtWorksite", "fisherman water work");
-        assertContains(entity, "Blocks.WATER", "fisherman water target");
-        assertContains(entity, "tryGatherFromAnimalPen", "animal farmer pen work");
-        assertContains(entity, "Animal.class", "animal farmer nearby animal scan");
-        assertContains(entity, "tryCookFromStorage", "cook storage recipe");
-        assertContains(entity, "\"minecraft:wheat\", 3", "cook wheat recipe cost");
-        assertContains(entity, "tryTradeGoodsForEmeralds", "merchant trade work");
-        assertContains(entity, "\"minecraft:emerald\"", "merchant emerald output");
-    }
-
-    private static void recruitUsesCourierLogisticsPlanner() throws IOException {
-        String entity = read("src/main/java/middleearth/lotr/warmod/entity/MiddleEarthRecruitEntity.java");
-
-        assertContains(entity, "planCourierLogistics", "courier logistics method");
-        assertContains(entity, "WorkerLogisticsPlanner.planAnyAvailableSupply", "courier logistics planner hook");
-        assertContains(entity, "WorkerResourceAction.WITHDRAW_FROM_STORAGE", "courier withdraw handling");
-        assertContains(entity, "WorkerResourceAction.DELIVER_TO_WORKSITE", "courier delivery handling");
-        assertContains(entity, "createCourierRoute", "courier route method");
+        assertContains(entity, "Items.WHEAT_SEEDS", "farmer seed consumption");
+        assertContains(entity, "Items.OAK_SAPLING", "lumberjack replanting");
+        assertContains(entity, "ModBlockTags.WORKER_MINEABLE", "miner allowlist");
+        assertContains(entity, "acquireCourierOrder", "courier route handler");
+        assertContains(entity, "placeCurrentBuildBlock", "builder placement handler");
     }
 
     private static void workerGoalDelegatesToRecruitCycle() throws IOException {
@@ -91,7 +80,8 @@ public final class RecruitWorkerAiIntegrationTest {
 
         assertContains(goal, "class RecruitWorkerGoal extends Goal", "worker goal class");
         assertContains(goal, "shouldRunWorkerCycle", "worker cycle guard");
-        assertContains(goal, "performWorkerCycle", "worker cycle call");
+        assertContains(goal, "tickWorkerController", "worker controller tick");
+        assertContains(goal, "pauseWorkerNavigation", "worker navigation cleanup");
     }
 
     private static String read(String path) throws IOException {
@@ -101,6 +91,12 @@ public final class RecruitWorkerAiIntegrationTest {
     private static void assertContains(String haystack, String needle, String label) {
         if (!haystack.contains(needle)) {
             throw new AssertionError(label + " missing <" + needle + ">");
+        }
+    }
+
+    private static void assertNotContains(String haystack, String needle, String label) {
+        if (haystack.contains(needle)) {
+            throw new AssertionError(label + " unexpectedly contains <" + needle + ">");
         }
     }
 }

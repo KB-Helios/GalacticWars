@@ -48,7 +48,9 @@ public final class RecruitCompanionAiIntegrationTest {
 
         assertContains(entity, "this.level().isClientSide()", "client-side worker cycle guard");
         assertContains(entity, "state.isAir() && !state.canBeReplaced()", "replaceable build target check");
-        assertContains(entity, "dropMalformedResourceEntry", "malformed resource NBT guard");
+        assertContains(entity, "dataVersion < 3", "legacy resource migration guard");
+        assertContains(entity, "Reset legacy synthetic worker resource counters", "legacy resource migration warning");
+        assertNotContains(entity, "decodeResources", "synthetic resource counter decoder");
     }
 
     private static String read(String relativePath) throws IOException {

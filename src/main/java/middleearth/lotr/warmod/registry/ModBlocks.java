@@ -1,6 +1,7 @@
 package middleearth.lotr.warmod.registry;
 
 import middleearth.lotr.warmod.KingdomWarsMiddleEarth;
+import middleearth.lotr.warmod.settlement.KingdomHallBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SoundType;
@@ -19,6 +20,9 @@ public final class ModBlocks {
     public static final DeferredBlock<Block> MALLORN_LOG =
             BLOCKS.registerBlock("mallorn_log", properties -> new RotatedPillarBlock(
                     properties.mapColor(MapColor.COLOR_YELLOW).strength(2.0F).sound(SoundType.WOOD)));
+    public static final DeferredBlock<KingdomHallBlock> KINGDOM_HALL =
+            BLOCKS.registerBlock("kingdom_hall", properties -> new KingdomHallBlock(
+                    properties.mapColor(MapColor.STONE).strength(4.0F, 8.0F).sound(SoundType.STONE)));
 
     private ModBlocks() {
     }

@@ -191,6 +191,58 @@ tasks.withType(Test).configureEach {
     failOnNoDiscoveredTests = false
 }
 
+// The project intentionally uses dependency-light executable test harnesses instead of JUnit.
+// Register every *Test.java main class as an individual JavaExec task and make `check` run
+// the aggregate so a green Gradle build represents the same verification contributors run.
+def executableHarnessClasses = fileTree('src/test/java') {
+    include '**/*Test.java'
+}.files.collect { sourceFile ->
+    sourceSets.test.java.srcDirs
+            .collect { sourceRoot -> sourceRoot.toPath() }
+            .findResult { sourceRoot ->
+                def sourcePath = sourceFile.toPath()
+                if (!sourcePath.startsWith(sourceRoot)) {
+                    return null
+                }
+                return sourceRoot.relativize(sourcePath)
+                        .toString()
+                        .replace('\\', '.')
+                        .replace('/', '.')
+                        .replaceFirst(/\.java$/, '')
+            }
+}.findAll { it != null }.sort()
+
+def executableHarnessTasks = executableHarnessClasses.collect { className ->
+    def taskSuffix = className.split('\\.').collect { segment -> segment.capitalize() }.join('')
+    tasks.register("run${taskSuffix}", JavaExec) {
+        group = LifecycleBasePlugin.VERIFICATION_GROUP
+        description = "Runs executable verification harness ${className}."
+        dependsOn tasks.named('testClasses'), tasks.named('jar')
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass.set(className)
+        workingDir = project.projectDir
+    }
+}
+
+tasks.register('runHarnesses') {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = 'Runs all executable main-method verification harnesses.'
+    dependsOn executableHarnessTasks
+}
+
+tasks.register('generateRecruitTextures', JavaExec) {
+    group = 'kingdomwars assets'
+    description = 'Regenerates the project-owned recruit skin atlases and spawn egg textures.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass.set('middleearth.lotr.warmod.integration.RecruitTextureAtlasGenerator')
+    workingDir = project.projectDir
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('runHarnesses')
+}
+
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
 idea {
     module {
