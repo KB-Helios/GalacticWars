@@ -17,6 +17,7 @@ public final class KingdomBlueprintCatalogTest {
     public static void main(String[] args) throws IOException {
         List<KingdomBaseBlueprint> blueprints = KingdomBaseBlueprint.all();
         assertEquals(6, blueprints.size(), "initial blueprint count");
+        assertTrue(blueprints == KingdomBaseBlueprint.all(), "static blueprint catalog is cached");
         Set<String> ids = new HashSet<>();
         for (KingdomBaseBlueprint blueprint : blueprints) {
             assertTrue(ids.add(blueprint.id()), "unique blueprint id " + blueprint.id());

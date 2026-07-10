@@ -28,6 +28,10 @@ public final class KingdomHallIntegrationTest {
         assertContains(hall, "reserveEmeralds", "atomic treasury reservation");
         assertContains(hall, "refundEmeralds", "campaign refund");
         assertContains(hall, "chargeDailyUpkeep", "daily upkeep");
+        assertContains(hall, "items.set(slot, ItemStack.EMPTY)", "depleted-slot normalization");
+        assertContains(hall, "getUpdatePacket", "block entity client update packet");
+        assertContains(hall, "getUpdateTag", "block entity client update tag");
+        assertContains(hall, "sendBlockUpdated", "custom state synchronization");
     }
 
     private static void hallFoundsAuthoritativeKingdomState() throws IOException {

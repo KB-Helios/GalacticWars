@@ -1,5 +1,7 @@
 package middleearth.lotr.warmod.client.gui;
 
+import java.util.ArrayList;
+import java.util.List;
 import middleearth.lotr.warmod.entity.MiddleEarthRecruitEntity;
 import middleearth.lotr.warmod.menu.RecruitCommandMenu;
 import middleearth.lotr.warmod.workforce.WorkerProfessionCatalog;
@@ -11,14 +13,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 
-import java.util.List;
-
 public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCommandMenu> {
     private static final int BUTTON_WIDTH = 102;
     private static final int BUTTON_HEIGHT = 18;
     private static final int GAP = 2;
     private static final int COLUMN_GAP = 6;
     private static final int COLUMN_COUNT = 3;
+    private static final int CONTROL_ROW_COUNT = 11;
+    private static final int STATUS_PANEL_MIN_WIDTH = 220;
+    private static final int COMPACT_STATUS_ROW = 3;
     private static final int STATUS_COLOR = 0xE0E0E0;
     private static final int STATUS_MUTED_COLOR = 0x9CA3AF;
     private final RecruitCommandMenu menu;
@@ -41,7 +44,7 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
         boolean tame = entity instanceof MiddleEarthRecruitEntity recruit && recruit.isTame();
 
         int x = (this.width - BUTTON_WIDTH) / 2;
-        int y = Math.max(8, (this.height - ((ownedByPlayer ? 11 : 1) * (BUTTON_HEIGHT + GAP))) / 2);
+        int y = Math.max(8, (this.height - ((ownedByPlayer ? CONTROL_ROW_COUNT : 1) * (BUTTON_HEIGHT + GAP))) / 2);
         if (!tame) {
             this.addButton(x, y, "screen.kingdomwarsmiddleearth.recruit.hire", RecruitCommandMenu.BUTTON_HIRE);
             return;
@@ -118,7 +121,7 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
         if (this.minecraft != null && this.minecraft.level != null) {
             Entity entity = this.minecraft.level.getEntity(this.menu.recruitEntityId());
             if (entity instanceof MiddleEarthRecruitEntity recruit) {
-                this.drawRecruitStatusPanel(graphics, recruit);
+                this.drawRecruitStatusPanel(graphics, recruit, mouseX, mouseY);
             }
         }
     }
@@ -147,18 +150,49 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 .build());
     }
 
-    private void drawRecruitStatusPanel(GuiGraphicsExtractor graphics, MiddleEarthRecruitEntity recruit) {
+    private void drawRecruitStatusPanel(
+            GuiGraphicsExtractor graphics,
+            MiddleEarthRecruitEntity recruit,
+            int mouseX,
+            int mouseY
+    ) {
         int controlsWidth = BUTTON_WIDTH * COLUMN_COUNT + COLUMN_GAP * (COLUMN_COUNT - 1);
         int controlsLeft = (this.width - controlsWidth) / 2;
         int controlsRight = controlsLeft + controlsWidth;
-        int x = this.width - controlsRight >= 220 ? controlsRight + 8 : 8;
+        List<Component> statusLines = recruit.recruitStatusLines();
+        if (this.width - controlsRight < STATUS_PANEL_MIN_WIDTH) {
+            this.drawCompactStatusTooltip(graphics, statusLines, controlsRight, mouseX, mouseY);
+            return;
+        }
+
+        int x = controlsRight + 8;
         int y = 8;
         graphics.text(this.font, Component.translatable("screen.kingdomwarsmiddleearth.recruit.status.title"), x, y, STATUS_COLOR);
-        List<Component> statusLines = recruit.recruitStatusLines();
         int lineY = y + 12;
         for (Component line : statusLines) {
             graphics.text(this.font, line, x, lineY, STATUS_MUTED_COLOR);
             lineY += 10;
+        }
+    }
+
+    private void drawCompactStatusTooltip(
+            GuiGraphicsExtractor graphics,
+            List<Component> statusLines,
+            int controlsRight,
+            int mouseX,
+            int mouseY
+    ) {
+        int controlsTop = Math.max(8, (this.height - CONTROL_ROW_COUNT * (BUTTON_HEIGHT + GAP)) / 2);
+        int x = controlsRight - BUTTON_WIDTH;
+        int y = controlsTop + COMPACT_STATUS_ROW * (BUTTON_HEIGHT + GAP);
+        Component title = Component.translatable("screen.kingdomwarsmiddleearth.recruit.status.title");
+        graphics.text(this.font, title, x, y + 5, STATUS_COLOR);
+
+        if (mouseX >= x && mouseX < x + BUTTON_WIDTH && mouseY >= y && mouseY < y + BUTTON_HEIGHT) {
+            List<Component> tooltipLines = new ArrayList<>(statusLines.size() + 1);
+            tooltipLines.add(title);
+            tooltipLines.addAll(statusLines);
+            graphics.setComponentTooltipForNextFrame(this.font, tooltipLines, mouseX, mouseY);
         }
     }
 }

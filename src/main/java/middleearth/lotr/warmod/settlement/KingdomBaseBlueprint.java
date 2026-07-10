@@ -30,6 +30,14 @@ public record KingdomBaseBlueprint(
         worksiteType = worksiteType == null ? "" : worksiteType.trim();
     }
 
+    private static final List<KingdomBaseBlueprint> ALL_BLUEPRINTS = List.of(
+            starterKeep(),
+            house(),
+            storehouse(),
+            farmPlot(),
+            lumberCamp(),
+            mineSite());
+
     public static KingdomBaseBlueprint starterKeep() {
         ArrayList<BaseBlockPlacement> placements = new ArrayList<>();
         for (int x = 0; x < 5; x++) {
@@ -102,7 +110,7 @@ public record KingdomBaseBlueprint(
     }
 
     public static List<KingdomBaseBlueprint> all() {
-        return List.of(starterKeep(), house(), storehouse(), farmPlot(), lumberCamp(), mineSite());
+        return ALL_BLUEPRINTS;
     }
 
     public static Optional<KingdomBaseBlueprint> byId(String id) {

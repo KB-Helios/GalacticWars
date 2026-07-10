@@ -24,6 +24,8 @@ public final class RecruitStatusGuiIntegrationTest {
         assertContains(screen, "drawRecruitStatusPanel", "status panel method");
         assertContains(screen, "recruit.recruitStatusLines()", "entity status lines");
         assertContains(screen, "screen.kingdomwarsmiddleearth.recruit.status.title", "status title label");
+        assertContains(screen, "drawCompactStatusTooltip", "narrow-screen status layout");
+        assertContains(screen, "setComponentTooltipForNextFrame", "narrow-screen status tooltip");
     }
 
     private static void entityExposesWorkerStatusLines() throws IOException {

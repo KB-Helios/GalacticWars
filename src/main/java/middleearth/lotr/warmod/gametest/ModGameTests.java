@@ -82,10 +82,20 @@ public final class ModGameTests {
         if (!hall.claim(owner) || hall.claim(intruder) || !hall.isOwner(owner)) {
             helper.fail("Kingdom Hall ownership guard rejected the owner or accepted an intruder");
         }
+        hall.setFaction("kingdomwarsmiddleearth:rohan");
+        if (hall.getUpdatePacket() == null
+                || !hall.getUpdateTag(helper.getLevel().registryAccess())
+                        .getStringOr("KingdomFaction", "")
+                        .equals("kingdomwarsmiddleearth:rohan")) {
+            helper.fail("Kingdom Hall custom state was not exposed through its client update packet");
+        }
         hall.setItem(0, new ItemStack(Items.EMERALD, 32));
         if (!hall.reserveEmeralds(10) || hall.treasuryEmeralds() != 22 || hall.refundEmeralds(5) != 5
                 || hall.treasuryEmeralds() != 27) {
             helper.fail("Kingdom Hall treasury did not conserve reserved and refunded emeralds");
+        }
+        if (!hall.reserveEmeralds(27) || hall.getItem(0) != ItemStack.EMPTY) {
+            helper.fail("Kingdom Hall treasury did not normalize a depleted slot to ItemStack.EMPTY");
         }
         KingdomRecord kingdom = KingdomSavedData.get(helper.getLevel()).foundKingdom(
                 owner.getUUID(),

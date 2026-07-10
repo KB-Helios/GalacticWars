@@ -5,9 +5,14 @@ import java.util.Objects;
 import java.util.UUID;
 import middleearth.lotr.warmod.registry.ModBlockEntityTypes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -54,7 +59,7 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
         }
         if (ownerId == null) {
             ownerId = player.getUUID();
-            this.setChanged();
+            this.setChangedAndSync();
         }
         return true;
     }
@@ -73,7 +78,7 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
             throw new IllegalArgumentException("unsupported faction " + factionId);
         }
         this.factionId = factionId;
-        this.setChanged();
+        this.setChangedAndSync();
         return this.factionId;
     }
 
@@ -98,7 +103,7 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
         int upkeep = Math.max(1, population);
         this.upkeepPaid = this.reserveEmeralds(upkeep);
         this.lastUpkeepGameTime = gameTime;
-        this.setChanged();
+        this.setChangedAndSync();
         return this.upkeepPaid;
     }
 
@@ -107,14 +112,18 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
             return false;
         }
         int remaining = amount;
-        for (ItemStack stack : items) {
+        for (int slot = 0; slot < items.size(); slot++) {
             if (remaining == 0) {
                 break;
             }
+            ItemStack stack = items.get(slot);
             if (stack.is(Items.EMERALD)) {
                 int removed = Math.min(remaining, stack.getCount());
                 stack.shrink(removed);
                 remaining -= removed;
+                if (stack.isEmpty()) {
+                    items.set(slot, ItemStack.EMPTY);
+                }
             }
         }
         this.setChanged();
@@ -193,5 +202,23 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
         output.putString("KingdomFaction", this.factionId);
         output.putLong("LastUpkeepGameTime", this.lastUpkeepGameTime);
         output.putBoolean("UpkeepPaid", this.upkeepPaid);
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return this.saveWithoutMetadata(registries);
+    }
+
+    private void setChangedAndSync() {
+        this.setChanged();
+        if (this.level != null && !this.level.isClientSide()) {
+            BlockState state = this.getBlockState();
+            this.level.sendBlockUpdated(this.worldPosition, state, state, 3);
+        }
     }
 }
