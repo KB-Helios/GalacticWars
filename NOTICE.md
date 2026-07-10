@@ -12,7 +12,7 @@ Code or assets ported from `quentin452/The-Lord-of-the-Rings` are derived from G
 
 ## Project-Owned Recruit Assets
 
-The Gondor, Rohan, Mordor orc, dwarf, and elf recruit skin atlases and spawn egg textures are original project assets generated from the deterministic palette and humanoid UV recipe in `RecruitTextureAtlasGenerator`. They do not contain third-party pixels.
+The Gondor, Rohan, Mordor orc, dwarf, and elf recruit skin atlases, faction-specific GeckoLib models, and spawn egg textures are original project assets. The distributable 64x64 pixels are generated from the deterministic faction design and humanoid UV recipe in `RecruitTextureAtlasGenerator`; high-resolution concept references are not included in the mod and no third-party pixels are used.
 
 ## User-Provided Resource Pack Assets
 

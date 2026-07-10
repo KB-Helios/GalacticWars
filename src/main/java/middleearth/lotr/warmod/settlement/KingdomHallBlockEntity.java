@@ -44,6 +44,7 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
     private long lastUpkeepGameTime;
     private boolean upkeepClockInitialized;
     private boolean upkeepPaid = true;
+    private boolean removalPrepared;
 
     public KingdomHallBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntityTypes.KINGDOM_HALL.get(), pos, state);
@@ -170,7 +171,8 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
             return 0;
         }
         KingdomSavedData data = KingdomSavedData.get(level);
-        boolean isAuthoritativeHall = data.kingdomForOwner(this.ownerId)
+        boolean isAuthoritativeHall = data.isHallActive(this.ownerId)
+                && data.kingdomForOwner(this.ownerId)
                 .map(KingdomRecord::settlement)
                 .filter(settlement -> settlement.dimensionId().equals(level.dimension().identifier().toString()))
                 .filter(settlement -> settlement.hallX() == this.worldPosition.getX()
@@ -180,6 +182,14 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
         return isAuthoritativeHall
                 ? data.applyPendingCampaignRefunds(this.ownerId, this::refundEmeralds)
                 : 0;
+    }
+
+    public boolean prepareForOwnerRemoval(ServerLevel level) {
+        if (this.removalPrepared) {
+            return false;
+        }
+        this.removalPrepared = true;
+        return KingdomHallLifecycleService.prepareOwnerRemoval(level, this);
     }
 
     @Override

@@ -1,16 +1,20 @@
 package middleearth.lotr.warmod.settlement;
 
 import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.BiConsumer;
 import middleearth.lotr.warmod.kingdom.KingdomRecord;
 import middleearth.lotr.warmod.kingdom.KingdomSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -44,9 +48,21 @@ public final class KingdomHallBlock extends BaseEntityBlock {
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
-        if (placer instanceof Player player && level.getBlockEntity(pos) instanceof KingdomHallBlockEntity hall) {
-            hall.claim(player);
+        if (!(placer instanceof Player player)
+                || !(level instanceof ServerLevel serverLevel)
+                || !(level.getBlockEntity(pos) instanceof KingdomHallBlockEntity hall)) {
+            return;
         }
+        Optional<KingdomRecord> activated = KingdomSavedData.get(serverLevel).activateHall(
+                player.getUUID(), hall.factionId(), serverLevel.dimension().identifier().toString(), pos);
+        if (activated.isEmpty()) {
+            player.sendSystemMessage(Component.translatable(
+                    "message.kingdomwarsmiddleearth.kingdom_hall.duplicate"));
+            serverLevel.destroyBlock(pos, true, player);
+            return;
+        }
+        hall.claim(player);
+        hall.setFaction(activated.orElseThrow().factionId());
     }
 
     @Override
@@ -67,6 +83,16 @@ public final class KingdomHallBlock extends BaseEntityBlock {
         }
 
         KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        Optional<KingdomRecord> activated = data.activateHall(
+                player.getUUID(), hall.factionId(), serverLevel.dimension().identifier().toString(), pos);
+        if (activated.isEmpty()) {
+            player.sendSystemMessage(Component.translatable(
+                    "message.kingdomwarsmiddleearth.kingdom_hall.duplicate"));
+            return InteractionResult.FAIL;
+        }
+        if (!hall.factionId().equals(activated.orElseThrow().factionId())) {
+            hall.setFaction(activated.orElseThrow().factionId());
+        }
         if (player.isShiftKeyDown()) {
             String previousFaction = hall.factionId();
             String nextFaction = hall.cycleFaction();
@@ -81,11 +107,7 @@ public final class KingdomHallBlock extends BaseEntityBlock {
             return InteractionResult.SUCCESS;
         }
 
-        KingdomRecord kingdom = data.foundKingdom(
-                player.getUUID(),
-                hall.factionId(),
-                serverLevel.dimension().identifier().toString(),
-                pos);
+        KingdomRecord kingdom = activated.orElseThrow();
         hall.settlePendingCampaignRefunds(serverLevel);
         player.openMenu(hall);
         player.sendSystemMessage(Component.translatable(
@@ -98,5 +120,54 @@ public final class KingdomHallBlock extends BaseEntityBlock {
                         ? Component.translatable("message.kingdomwarsmiddleearth.kingdom_hall.commander.assigned")
                         : Component.translatable("message.kingdomwarsmiddleearth.kingdom_hall.commander.unassigned")));
         return InteractionResult.SUCCESS;
+    }
+
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        if (level instanceof ServerLevel serverLevel
+                && level.getBlockEntity(pos) instanceof KingdomHallBlockEntity hall
+                && (hall.ownerId() == null || hall.isOwner(player))) {
+            hall.prepareForOwnerRemoval(serverLevel);
+            dropHallContents(serverLevel, pos, hall);
+        }
+        return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
+    public void playerDestroy(
+            Level level,
+            Player player,
+            BlockPos pos,
+            BlockState state,
+            @Nullable BlockEntity blockEntity,
+            ItemStack tool
+    ) {
+        super.playerDestroy(level, player, pos, state, blockEntity, tool);
+    }
+
+    @Override
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston) {
+        Containers.updateNeighboursAfterDestroy(state, level, pos);
+    }
+
+    @Override
+    protected void onExplosionHit(
+            BlockState state,
+            ServerLevel level,
+            BlockPos pos,
+            Explosion explosion,
+            BiConsumer<ItemStack, BlockPos> dropConsumer
+    ) {
+        // Hall removal is owner-authorized so treasury and campaign reservations remain conserved.
+    }
+
+    private static void dropHallContents(ServerLevel level, BlockPos pos, KingdomHallBlockEntity hall) {
+        for (int slot = 0; slot < hall.getContainerSize(); slot++) {
+            ItemStack stored = hall.removeItemNoUpdate(slot);
+            if (!stored.isEmpty()) {
+                popResource(level, pos, stored);
+            }
+        }
+        hall.clearContent();
     }
 }

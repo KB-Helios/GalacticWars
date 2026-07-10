@@ -13,15 +13,15 @@ public final class ModEntityTypes {
             DeferredRegister.createEntities(KingdomWarsMiddleEarth.MODID);
 
     public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> GONDOR_RECRUIT =
-            registerRecruit("gondor_recruit");
+            registerRecruit("gondor_recruit", 0.60F, 1.95F);
     public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> ROHAN_RECRUIT =
-            registerRecruit("rohan_recruit");
+            registerRecruit("rohan_recruit", 0.60F, 1.95F);
     public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> MORDOR_ORC_RECRUIT =
-            registerRecruit("mordor_orc_recruit");
+            registerRecruit("mordor_orc_recruit", 0.70F, 1.85F);
     public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> DWARF_RECRUIT =
-            registerRecruit("dwarf_recruit");
+            registerRecruit("dwarf_recruit", 0.75F, 1.55F);
     public static final DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> ELF_RECRUIT =
-            registerRecruit("elf_recruit");
+            registerRecruit("elf_recruit", 0.60F, 2.05F);
 
     private ModEntityTypes() {
     }
@@ -30,11 +30,15 @@ public final class ModEntityTypes {
         ENTITY_TYPES.register(modEventBus);
     }
 
-    private static DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> registerRecruit(String name) {
+    private static DeferredHolder<EntityType<?>, EntityType<MiddleEarthRecruitEntity>> registerRecruit(
+            String name,
+            float width,
+            float height
+    ) {
         return ENTITY_TYPES.registerEntityType(
                 name,
                 MiddleEarthRecruitEntity::new,
                 MobCategory.CREATURE,
-                builder -> builder.sized(0.6F, 1.95F).clientTrackingRange(8).updateInterval(3));
+                builder -> builder.sized(width, height).clientTrackingRange(8).updateInterval(3));
     }
 }

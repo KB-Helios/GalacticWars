@@ -84,6 +84,23 @@ public record SettlementRecord(
         return copy(List.copyOf(updated), commanderId, commanderPolicy, recruitmentCampaigns, revision + 1);
     }
 
+    public SettlementRecord withoutRecruit(UUID recruitId) {
+        Objects.requireNonNull(recruitId, "recruitId");
+        if (!containsRecruit(recruitId)) {
+            return this;
+        }
+        LinkedHashSet<UUID> updated = new LinkedHashSet<>(recruitIds);
+        updated.remove(recruitId);
+        Optional<UUID> updatedCommander = commanderId.filter(id -> !id.equals(recruitId));
+        return copy(List.copyOf(updated), updatedCommander, commanderPolicy, recruitmentCampaigns, revision + 1);
+    }
+
+    public SettlementRecord withHallLocation(String dimensionId, int x, int y, int z) {
+        return new SettlementRecord(id, dimensionId, x, y, z, claimRadius, housingCapacity,
+                recruitIds, commanderId, commanderPolicy, worksites, buildProjects, workOrders,
+                recruitmentCampaigns, revision + 1);
+    }
+
     public SettlementRecord withCommander(UUID recruitId) {
         if (!containsRecruit(recruitId)) {
             throw new IllegalArgumentException("commander must be a settlement recruit");

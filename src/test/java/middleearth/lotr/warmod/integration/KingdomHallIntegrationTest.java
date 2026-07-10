@@ -38,10 +38,19 @@ public final class KingdomHallIntegrationTest {
 
     private static void hallFoundsAuthoritativeKingdomState() throws IOException {
         String block = read("src/main/java/middleearth/lotr/warmod/settlement/KingdomHallBlock.java");
+        String events = read("src/main/java/middleearth/lotr/warmod/settlement/KingdomHallEvents.java");
+        String lifecycle = read("src/main/java/middleearth/lotr/warmod/settlement/KingdomHallLifecycleService.java");
         assertContains(block, "KingdomSavedData.get(serverLevel)", "overworld saved data access");
-        assertContains(block, "foundKingdom", "kingdom founding");
+        assertContains(block, "activateHall", "kingdom founding and relocation");
         assertContains(block, "changeFaction", "guarded faction selection");
         assertContains(block, "player.openMenu(hall)", "hall treasury menu");
+        assertContains(block, "onExplosionHit", "explosion-resistant owner removal path");
+        assertContains(block, "playerWillDestroy", "pre-removal lifecycle transaction");
+        assertContains(block, "dropHallContents", "exactly-once inventory drops");
+        assertContains(events, "BreakBlockEvent", "owner-authorized block breaking");
+        assertContains(events, "event.setCanceled(true)", "non-owner break rejection");
+        assertContains(lifecycle, "cancelActiveCampaigns", "campaign cancellation before removal");
+        assertContains(lifecycle, "deactivateHall", "authoritative Hall deactivation");
     }
 
     private static void hallAssetsAreComplete() {

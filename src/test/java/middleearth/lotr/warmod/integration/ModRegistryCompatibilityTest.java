@@ -13,6 +13,7 @@ public final class ModRegistryCompatibilityTest {
         spawnEggModelUsesCurrentItemModelFormat();
         registeredItemsHaveItemModelDefinitions();
         recruitRendererUsesGeckoLibRenderer();
+        recruitTypesUseFactionDimensions();
 
         System.out.println("ModRegistryCompatibilityTest passed");
     }
@@ -68,6 +69,21 @@ public final class ModRegistryCompatibilityTest {
         assertNotContains(renderer,
                 "HumanoidMobRenderer",
                 "recruit renderer must not use vanilla mob humanoid rendering for GeckoLib recruits");
+    }
+
+    private static void recruitTypesUseFactionDimensions() throws IOException {
+        String entityTypes = Files.readString(Path.of(
+                "src/main/java/middleearth/lotr/warmod/registry/ModEntityTypes.java"));
+        assertContains(entityTypes, "registerRecruit(\"gondor_recruit\", 0.60F, 1.95F)",
+                "Gondor dimensions");
+        assertContains(entityTypes, "registerRecruit(\"rohan_recruit\", 0.60F, 1.95F)",
+                "Rohan dimensions");
+        assertContains(entityTypes, "registerRecruit(\"mordor_orc_recruit\", 0.70F, 1.85F)",
+                "Mordor dimensions");
+        assertContains(entityTypes, "registerRecruit(\"dwarf_recruit\", 0.75F, 1.55F)",
+                "dwarf dimensions");
+        assertContains(entityTypes, "registerRecruit(\"elf_recruit\", 0.60F, 2.05F)",
+                "elf dimensions");
     }
 
     private static void assertContains(String haystack, String needle, String label) {
