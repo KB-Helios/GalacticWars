@@ -6,69 +6,69 @@
 
 **Architecture:** Keep this slice as pure Java data modeling plus JSON resources. The Java API mirrors the existing faction and army unit catalogs: normalized ID value object, enum for bounded categories, immutable definition record, immutable catalog with lookup/filter helpers and duplicate rejection.
 
-**Tech Stack:** Java 25 records/enums, existing main-method test harness style, Minecraft data resources under `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/regions`.
+**Tech Stack:** Java 25 records/enums, existing main-method test harness style, Minecraft data resources under `src/main/resources/data/galacticwars/kingdomwars/regions`.
 
 ---
 
 ### Task 1: Region Catalog Test Harness
 
 **Files:**
-- Create: `src/test/java/middleearth/lotr/warmod/world/MiddleEarthRegionCatalogTest.java`
+- Create: `src/test/java/middleearth/lotr/warmod/world/GalacticRegionCatalogTest.java`
 
 - [ ] **Step 1: Write the failing test**
 
-Create a main-method harness that imports `middleearth.lotr.warmod.world.*` and verifies:
-- `MiddleEarthRegionId.of("Gondor")` normalizes to `kingdomwarsmiddleearth:gondor`.
-- `MiddleEarthRegionDefinition` stores id, display name, controlling faction, climate, temperature, downfall, spawn weight, and features.
-- `MiddleEarthRegionCatalog` looks up by id, filters by faction, filters by climate, and rejects duplicate ids.
+Create a main-method harness that imports `galacticwars.clonewars.world.*` and verifies:
+- `GalacticRegionId.of("Republic")` normalizes to `galacticwars:republic`.
+- `GalacticRegionDefinition` stores id, display name, controlling faction, climate, temperature, downfall, spawn weight, and features.
+- `GalacticRegionCatalog` looks up by id, filters by faction, filters by climate, and rejects duplicate ids.
 
 - [ ] **Step 2: Run the focused compile to verify it fails**
 
-Run: `javac -cp src/main/java -d build/test-classes src/test/java/middleearth/lotr/warmod/world/MiddleEarthRegionCatalogTest.java`
+Run: `javac -cp src/main/java -d build/test-classes src/test/java/middleearth/lotr/warmod/world/GalacticRegionCatalogTest.java`
 
-Expected: compile failure because `middleearth.lotr.warmod.world` classes do not exist yet.
+Expected: compile failure because `galacticwars.clonewars.world` classes do not exist yet.
 
 ### Task 2: Region Catalog Model
 
 **Files:**
-- Create: `src/main/java/middleearth/lotr/warmod/world/MiddleEarthRegionId.java`
-- Create: `src/main/java/middleearth/lotr/warmod/world/MiddleEarthRegionClimate.java`
-- Create: `src/main/java/middleearth/lotr/warmod/world/MiddleEarthRegionDefinition.java`
-- Create: `src/main/java/middleearth/lotr/warmod/world/MiddleEarthRegionCatalog.java`
+- Create: `src/main/java/middleearth/lotr/warmod/world/GalacticRegionId.java`
+- Create: `src/main/java/middleearth/lotr/warmod/world/GalacticRegionClimate.java`
+- Create: `src/main/java/middleearth/lotr/warmod/world/GalacticRegionDefinition.java`
+- Create: `src/main/java/middleearth/lotr/warmod/world/GalacticRegionCatalog.java`
 
-- [ ] **Step 1: Implement `MiddleEarthRegionId`**
+- [ ] **Step 1: Implement `GalacticRegionId`**
 
-Use the same normalization behavior as `FactionId` and `ArmyUnitId`: default namespace `kingdomwarsmiddleearth`, lowercase path/namespace, reject blank or non `[a-z0-9_.-]+` parts, and format as `namespace:path`.
+Use the same normalization behavior as `FactionId` and `ArmyUnitId`: default namespace `galacticwars`, lowercase path/namespace, reject blank or non `[a-z0-9_.-]+` parts, and format as `namespace:path`.
 
-- [ ] **Step 2: Implement `MiddleEarthRegionClimate`**
+- [ ] **Step 2: Implement `GalacticRegionClimate`**
 
 Add enum values `TEMPERATE`, `PLAINS`, `SHADOW`, `WOODLAND`, and `MOUNTAIN`.
 
-- [ ] **Step 3: Implement `MiddleEarthRegionDefinition`**
+- [ ] **Step 3: Implement `GalacticRegionDefinition`**
 
 Use a record with fields:
-`MiddleEarthRegionId id`, `String displayName`, `FactionId controllingFaction`, `MiddleEarthRegionClimate climate`, `float baseTemperature`, `float downfall`, `int spawnWeight`, and `Set<String> features`.
+`GalacticRegionId id`, `String displayName`, `FactionId controllingFaction`, `GalacticRegionClimate climate`, `float baseTemperature`, `float downfall`, `int spawnWeight`, and `Set<String> features`.
 
 Validation: non-null object fields, non-blank display name and feature names, `baseTemperature` and `downfall` must be non-negative, `spawnWeight` must be non-negative, and `features` must be copied with `Set.copyOf`.
 
-- [ ] **Step 4: Implement `MiddleEarthRegionCatalog`**
+- [ ] **Step 4: Implement `GalacticRegionCatalog`**
 
-Support construction from a `List<MiddleEarthRegionDefinition>` and a `Map<MiddleEarthRegionId, MiddleEarthRegionDefinition>`. Expose `definition(id)`, `regionsForFaction(factionId)`, and `regionsForClimate(climate)`. Reject duplicate ids when indexing the list.
+Support construction from a `List<GalacticRegionDefinition>` and a `Map<GalacticRegionId, GalacticRegionDefinition>`. Expose `definition(id)`, `regionsForFaction(factionId)`, and `regionsForClimate(climate)`. Reject duplicate ids when indexing the list.
 
 - [ ] **Step 5: Run the focused harness**
 
-Run: `javac -cp src/main/java -d build/test-classes src/test/java/middleearth/lotr/warmod/world/MiddleEarthRegionCatalogTest.java`
+Run: `javac -cp src/main/java -d build/test-classes src/test/java/middleearth/lotr/warmod/world/GalacticRegionCatalogTest.java`
 
-Run: `java -cp build/test-classes;src/main/java middleearth.lotr.warmod.world.MiddleEarthRegionCatalogTest`
+Run: `java -cp build/test-classes;src/main/java galacticwars.clonewars.world.GalacticRegionCatalogTest`
 
-Expected: `MiddleEarthRegionCatalogTest passed`.
+Expected: `GalacticRegionCatalogTest passed`.
 
 ### Task 3: Region Data Resources
 
 **Files:**
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/regions/gondor.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/regions/rohan.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/regions/mordor.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/regions/republic.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/regions/mandalorian.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/regions/separatist.json`
 
 - [ ] **Step 1: Add resource JSON**
 
@@ -76,7 +76,7 @@ Each file must include `display_name`, `controlling_faction`, `climate`, `base_t
 
 - [ ] **Step 2: Parse the resource JSON**
 
-Run: `Get-ChildItem src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/regions -Filter *.json | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json > $null }`
+Run: `Get-ChildItem src/main/resources/data/galacticwars/kingdomwars/regions -Filter *.json | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json > $null }`
 
 Expected: exit code `0`.
 

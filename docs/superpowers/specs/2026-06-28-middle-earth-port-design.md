@@ -1,10 +1,10 @@
-# KingdomWars-Middle-Earth Port Design
+# Galactic Wars: Clone Wars Port Design
 
 Date: 2026-06-28
 
 ## Purpose
 
-Port KingdomWars-Middle-Earth from the current NeoForge 26.2 template toward a full Middle-earth mod that uses LOTR-derived content and clean-room army behavior inspired by `talhanation/recruits`.
+Port Galactic Wars: Clone Wars from the current NeoForge 26.2 template toward a full Middle-earth mod that uses LOTR-derived content and clean-room army behavior inspired by `talhanation/recruits`.
 
 The target is not a one-shot source dump. The target is a phased port where each phase leaves the mod buildable and playable in a limited form while moving toward the full requested feature set.
 
@@ -15,7 +15,7 @@ The target is not a one-shot source dump. The target is a phased port where each
 - Project path: `C:\Users\kevin\Desktop\Programmering\Projekt\MIddle-earth-renewed`
 - Current state: small NeoForge 26.2 MDK-style template.
 - Target stack: Minecraft `26.2`, NeoForge `26.2.0.7-beta`, Java 25.
-- Mod ID: `kingdomwarsmiddleearth`.
+- Mod ID: `galacticwars`.
 - Current metadata still says `mod_license=All Rights Reserved`; this must change before LOTR-derived code or assets are ported.
 
 ### LOTR Upstream
@@ -85,13 +85,13 @@ Port a small representative LOTR-derived content slice:
 - One material path for tools/weapons.
 - One armor/material path.
 - Basic generated models, blockstates, recipes, loot, tags, and language.
-- Namespaced assets under `kingdomwarsmiddleearth`, with attribution and notices.
+- Namespaced assets under `galacticwars`, with attribution and notices.
 
 This phase proves the content pipeline before scaling to hundreds of blocks/items.
 
 ### Phase 3: Middle-earth World Seed
 
-Add a minimal `middle_earth` dimension and initial biomes using modern data-driven worldgen.
+Add a minimal `galactic` dimension and initial biomes using modern data-driven worldgen.
 
 Include:
 

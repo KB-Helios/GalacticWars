@@ -1,0 +1,8 @@
+{"schema_version":1,"abilities":[
+  {"id":"light_push","path":"light","energy":20,"cooldown_ticks":60,"quest":"republic_chapter_2"},
+  {"id":"light_pull","path":"light","energy":25,"cooldown_ticks":80,"quest":"republic_chapter_2"},
+  {"id":"light_leap","path":"light","energy":15,"cooldown_ticks":40,"quest":"republic_chapter_3"},
+  {"id":"dark_push","path":"dark","energy":20,"cooldown_ticks":60,"quest":"nightsister_chapter_2"},
+  {"id":"dark_choke","path":"dark","energy":35,"cooldown_ticks":120,"quest":"nightsister_chapter_3"},
+  {"id":"dark_dash","path":"dark","energy":15,"cooldown_ticks":40,"quest":"nightsister_chapter_2"}
+]}

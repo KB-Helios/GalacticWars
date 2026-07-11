@@ -1,0 +1,6 @@
+{"schema_version":1,"regions":[
+  {"id":"tatooine_spaceport","planet":"tatooine","protected_radius":48,"capture_ticks":1200,"reward_credits":90},
+  {"id":"geonosis_foundry","planet":"geonosis","protected_radius":48,"capture_ticks":1400,"reward_credits":100},
+  {"id":"kamino_platform","planet":"kamino","protected_radius":64,"capture_ticks":1400,"reward_credits":100},
+  {"id":"coruscant_district","planet":"coruscant","protected_radius":64,"capture_ticks":1600,"reward_credits":120}
+]}

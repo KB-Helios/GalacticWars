@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "galacticwars:mine",
+  "display_name": "Mine",
+  "anchor": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "allowed_rotations": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "placements": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "block": "galacticwars:duracrete",
+      "item": "galacticwars:duracrete"
+    }
+  ],
+  "rewards": {
+    "housing": 0,
+    "storage_slots": 0,
+    "worksite": "miner",
+    "worksite_capacity": 2,
+    "commander_slots": 0
+  }
+}

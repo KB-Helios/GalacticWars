@@ -1,0 +1,23 @@
+{
+  "id": "galacticwars:clone_trooper",
+  "display_name": "Clone Trooper",
+  "faction": "galacticwars:republic",
+  "entity_type": "galacticwars:clone_trooper",
+  "role": "infantry",
+  "hire_cost": 25,
+  "attributes": {
+    "max_health": 24,
+    "attack_damage": 5,
+    "movement_speed": 0.28,
+    "follow_range": 24.0,
+    "armor": 0.0
+  },
+  "equipment": {
+    "main_hand": "galacticwars:dc15_blaster",
+    "head": "galacticwars:republic_plastoid_helmet",
+    "chest": "galacticwars:republic_plastoid_chestplate",
+    "legs": "galacticwars:republic_plastoid_leggings",
+    "feet": "galacticwars:republic_plastoid_boots"
+  },
+  "default_formation": "line"
+}

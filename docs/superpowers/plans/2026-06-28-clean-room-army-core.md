@@ -62,7 +62,7 @@ Create `ArmyGroupState` with immutable owner, group, recruit membership, and cur
 
 - [ ] **Step 4: Add faction alignment primitives**
 
-Create `FactionId` and `FactionAlignment`. `FactionId.of("gondor")` returns `kingdomwarsmiddleearth:gondor`; `FactionAlignment` tracks per-faction score additions.
+Create `FactionId` and `FactionAlignment`. `FactionId.of("republic")` returns `galacticwars:republic`; `FactionAlignment` tracks per-faction score additions.
 
 ### Task 3: Green Verification
 
@@ -81,7 +81,7 @@ Expected: compile succeeds.
 Run:
 
 ```powershell
-java -cp build\army-core-test-classes middleearth.lotr.warmod.army.ArmyCoreTest
+java -cp build\army-core-test-classes galacticwars.clonewars.army.ArmyCoreTest
 ```
 
 Expected: prints `ArmyCoreTest passed`.

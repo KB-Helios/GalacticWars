@@ -23,7 +23,7 @@
 
 Create `ArmyTargetSelectorTest` with a `main` method that checks:
 
-- Allies, self faction, neutral/unknown factions, and out-of-range enemies are ignored.
+- Allies, snightsister faction, neutral/unknown factions, and out-of-range enemies are ignored.
 - An enemy attacking the owner is selected over a closer ordinary enemy.
 - An enemy attacking the recruit is selected over a higher-threat ordinary enemy when no owner attacker exists.
 - Ordinary enemy selection uses threat first and distance as a deterministic tie-breaker.
@@ -65,7 +65,7 @@ Create `ArmyTargetSelector.selectTarget(FactionId ownFaction, ArmyPosition origi
 - Score enemies as `1000 + ownerAttackerBonus + recruitAttackerBonus + threatBonus - distancePenalty`.
 - `ownerAttackerBonus = 10000`, `recruitAttackerBonus = 5000`, `threatBonus = threat * 20`, and `distancePenalty = manhattanDistance`.
 - Select the highest score; tie-break by lower manhattan distance, then by lexicographically smaller UUID string.
-- Reason codes are `protect_owner`, `self_defense`, or `hostile_threat`.
+- Reason codes are `protect_owner`, `snightsister_defense`, or `hostile_threat`.
 - Return `Optional.empty()` when no valid enemy exists.
 
 ### Task 3: Verification
@@ -76,7 +76,7 @@ Run:
 
 ```powershell
 javac -d build\target-selector-test-classes src\main\java\middleearth\lotr\warmod\army\ArmyPosition.java src\main\java\middleearth\lotr\warmod\army\ArmyTargetCandidate.java src\main\java\middleearth\lotr\warmod\army\ArmyTargetSelection.java src\main\java\middleearth\lotr\warmod\army\ArmyTargetSelector.java src\main\java\middleearth\lotr\warmod\faction\FactionId.java src\main\java\middleearth\lotr\warmod\faction\FactionRelation.java src\main\java\middleearth\lotr\warmod\faction\FactionDefinition.java src\main\java\middleearth\lotr\warmod\faction\FactionCatalog.java src\test\java\middleearth\lotr\warmod\army\ArmyTargetSelectorTest.java
-java -cp build\target-selector-test-classes middleearth.lotr.warmod.army.ArmyTargetSelectorTest
+java -cp build\target-selector-test-classes galacticwars.clonewars.army.ArmyTargetSelectorTest
 ```
 
 Expected: prints `ArmyTargetSelectorTest passed`.
@@ -92,7 +92,7 @@ Expected: all print their `passed` messages.
 Run:
 
 ```powershell
-rtk rg -n "ArmyTargetCandidate|ArmyTargetSelection|ArmyTargetSelector|protect_owner|self_defense|hostile_threat" src docs\superpowers\plans\2026-06-28-army-target-selector.md
+rtk rg -n "ArmyTargetCandidate|ArmyTargetSelection|ArmyTargetSelector|protect_owner|snightsister_defense|hostile_threat" src docs\superpowers\plans\2026-06-28-army-target-selector.md
 rtk rg -n "talhanation|AbstractRecruit|RecruitEntity|PatrolLeader|package com\.talhanation|net\.talhanation" src\main\java src\test\java
 ```
 

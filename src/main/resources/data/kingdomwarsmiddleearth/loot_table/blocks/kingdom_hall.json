@@ -1,9 +1,0 @@
-{
-  "type": "minecraft:block",
-  "pools": [{
-    "rolls": 1,
-    "entries": [{"type": "minecraft:item", "name": "kingdomwarsmiddleearth:kingdom_hall"}],
-    "conditions": [{"condition": "minecraft:survives_explosion"}]
-  }],
-  "random_sequence": "kingdomwarsmiddleearth:blocks/kingdom_hall"
-}

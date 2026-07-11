@@ -37,7 +37,7 @@ Run:
 
 ```powershell
 javac -d build\geckolib-metadata-test-classes src\test\java\middleearth\lotr\warmod\integration\GeckoLibDependencyMetadataTest.java
-java -cp build\geckolib-metadata-test-classes middleearth.lotr.warmod.integration.GeckoLibDependencyMetadataTest
+java -cp build\geckolib-metadata-test-classes galacticwars.clonewars.integration.GeckoLibDependencyMetadataTest
 ```
 
 Expected: compile succeeds and the test fails because GeckoLib metadata is not wired yet.
@@ -76,7 +76,7 @@ Run:
 
 ```powershell
 javac -d build\geckolib-metadata-test-classes src\test\java\middleearth\lotr\warmod\integration\GeckoLibDependencyMetadataTest.java
-java -cp build\geckolib-metadata-test-classes middleearth.lotr.warmod.integration.GeckoLibDependencyMetadataTest
+java -cp build\geckolib-metadata-test-classes galacticwars.clonewars.integration.GeckoLibDependencyMetadataTest
 ```
 
 Expected: prints `GeckoLibDependencyMetadataTest passed`.

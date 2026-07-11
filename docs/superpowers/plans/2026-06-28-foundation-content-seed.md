@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the NeoForge MDK sample with a GPL-compatible KingdomWars-Middle-Earth foundation and a small Middle-earth content seed.
+**Goal:** Replace the NeoForge MDK sample with a GPL-compatible Galactic Wars: Clone Wars foundation and a small Middle-earth content seed.
 
 **Architecture:** Keep the main mod class thin and move registrations into focused `registry` classes. Use current NeoForge template APIs already present in the checkout, add manual resource JSON for the first content seed, and avoid copying ARR `recruits` code.
 
@@ -15,26 +15,26 @@
 - Modify: `gradle.properties`
 - Modify: `README.md`
 - Modify: `src/main/templates/META-INF/neoforge.mods.toml`
-- Modify: `src/main/java/middleearth/lotr/warmod/KingdomWarsMiddleEarth.java`
+- Modify: `src/main/java/middleearth/lotr/warmod/GalacticWars.java`
 - Modify: `src/main/java/middleearth/lotr/warmod/Config.java`
-- Modify: `src/main/java/middleearth/lotr/warmod/KingdomWarsMiddleEarthClient.java`
+- Modify: `src/main/java/middleearth/lotr/warmod/GalacticWarsClient.java`
 - Create: `src/main/java/middleearth/lotr/warmod/registry/ModBlocks.java`
 - Create: `src/main/java/middleearth/lotr/warmod/registry/ModItems.java`
 - Create: `src/main/java/middleearth/lotr/warmod/registry/ModCreativeTabs.java`
-- Modify: `src/main/resources/assets/kingdomwarsmiddleearth/lang/en_us.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/blockstates/middle_earth_stone.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/blockstates/mithril_ore.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/blockstates/mallorn_log.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/models/block/middle_earth_stone.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/models/block/mithril_ore.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/models/block/mallorn_log.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/models/item/middle_earth_stone.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/models/item/mithril_ore.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/models/item/mallorn_log.json`
-- Create: `src/main/resources/assets/kingdomwarsmiddleearth/models/item/mithril_ingot.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/loot_tables/blocks/middle_earth_stone.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/loot_tables/blocks/mithril_ore.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/loot_tables/blocks/mallorn_log.json`
+- Modify: `src/main/resources/assets/galacticwars/lang/en_us.json`
+- Create: `src/main/resources/assets/galacticwars/blockstates/galactic_stone.json`
+- Create: `src/main/resources/assets/galacticwars/blockstates/beskar_ore.json`
+- Create: `src/main/resources/assets/galacticwars/blockstates/nightsister_weave_log.json`
+- Create: `src/main/resources/assets/galacticwars/models/block/galactic_stone.json`
+- Create: `src/main/resources/assets/galacticwars/models/block/beskar_ore.json`
+- Create: `src/main/resources/assets/galacticwars/models/block/nightsister_weave_log.json`
+- Create: `src/main/resources/assets/galacticwars/models/item/galactic_stone.json`
+- Create: `src/main/resources/assets/galacticwars/models/item/beskar_ore.json`
+- Create: `src/main/resources/assets/galacticwars/models/item/nightsister_weave_log.json`
+- Create: `src/main/resources/assets/galacticwars/models/item/beskar_ingot.json`
+- Create: `src/main/resources/data/galacticwars/loot_tables/blocks/galactic_stone.json`
+- Create: `src/main/resources/data/galacticwars/loot_tables/blocks/beskar_ore.json`
+- Create: `src/main/resources/data/galacticwars/loot_tables/blocks/nightsister_weave_log.json`
 - Create: `src/main/resources/data/minecraft/tags/blocks/mineable/pickaxe.json`
 - Create: `src/main/resources/data/minecraft/tags/blocks/mineable/axe.json`
 - Create: `src/main/resources/data/minecraft/tags/blocks/needs_iron_tool.json`
@@ -73,7 +73,7 @@ credits="The Lord of the Rings Mod by Mevans and quentin452/The-Lord-of-the-Ring
 authors="KB"
 
 description='''
-KingdomWars-Middle-Earth is a NeoForge 26.2 Middle-earth port foundation.
+Galactic Wars: Clone Wars is a NeoForge 26.2 Middle-earth port foundation.
 LOTR-derived material is handled under GPLv3-compatible terms.
 Army behavior is a clean-room implementation inspired by observed recruit command behavior.
 '''
@@ -84,7 +84,7 @@ Army behavior is a clean-room implementation inspired by observed recruit comman
 Create `NOTICE.md` with:
 
 ```markdown
-# KingdomWars-Middle-Earth Notices
+# Galactic Wars: Clone Wars Notices
 
 This project is being developed as a GPL-3.0-only compatible NeoForge 26.2 port.
 
@@ -101,23 +101,23 @@ Code or assets ported from `quentin452/The-Lord-of-the-Rings` are derived from G
 
 - [ ] **Step 1: Replace the main mod class**
 
-`KingdomWarsMiddleEarth.java` registers config and the focused registry classes only. It must not define example blocks or items.
+`GalacticWars.java` registers config and the focused registry classes only. It must not define example blocks or items.
 
 - [ ] **Step 2: Create block registry**
 
 `ModBlocks.java` registers:
 
-- `middle_earth_stone`
-- `mithril_ore`
-- `mallorn_log`
+- `galactic_stone`
+- `beskar_ore`
+- `nightsister_weave_log`
 
 - [ ] **Step 3: Create item registry**
 
-`ModItems.java` registers block items for all seed blocks and `mithril_ingot`.
+`ModItems.java` registers block items for all seed blocks and `beskar_ingot`.
 
 - [ ] **Step 4: Create creative tab registry**
 
-`ModCreativeTabs.java` registers `middle_earth` with `mithril_ingot` as the icon and displays the seed content.
+`ModCreativeTabs.java` registers `galactic` with `beskar_ingot` as the icon and displays the seed content.
 
 - [ ] **Step 5: Simplify config**
 
@@ -143,15 +143,15 @@ Create blockstates and models for the three seed blocks. Use vanilla textures fo
 
 - [ ] **Step 3: Add item models**
 
-Create item models for the three block items and `mithril_ingot`.
+Create item models for the three block items and `beskar_ingot`.
 
 - [ ] **Step 4: Add loot tables**
 
-Create self-drop loot tables for the three seed blocks.
+Create snightsister-drop loot tables for the three seed blocks.
 
 - [ ] **Step 5: Add mining tags**
 
-Tag stone/ore for pickaxe mining, mallorn log for axe mining, and mithril ore as needing iron tool level.
+Tag stone/ore for pickaxe mining, nightsister_weave log for axe mining, and beskar ore as needing iron tool level.
 
 ### Task 5: Verification
 
@@ -163,7 +163,7 @@ Expected: No matches.
 
 - [ ] **Step 2: Confirm seed content identifiers exist**
 
-Run: `rtk rg -n "middle_earth_stone|mithril_ore|mallorn_log|mithril_ingot|GPL-3.0-only|recruits.*behavior reference" .`
+Run: `rtk rg -n "galactic_stone|beskar_ore|nightsister_weave_log|beskar_ingot|GPL-3.0-only|recruits.*behavior reference" .`
 
 Expected: Matches across Java, resources, metadata, and notices.
 

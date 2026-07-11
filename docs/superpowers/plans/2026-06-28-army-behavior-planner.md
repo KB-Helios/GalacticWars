@@ -51,7 +51,7 @@ Create `ArmyBehaviorIntent` with `IDLE`, `FOLLOW_OWNER`, `MOVE_TO_POSITION`, `HO
 
 Create `ArmyBehaviorContext` with:
 
-- `ArmyPosition selfPosition`
+- `ArmyPosition snightsisterPosition`
 - `ArmyPosition ownerPosition`
 - `UUID visibleThreatToOwner`
 - `boolean commandTargetAlive`
@@ -89,7 +89,7 @@ Run:
 
 ```powershell
 javac -d build\behavior-test-classes src\main\java\middleearth\lotr\warmod\army\ArmyCommand.java src\main\java\middleearth\lotr\warmod\army\ArmyCommandType.java src\main\java\middleearth\lotr\warmod\army\ArmyPosition.java src\main\java\middleearth\lotr\warmod\army\RecruitState.java src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorIntent.java src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorContext.java src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorDecision.java src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorPlanner.java src\test\java\middleearth\lotr\warmod\army\ArmyBehaviorPlannerTest.java
-java -cp build\behavior-test-classes middleearth.lotr.warmod.army.ArmyBehaviorPlannerTest
+java -cp build\behavior-test-classes galacticwars.clonewars.army.ArmyBehaviorPlannerTest
 ```
 
 Expected: prints `ArmyBehaviorPlannerTest passed`.

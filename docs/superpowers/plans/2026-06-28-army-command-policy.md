@@ -71,7 +71,7 @@ Validation order:
 
 Run: `javac -d build/test-classes src/main/java/middleearth/lotr/warmod/faction/*.java src/main/java/middleearth/lotr/warmod/army/*.java src/test/java/middleearth/lotr/warmod/army/ArmyCommandPolicyTest.java`
 
-Run: `java -cp build/test-classes;src/main/java middleearth.lotr.warmod.army.ArmyCommandPolicyTest`
+Run: `java -cp build/test-classes;src/main/java galacticwars.clonewars.army.ArmyCommandPolicyTest`
 
 Expected: `ArmyCommandPolicyTest passed`.
 

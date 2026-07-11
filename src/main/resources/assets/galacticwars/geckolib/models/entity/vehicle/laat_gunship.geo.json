@@ -1,0 +1,306 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.galacticwars.vehicle.laat_gunship",
+        "texture_width": 256,
+        "texture_height": 256,
+        "visible_bounds_width": 8,
+        "visible_bounds_height": 5,
+        "visible_bounds_offset": [
+          0,
+          1.5,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "root",
+          "pivot": [
+            0,
+            12,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -16,
+                4,
+                -24
+              ],
+              "size": [
+                32,
+                18,
+                48
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            },
+            {
+              "origin": [
+                -12,
+                10,
+                -44
+              ],
+              "size": [
+                24,
+                14,
+                20
+              ],
+              "uv": [
+                162,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "left_wing",
+          "parent": "root",
+          "pivot": [
+            -14,
+            18,
+            4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -54,
+                16,
+                -5
+              ],
+              "size": [
+                40,
+                4,
+                18
+              ],
+              "uv": [
+                0,
+                68
+              ]
+            }
+          ]
+        },
+        {
+          "name": "right_wing",
+          "parent": "root",
+          "pivot": [
+            14,
+            18,
+            4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                14,
+                16,
+                -5
+              ],
+              "size": [
+                40,
+                4,
+                18
+              ],
+              "uv": [
+                118,
+                68
+              ]
+            }
+          ]
+        },
+        {
+          "name": "engine_left",
+          "parent": "left_wing",
+          "pivot": [
+            -28,
+            20,
+            4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -33,
+                18,
+                -8
+              ],
+              "size": [
+                10,
+                10,
+                24
+              ],
+              "uv": [
+                0,
+                92
+              ]
+            }
+          ]
+        },
+        {
+          "name": "engine_right",
+          "parent": "right_wing",
+          "pivot": [
+            28,
+            20,
+            4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                23,
+                18,
+                -8
+              ],
+              "size": [
+                10,
+                10,
+                24
+              ],
+              "uv": [
+                70,
+                92
+              ]
+            }
+          ]
+        },
+        {
+          "name": "side_door",
+          "parent": "root",
+          "pivot": [
+            16,
+            13,
+            4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                16,
+                4,
+                -8
+              ],
+              "size": [
+                4,
+                18,
+                24
+              ],
+              "uv": [
+                140,
+                92
+              ]
+            }
+          ]
+        },
+        {
+          "name": "tail",
+          "parent": "root",
+          "pivot": [
+            0,
+            16,
+            22
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -8,
+                8,
+                22
+              ],
+              "size": [
+                16,
+                18,
+                20
+              ],
+              "uv": [
+                0,
+                128
+              ]
+            }
+          ]
+        },
+        {
+          "name": "left_cannon",
+          "parent": "left_wing",
+          "pivot": [
+            -18,
+            14,
+            -12
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -21,
+                11,
+                -24
+              ],
+              "size": [
+                6,
+                6,
+                12
+              ],
+              "uv": [
+                74,
+                128
+              ]
+            }
+          ]
+        },
+        {
+          "name": "right_cannon",
+          "parent": "right_wing",
+          "pivot": [
+            18,
+            14,
+            -12
+          ],
+          "cubes": [
+            {
+              "origin": [
+                15,
+                11,
+                -24
+              ],
+              "size": [
+                6,
+                6,
+                12
+              ],
+              "uv": [
+                112,
+                168
+              ]
+            }
+          ]
+        },
+        {
+          "name": "nose_guns",
+          "parent": "root",
+          "pivot": [
+            0,
+            10,
+            -42
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -2,
+                8,
+                -64
+              ],
+              "size": [
+                4,
+                4,
+                20
+              ],
+              "uv": [
+                150,
+                136
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

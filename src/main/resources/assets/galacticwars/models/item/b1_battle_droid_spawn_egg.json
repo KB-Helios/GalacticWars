@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "galacticwars:item/b1_battle_droid_spawn_egg"
+  }
+}

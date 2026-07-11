@@ -1,0 +1,23 @@
+{
+  "id": "galacticwars:mandalorian_warrior",
+  "display_name": "Mandalorian Warrior",
+  "faction": "galacticwars:mandalorian",
+  "entity_type": "galacticwars:mandalorian_warrior",
+  "role": "infantry",
+  "hire_cost": 20,
+  "attributes": {
+    "max_health": 26,
+    "attack_damage": 6,
+    "movement_speed": 0.30,
+    "follow_range": 26.0,
+    "armor": 0.0
+  },
+  "equipment": {
+    "main_hand": "galacticwars:westar_blaster",
+    "head": "galacticwars:mandalorian_alloy_helmet",
+    "chest": "galacticwars:mandalorian_alloy_chestplate",
+    "legs": "galacticwars:mandalorian_alloy_leggings",
+    "feet": "galacticwars:mandalorian_alloy_boots"
+  },
+  "default_formation": "wedge"
+}

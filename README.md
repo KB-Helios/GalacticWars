@@ -1,68 +1,81 @@
+# Galactic Wars: Clone Wars
 
-# KingdomWars-Middle-Earth
+Galactic Wars: Clone Wars is an unofficial, GPL-3.0-only NeoForge 26.2 fan mod focused on faction armies, working settlements, planetary travel, vehicles, Force progression, quests, trading, and conquest.
 
-KingdomWars-Middle-Earth is a NeoForge 26.2 kingdom, workforce, recruitment,
-and clean-room army gameplay mod for Middle-earth.
+This is a clean-break conversion. Existing KingdomWars-Middle-Earth worlds and registry IDs are not compatible; start a fresh world.
 
-## Scope
+## Installation
 
-- Port compatible features from `quentin452/The-Lord-of-the-Rings` in phased,
-  NeoForge-native slices.
-- Build army command behavior from clean-room observations of
-  `talhanation/recruits`.
-- Keep registrations, gameplay systems, and resources modular enough for later
-  biomes, factions, NPCs, structures, and command UI work.
+1. Install the matching Minecraft 26.2 and NeoForge 26.2 client or dedicated server.
+2. Place the Galactic Wars JAR and a compatible GeckoLib JAR in the instance's `mods` folder.
+3. Remove earlier KingdomWars-Middle-Earth builds from that folder and create a fresh world.
+4. Keep the same mod/config versions on every multiplayer client and the server.
 
-## Kingdom gameplay
+## Requirements
 
-1. Place a Kingdom Hall and sneak-use it to choose Gondor, Rohan, Mordor,
-   dwarf, or elf before recruiting. Normal use opens its shared treasury and
-   stockpile.
-2. Hire an aligned recruit, then assign farmer, lumberjack, miner, courier, or
-   builder duty from the recruit screen. Aim at a loaded block inside the Hall
-   claim to assign worksites and real containers.
-3. Fund the Hall and worker containers with real items. Workers walk to their
-   targets, collect loot, consume tools and replanting materials, and deliver
-   their inventory without virtual resource counters.
-4. Select and queue the starter keep, house, storehouse, farm plot, lumber
-   camp, or mine-site blueprint. Completing buildings adds housing, storage,
-   worksite capacity, and the starter keep's commander slot.
-5. Promote one owned soldier after completing the starter keep. The commander
-   can issue group orders and run bounded recruitment campaigns that respect
-   faction alignment, housing, treasury reserve, upkeep, and campaign limits.
+- Minecraft 26.2
+- NeoForge 26.2.0.7-beta or newer compatible 26.2 build
+- Java 25
+- GeckoLib 5.5.3 or newer compatible release
 
-## Licensing
+## Controls
 
-The project metadata is GPL-3.0-only compatible because LOTR-derived material is
-based on GPLv3 source. `talhanation/recruits` is All Rights Reserved and is used
-only as a clean-room behavior reference; its code and assets are not included.
+- Claim and activate a Command Center, then use an identity chip on your center to pledge its faction.
+- Interact with a recruit to open the command screen. Hire first, then choose combat orders, formations, a worksite, storage, a profession, or construction controls.
+- Use a blaster to fire; each accepted shot consumes one Energy Cell, applies weapon durability and a short server-authoritative cooldown.
+- Place blueprint structures through the recruit command screen. Builders withdraw real blocks from Command Center or linked storage before placing them.
+- Planet navigation, vehicles, and Force bindings are tracked below and are not presented as playable controls until their runtime milestones are complete.
 
-See `NOTICE.md` for attribution and source-use rules.
+## Core gameplay loop
+
+1. Build a Command Center and pledge to the Republic, Separatists, Mandalorians, Hutt Cartel, or Nightsisters.
+2. Earn physical Credit Chips through faction objectives, work, exploration, and trading.
+3. Recruit soldiers, droids, specialists, and workers. Give squads follow, hold, move, protect, attack, patrol, and formation orders.
+4. Assign workers to real farms, salvage zones, mines, storage, deliveries, and construction projects.
+5. Complete a Forward Base, Barracks, Supply Depot, Moisture Farm, Salvage Yard, and Mine to expand housing, logistics, travel, vehicles, and command capacity.
+6. Travel between Tatooine, Geonosis, Kamino, and Coruscant; complete faction chapters and unlock vehicles or a light/dark Force path.
+7. Trade with aligned merchants and capture regional objectives without overwriting protected player builds.
+
+Credits, unlocks, quest milestones, vehicles, Force choices, and conquest use an idempotent server-side progression coordinator: duplicate packets or reconnects must not duplicate charges or rewards.
+
+## Launch content contract
+
+- 5 factions and 15 unit definitions: three per faction.
+- 4 separate planet dimensions.
+- BARC Speeder, AT-RT, STAP, AAT, and LAAT Gunship definitions.
+- Light Force path: Push, Pull, Leap. Dark path: Push, Choke, Dash.
+- 15 quests arranged as one three-chapter campaign per faction.
+- Credit-based recruitment, treasury, profession training, trading, vehicle acquisition, and upkeep.
+- Original project-owned textures only. No official Star Wars or third-party mod assets are bundled.
+
+## Roadmap to the completed release
+
+- [x] Rename the mod, Java packages, mixins, resources, datapacks, tests, and artifact namespace to `galacticwars`.
+- [x] Convert factions, Command Center gameplay, settlement blueprints, Beskar, Credit Chips, and atomic payment/refund behavior.
+- [x] Complete the manifest-driven original art pass for five faction kits, fifteen units, planets, combat effects, GUI, and five vehicle UV atlases, with provenance and executable asset validation.
+- [x] Register and data-drive all fifteen launch-unit IDs while retaining formation, command, hiring, worker, commander, and persistence foundations.
+- [ ] Finish blaster heat behavior and ranged AI goals; server-authoritative projectiles, Energy Cell consumption, cooldowns, durability, configurable PvP, and faction/owner friendly-fire protection are implemented.
+- [ ] Finish safe arrival structures, navigation UI, travel/respawn, and cross-dimension squad transfer for the four registered dimensions.
+- [ ] Implement drivable runtime entities, controls, persistence, and combat for all five vehicles; authoritative ownership, allied boarding, seat limits, fuel, damage/destruction, and safe dimension-transfer policies are implemented and tested.
+- [ ] Implement runtime Force input, targeting, persistence/sync, effects, and accessibility feedback; unlock validation, path/quest gates, energy, cooldown replay protection, regeneration, and PvP policy are implemented and tested.
+- [ ] Load the fifteen quest, trade, vehicle, planet, Force, and conquest definitions through the atomic datapack manager and persist player progress.
+- [ ] Connect conquest capture zones to faction spawns, merchant stock, travel safety, rewards, and protected-build rules.
+- [ ] Complete multiplayer balance, accessibility, visual QA, dedicated-server testing, GameTests, and a fresh-world acceptance playthrough.
+
+Post-release candidates: Dathomir, Naboo, Kashyyyk, additional unit families, more vehicles, free-flight space combat, capital ships, bosses, longer campaigns, and localization.
 
 ## Development
 
-Build with the included Gradle wrapper:
-
-```bash
-./gradlew build
-./gradlew runGameTestServer
+```powershell
+.\gradlew.bat clean build
+.\gradlew.bat runHarnesses
+.\gradlew.bat runGameTestServer
 ```
 
-Animated entity work uses GeckoLib 5.5.3 for NeoForge 26.2. The dependency is
-declared in Gradle and in the generated NeoForge mod metadata so clients and
-servers load it before animated Middle-earth recruit entities.
+Executable `*Test.java` harnesses are part of `check`. Generated or edited textures must satisfy `docs/galacticwars-asset-manifest.json`; generation provenance is recorded in `docs/galacticwars-asset-provenance.md`.
 
-## Current release
+## Licensing and fan-project notice
 
-- Faction relations, alignment effects, unit costs, attributes, equipment, and
-  kingdom blueprints load from validated datapack resources.
-- Army groups persist their membership, formations, commands, tactical vitals,
-  and movement-only virtual state across chunk unloads and server restarts.
-- Worksites enforce capacity through persisted assignments and work orders;
-  completed blueprints apply housing, storage, worksite, and commander rewards.
-- The Kingdom Hall, Mallorn, Mithril, faction materials, tokens, and five armor
-  and tool families have survival recipes and dedicated models and textures.
+This is an unofficial fan project and is not affiliated with or endorsed by Lucasfilm or Disney. Star Wars names identify the fan setting; newly introduced code, textures, models, and writing are project-owned originals. GPL-derived historical code remains GPL-3.0-only and its required attribution is retained in `NOTICE.md`.
 
-Fisherman, animal farmer, cook, and merchant remain disabled pending their
-runtime worker loops. Region-specific spawning, Middle-earth world generation,
-cavalry, ranged units, trading, quests, and conquest remain later expansion work.
+`talhanation/recruits` remains a behavioral reference only. Its code and assets are not included.

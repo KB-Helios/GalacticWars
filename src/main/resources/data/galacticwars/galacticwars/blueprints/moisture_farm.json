@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "id": "galacticwars:moisture_farm",
+  "display_name": "Moisture Farm",
+  "anchor": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "allowed_rotations": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "placements": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "block": "minecraft:dirt",
+      "item": "minecraft:dirt"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 4,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 4,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 4,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 4,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 4,
+      "block": "minecraft:oak_log",
+      "item": "minecraft:oak_log"
+    }
+  ],
+  "rewards": {
+    "housing": 0,
+    "storage_slots": 0,
+    "worksite": "farmer",
+    "worksite_capacity": 2,
+    "commander_slots": 0
+  }
+}

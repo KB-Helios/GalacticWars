@@ -1,0 +1,13 @@
+{
+  "display_name": "Separatist",
+  "controlling_faction": "galacticwars:separatist",
+  "climate": "shadow",
+  "base_temperature": 1.0,
+  "downfall": 0.0,
+  "spawn_weight": 6,
+  "features": [
+    "ash_wastes",
+    "black_gate",
+    "orc_camps"
+  ]
+}

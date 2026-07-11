@@ -18,8 +18,8 @@
 - [ ] **Step 1: Write the failing test**
 
 Create a main-method harness that verifies:
-- Helping Gondor applies a direct Gondor score gain, an allied Rohan score gain, and an enemy Mordor score loss.
-- Harming Gondor applies a direct Gondor score loss, an allied Rohan score loss, and an enemy Mordor score gain.
+- Helping Republic applies a direct Republic score gain, an allied Mandalorian score gain, and an enemy Separatist score loss.
+- Harming Republic applies a direct Republic score loss, an allied Mandalorian score loss, and an enemy Separatist score gain.
 - Neutral factions do not receive changes.
 - Returned changes include faction id, before score, delta, after score, and a stable reason code.
 - Blank reason codes and a zero-effect rule are rejected.
@@ -58,14 +58,14 @@ For each catalog definition:
 - source faction gets `directDelta`.
 - factions where `catalog.relation(sourceFaction, candidate)` is `ALLY` get `allyDelta`.
 - factions where the relation is `ENEMY` get `enemyDelta`.
-- `SELF` and `NEUTRAL` candidates other than the source produce no additional change.
+- `SNIGHTSISTER` and `NEUTRAL` candidates other than the source produce no additional change.
 - zero deltas are skipped.
 
 - [ ] **Step 5: Run focused harness**
 
 Run: `javac -d build/test-classes src/main/java/middleearth/lotr/warmod/faction/*.java src/test/java/middleearth/lotr/warmod/faction/FactionAlignmentUpdaterTest.java`
 
-Run: `java -cp build/test-classes;src/main/java middleearth.lotr.warmod.faction.FactionAlignmentUpdaterTest`
+Run: `java -cp build/test-classes;src/main/java galacticwars.clonewars.faction.FactionAlignmentUpdaterTest`
 
 Expected: `FactionAlignmentUpdaterTest passed`.
 

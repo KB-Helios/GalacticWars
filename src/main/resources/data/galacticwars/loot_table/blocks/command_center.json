@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:block",
+  "pools": [{
+    "rolls": 1,
+    "entries": [{"type": "minecraft:item", "name": "galacticwars:command_center"}],
+    "conditions": [{"condition": "minecraft:survives_explosion"}]
+  }],
+  "random_sequence": "galacticwars:blocks/command_center"
+}
