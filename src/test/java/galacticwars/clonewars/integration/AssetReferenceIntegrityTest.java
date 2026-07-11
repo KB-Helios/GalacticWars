@@ -31,6 +31,7 @@ public final class AssetReferenceIntegrityTest {
     public static void main(String[] args) throws IOException {
         blockstatesReferenceExistingBlockModels();
         itemDefinitionsReferenceExistingItemModels();
+        exactRegisteredItemDefinitionsExist();
         modelsReferenceExistingModTextures();
         recruitRenderTexturesExist();
         geckoRecruitAssetsExist();
@@ -144,6 +145,14 @@ public final class AssetReferenceIntegrityTest {
             references.add(matcher.group(1));
         }
         return references;
+    }
+
+    private static void exactRegisteredItemDefinitionsExist() {
+        assertRegularFile(MOD_ASSET_ROOT.resolve("items/nightsister_weave.json"),
+                "Nightsister Weave exact item definition");
+        if (Files.exists(MOD_ASSET_ROOT.resolve("items/nightsister_weave_weave.json"))) {
+            throw new AssertionError("stale Nightsister Weave duplicate item definition");
+        }
     }
 
     private static Set<String> textureReferencesIn(Path file) throws IOException {

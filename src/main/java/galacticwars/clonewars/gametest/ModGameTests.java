@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.combat.BlasterCombatEvents;
+import galacticwars.clonewars.combat.FactionRangedWeaponService;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.entity.RecruitSpawnEggItem;
@@ -209,6 +210,21 @@ public final class ModGameTests {
             helper.fail("Recruit blaster did not spawn one owned, weapon-tagged bolt");
             return;
         }
+
+        GalacticRecruitEntity archer = helper.spawn(
+                ModEntityTypes.NIGHTSISTER_ARCHER.get(), new BlockPos(2, 1, 4));
+        GalacticRecruitEntity bowTarget = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(6, 1, 4));
+        archer.tame(owner);
+        ItemStack bow = new ItemStack(ModItems.NIGHTSISTER_BOW.get());
+        archer.setItemInHand(InteractionHand.MAIN_HAND, bow);
+        FactionRangedWeaponService.fireNightsisterBow(helper.getLevel(), archer, bowTarget, bow);
+        List<Arrow> arrows = helper.getLevel().getEntitiesOfClass(
+                Arrow.class, archer.getBoundingBox().inflate(8.0D), arrow -> arrow.getOwner() == archer);
+        if (arrows.size() != 1 || !arrows.getFirst().getWeaponItem().is(ModItems.NIGHTSISTER_BOW.get())) {
+            helper.fail("Nightsister Archer did not spawn one owned, bow-tagged ranged projectile");
+            return;
+        }
         helper.succeed();
     }
 
@@ -239,6 +255,16 @@ public final class ModGameTests {
         BlasterCombatEvents.onProjectileImpact(recruitImpact);
         if (!recruitImpact.isCanceled() || !recruitBolt.isRemoved()) {
             helper.fail("Same-owner squadmate was not protected from a recruit blaster bolt");
+            return;
+        }
+        Arrow bowArrow = new Arrow(
+                helper.getLevel(), squadmate,
+                new ItemStack(Items.ARROW),
+                new ItemStack(ModItems.NIGHTSISTER_BOW.get()));
+        ProjectileImpactEvent bowImpact = new ProjectileImpactEvent(bowArrow, new EntityHitResult(recruit));
+        BlasterCombatEvents.onProjectileImpact(bowImpact);
+        if (!bowImpact.isCanceled() || !bowArrow.isRemoved()) {
+            helper.fail("Same-owner squadmate was not protected from a Nightsister bow projectile");
             return;
         }
         helper.succeed();

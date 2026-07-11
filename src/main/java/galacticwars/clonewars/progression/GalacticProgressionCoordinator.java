@@ -33,7 +33,7 @@ public final class GalacticProgressionCoordinator {
             faction = event.subjectId();
         } else if (faction.isEmpty()
                 && !(event.type() == ProgressionEventType.BUILDING_COMPLETED
-                && event.subjectId().equals("command_center"))) {
+                && subjectPath(event.subjectId()).equals("command_center"))) {
             return ProgressionDecision.rejected("faction_required", state);
         }
         if (event.type() == ProgressionEventType.PLANET_VISITED && !PLANETS.contains(event.subjectId())) {
@@ -88,13 +88,14 @@ public final class GalacticProgressionCoordinator {
         switch (event.type()) {
             case FACTION_PLEDGED -> unlocks.add("faction_intro");
             case BUILDING_COMPLETED -> {
-                if (event.subjectId().equals("command_center")) {
+                String buildingId = subjectPath(event.subjectId());
+                if (buildingId.equals("command_center")) {
                     unlocks.addAll(Set.of("treasury", "recruitment", "workforce"));
                 }
-                if (event.subjectId().equals("forward_base")) {
+                if (buildingId.equals("forward_base")) {
                     unlocks.addAll(Set.of("commander", "planet_travel"));
                 }
-                if (event.subjectId().equals("supply_depot")) {
+                if (buildingId.equals("supply_depot")) {
                     unlocks.add("vehicle_crafting");
                 }
             }
@@ -103,19 +104,17 @@ public final class GalacticProgressionCoordinator {
                     unlocks.add("advanced_trading");
                 }
             }
-            case QUEST_ADVANCED -> {
-                if (event.subjectId().endsWith("chapter_2")) {
-                    unlocks.add("force_path");
-                }
-                if (event.subjectId().endsWith("chapter_3")) {
-                    unlocks.add("conquest");
-                }
-            }
+            case QUEST_ADVANCED -> unlocks.addAll(LaunchContentCatalog.questUnlocks(event.subjectId()));
             case VEHICLE_ACQUIRED -> unlocks.add("vehicle_control");
             case REGION_CAPTURED -> unlocks.add("veteran_trades");
             default -> {
             }
         }
         return Set.copyOf(unlocks);
+    }
+
+    private static String subjectPath(String subjectId) {
+        int separator = subjectId.indexOf(':');
+        return separator < 0 ? subjectId : subjectId.substring(separator + 1);
     }
 }

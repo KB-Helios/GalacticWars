@@ -2,7 +2,12 @@ package galacticwars.clonewars.progression;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public final class LaunchDataIntegrityTest {
@@ -23,6 +28,18 @@ public final class LaunchDataIntegrityTest {
         for (String quest : LaunchContentCatalog.QUESTS) {
             assertTrue(quests.contains("\"id\":\"" + quest + "\""), quest);
         }
+        Map<String, Set<String>> declaredUnlocks = new HashMap<>();
+        Matcher questMatcher = Pattern.compile(
+                "\\{\"id\":\"([^\"]+)\".*?\"unlocks\":\\[([^]]*)]}").matcher(quests);
+        while (questMatcher.find()) {
+            HashSet<String> unlocks = new HashSet<>();
+            Matcher unlockMatcher = Pattern.compile("\"([^\"]+)\"").matcher(questMatcher.group(2));
+            while (unlockMatcher.find()) {
+                unlocks.add(unlockMatcher.group(1));
+            }
+            declaredUnlocks.put(questMatcher.group(1), Set.copyOf(unlocks));
+        }
+        assertTrue(declaredUnlocks.equals(LaunchContentCatalog.QUEST_UNLOCKS), "quest unlock declarations");
         System.out.println("LaunchDataIntegrityTest passed");
     }
 

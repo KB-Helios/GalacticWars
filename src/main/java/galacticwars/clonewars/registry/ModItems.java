@@ -8,6 +8,7 @@ import galacticwars.clonewars.faction.IdentityChipItem;
 import galacticwars.clonewars.world.HyperspaceNavigatorItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.AxeItem;
+import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ShovelItem;
@@ -51,8 +52,8 @@ public final class ModItems {
             ITEMS.registerItem("westar_blaster", properties -> new BlasterItem(properties.durability(900), 6.5D, 3.5F, 0.6F));
     public static final DeferredItem<BlasterItem> SCATTER_BLASTER =
             ITEMS.registerItem("scatter_blaster", properties -> new BlasterItem(properties.durability(650), 7.0D, 2.8F, 1.4F));
-    public static final DeferredItem<Item> NIGHTSISTER_BOW =
-            ITEMS.registerSimpleItem("nightsister_bow", properties -> properties.stacksTo(1).durability(600));
+    public static final DeferredItem<BowItem> NIGHTSISTER_BOW =
+            ITEMS.registerItem("nightsister_bow", properties -> new BowItem(properties.durability(600)));
     public static final DeferredItem<Item> BLUE_LIGHTSABER =
             ITEMS.registerSimpleItem("blue_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
     public static final DeferredItem<Item> GREEN_LIGHTSABER =

@@ -21,7 +21,7 @@ public final class BlasterCombatEvents {
 
     public static void onProjectileImpact(ProjectileImpactEvent event) {
         if (!(event.getProjectile() instanceof AbstractArrow arrow)
-                || !(arrow.getWeaponItem().getItem() instanceof BlasterItem)
+                || !FactionRangedWeaponService.isProtectedFactionProjectile(arrow.getWeaponItem())
                 || !(arrow.getOwner() instanceof LivingEntity shooter)
                 || !(event.getRayTraceResult() instanceof EntityHitResult hit)) {
             return;

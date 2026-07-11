@@ -10,7 +10,8 @@ public final class GalacticSystemsIntegrationTest {
         state = event(state, ProgressionEventType.CREDIT_TRANSACTION, "starter_reward", 100);
         state = event(state, ProgressionEventType.BUILDING_COMPLETED, "command_center", 1);
         state = event(state, ProgressionEventType.BUILDING_COMPLETED, "forward_base", 1);
-        state = event(state, ProgressionEventType.BUILDING_COMPLETED, "supply_depot", 1);
+        assertTrue(!state.unlocks().contains("vehicle_crafting"),
+                "vehicle acquisition test starts without Supply Depot crafting access");
 
         GalacticSystemsService.SystemDecision prematureVehicle = GalacticSystemsService.acquireVehicle(
                 state, UUID.randomUUID(), "barc_speeder");
@@ -18,10 +19,13 @@ public final class GalacticSystemsIntegrationTest {
                 "vehicle quest requirement cannot be bypassed");
         state = event(state, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_1", 1);
         state = event(state, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2", 1);
+        assertTrue(!state.unlocks().contains("vehicle_crafting"),
+                "Republic chapter 2 does not synthesize the unrelated crafting unlock");
 
         GalacticSystemsService.SystemDecision vehicle = GalacticSystemsService.acquireVehicle(
                 state, UUID.randomUUID(), "barc_speeder");
-        assertTrue(vehicle.accepted() && vehicle.changed(), vehicle.reason());
+        assertTrue(vehicle.accepted() && vehicle.changed(),
+                "quest-declared BARC unlock bypasses unrelated Supply Depot gate: " + vehicle.reason());
         state = vehicle.state();
         assertTrue(state.unlocks().contains("vehicle_control"), "vehicle acquisition connects to controls");
 

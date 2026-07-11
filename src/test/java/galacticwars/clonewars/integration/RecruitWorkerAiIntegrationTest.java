@@ -14,6 +14,7 @@ public final class RecruitWorkerAiIntegrationTest {
         recruitUsesRealLootAndInventoryTransactions();
         recruitRequiresReachableClaimedTargets();
         recruitImplementsEnabledProfessionHandlers();
+        builderNormalizesProgressionSubject();
         workerGoalDelegatesToRecruitCycle();
 
         System.out.println("RecruitWorkerAiIntegrationTest passed");
@@ -36,6 +37,12 @@ public final class RecruitWorkerAiIntegrationTest {
         assertContains(entity, "\"WorkerInventory\"", "worker inventory save key");
         assertContains(entity, "\"WorkerPhase\"", "worker phase save key");
         assertContains(entity, "\"StarterBaseCompletedBlocks\"", "base progress save key");
+    }
+
+    private static void builderNormalizesProgressionSubject() throws IOException {
+        String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
+        assertContains(entity, "KingdomBaseBlueprint.path(blueprint.id())",
+                "canonical builder progression subject");
     }
 
     private static void recruitUsesRealLootAndInventoryTransactions() throws IOException {

@@ -1820,7 +1820,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         }
         ProgressionSavedData.get(serverLevel).apply(new ProgressionEvent(
                 UUID.randomUUID(), this.getOwnerReference().getUUID(), ProgressionEventType.BUILDING_COMPLETED,
-                blueprint.id(), 1));
+                KingdomBaseBlueprint.path(blueprint.id()), 1));
         KingdomSavedData.get(serverLevel).reserveWorksite(
                 this.getOwnerReference().getUUID(), this.getUUID(), WorkerProfession.BUILDER);
         this.workerCooldownTicks = 100;

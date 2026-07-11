@@ -7,9 +7,11 @@ import java.util.UUID;
 
 import galacticwars.clonewars.combat.BlasterHeatPolicy;
 import galacticwars.clonewars.combat.BlasterItem;
+import galacticwars.clonewars.combat.FactionRangedWeaponService;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.faction.FactionId;
+import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.recruitment.RecruitDuty;
 import net.minecraft.server.level.ServerLevel;
@@ -19,6 +21,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -212,14 +215,20 @@ public final class ArmyRecruitRuntimeController {
                 recruit.setTarget(target);
                 recruit.setAggressive(true);
                 recruit.getLookControl().setLookAt(target, 30.0F, 30.0F);
-                if (recruit.getMainHandItem().getItem() instanceof BlasterItem blaster
+                ItemStack weapon = recruit.getMainHandItem();
+                if (FactionRangedWeaponService.supportsRecruitRangedCombat(weapon)
                         && recruit.distanceToSqr(target) <= recruit.getAttributeValue(Attributes.FOLLOW_RANGE)
                                 * recruit.getAttributeValue(Attributes.FOLLOW_RANGE)
                         && recruit.getSensing().hasLineOfSight(target)) {
                     recruit.getNavigation().stop();
-                    if (BlasterHeatPolicy.canFire(blasterHeat)) {
-                        blaster.fireAt(level, recruit, target, recruit.getMainHandItem());
+                    if (weapon.getItem() instanceof BlasterItem blaster
+                            && BlasterHeatPolicy.canFire(blasterHeat)) {
+                        blaster.fireAt(level, recruit, target, weapon);
                         blasterHeat = BlasterHeatPolicy.afterShot(blasterHeat);
+                    } else if (weapon.is(ModItems.NIGHTSISTER_BOW.get())
+                            && ticksUntilNextAttack == 0) {
+                        FactionRangedWeaponService.fireNightsisterBow(level, recruit, target, weapon);
+                        ticksUntilNextAttack = 24;
                     }
                 } else if (recruit.isWithinMeleeAttackRange(target)
                         && recruit.getSensing().hasLineOfSight(target)) {

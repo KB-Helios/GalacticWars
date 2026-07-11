@@ -40,9 +40,6 @@ public final class GalacticSystemsService {
         if (!LaunchContentCatalog.VEHICLES.contains(vehicleId)) {
             return SystemDecision.rejected("unknown_vehicle", state);
         }
-        if (!state.unlocks().contains("vehicle_crafting")) {
-            return SystemDecision.rejected("vehicle_crafting_locked", state);
-        }
         String requirement = VEHICLE_REQUIREMENTS.get(vehicleId);
         if (!requirementSatisfied(state, requirement)) {
             return SystemDecision.rejected("vehicle_quest_locked", state);

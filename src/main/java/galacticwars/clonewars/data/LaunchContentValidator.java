@@ -13,6 +13,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -26,8 +27,41 @@ final class LaunchContentValidator {
         assertIds(manager, "vehicles", "vehicles", Set.copyOf(LaunchContentCatalog.VEHICLES));
         assertIds(manager, "force_abilities", "abilities", LaunchContentCatalog.FORCE_ABILITIES);
         assertIds(manager, "quests", "quests", Set.copyOf(LaunchContentCatalog.QUESTS));
+        assertQuestUnlocks(manager);
         assertCount(manager, "trades", "trades", 5);
         assertCount(manager, "conquest_regions", "regions", 4);
+    }
+
+    private static void assertQuestUnlocks(ResourceManager manager) throws IOException {
+        FileToIdConverter converter = FileToIdConverter.json("galacticwars/quests");
+        Map<String, Set<String>> actual = new HashMap<>();
+        for (Map.Entry<Identifier, Resource> entry
+                : converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID).entrySet()) {
+            try (BufferedReader reader = entry.getValue().openAsReader()) {
+                JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+                JsonArray quests = json.getAsJsonArray("quests");
+                if (quests == null) {
+                    throw new IllegalArgumentException("Missing quests in " + entry.getKey());
+                }
+                for (JsonElement element : quests) {
+                    JsonObject quest = element.getAsJsonObject();
+                    String id = quest.get("id").getAsString();
+                    JsonArray unlocksJson = quest.getAsJsonArray("unlocks");
+                    if (unlocksJson == null) {
+                        throw new IllegalArgumentException("Quest " + id + " is missing unlocks");
+                    }
+                    HashSet<String> unlocks = new HashSet<>();
+                    unlocksJson.forEach(unlock -> unlocks.add(unlock.getAsString()));
+                    if (actual.putIfAbsent(id, Set.copyOf(unlocks)) != null) {
+                        throw new IllegalArgumentException("Duplicate quest id " + id);
+                    }
+                }
+            }
+        }
+        if (!actual.equals(LaunchContentCatalog.QUEST_UNLOCKS)) {
+            throw new IllegalArgumentException("Quest unlocks do not match launch data contract; expected "
+                    + LaunchContentCatalog.QUEST_UNLOCKS + " but found " + actual);
+        }
     }
 
     private static void assertIds(

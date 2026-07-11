@@ -22,9 +22,12 @@ public final class GalacticProgressionCoordinatorTest {
                 state, event(player, ProgressionEventType.CREDIT_TRANSACTION, "invalid_purchase", -26));
         assertTrue(!overspend.accepted() && state.credits() == 25, "overspend is atomic");
         state = accepted(state, event(player, ProgressionEventType.BUILDING_COMPLETED, "command_center", 1));
-        state = accepted(state, event(player, ProgressionEventType.BUILDING_COMPLETED, "forward_base", 1));
+        state = accepted(state, event(player, ProgressionEventType.BUILDING_COMPLETED, "galacticwars:forward_base", 1));
+        state = accepted(state, event(player, ProgressionEventType.BUILDING_COMPLETED, "galacticwars:supply_depot", 1));
         assertTrue(state.unlocks().contains("planet_travel") && state.unlocks().contains("recruitment"),
                 "base progression unlocks connected systems");
+        assertTrue(state.unlocks().contains("vehicle_crafting"),
+                "namespaced supply depot unlocks vehicle crafting");
         state = accepted(state, event(player, ProgressionEventType.PLANET_VISITED, "tatooine", 1));
         ProgressionDecision skippedQuest = GalacticProgressionCoordinator.apply(state,
                 event(player, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2", 1));
@@ -40,6 +43,19 @@ public final class GalacticProgressionCoordinatorTest {
                 event(player, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2", 1));
         assertTrue(questReplay == state, "semantic quest replay is idempotent across event ids");
         assertTrue(state.unlocks().contains("force_path"), "quest unlocks Force path");
+
+        UUID mandalorianPlayer = UUID.randomUUID();
+        ProgressionState mandalorian = ProgressionState.create(mandalorianPlayer);
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.FACTION_PLEDGED, "galacticwars:mandalorian", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.QUEST_ADVANCED, "mandalorian_chapter_1", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.QUEST_ADVANCED, "mandalorian_chapter_2", 1));
+        assertTrue(mandalorian.unlocks().contains("vehicle_crafting"),
+                "Mandalorian chapter 2 honors its declared unlock");
+        assertTrue(!mandalorian.unlocks().contains("force_path"),
+                "Mandalorian chapter 2 does not receive the Republic/Nightsister Force reward");
         System.out.println("GalacticProgressionCoordinatorTest passed");
     }
 

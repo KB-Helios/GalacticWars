@@ -11,7 +11,7 @@ public final class RecruitCompanionAiIntegrationTest {
     public static void main(String[] args) throws IOException {
         recruitUsesSinglePlannerRuntimeController();
         controllerIntegratesExistingPlannerPipeline();
-        controllerUsesDataDrivenBlasterCombat();
+        controllerUsesDataDrivenRangedCombat();
         groupCommandsPersistBeforeRuntimeMutation();
         explicitAttackTargetsAreGuarded();
         missingGroupsReleaseStaleRuntimeOwnership();
@@ -48,13 +48,18 @@ public final class RecruitCompanionAiIntegrationTest {
         assertContains(controller, "recruit.doHurtTarget(level, target)", "runtime melee execution");
     }
 
-    private static void controllerUsesDataDrivenBlasterCombat() throws IOException {
+    private static void controllerUsesDataDrivenRangedCombat() throws IOException {
         String controller = read("src/main/java/galacticwars/clonewars/army/ArmyRecruitRuntimeController.java");
         String events = read("src/main/java/galacticwars/clonewars/combat/BlasterCombatEvents.java");
 
-        assertContains(controller, "getMainHandItem().getItem() instanceof BlasterItem", "loadout-driven blaster detection");
+        assertContains(controller, "FactionRangedWeaponService.supportsRecruitRangedCombat",
+                "loadout-driven faction ranged-weapon detection");
         assertContains(controller, "blaster.fireAt(level, recruit, target", "server-authoritative ranged attack");
         assertContains(controller, "BlasterHeatPolicy.canFire", "ranged heat gate");
+        assertContains(controller, "FactionRangedWeaponService.supportsRecruitRangedCombat",
+                "data-driven blaster and Nightsister bow detection");
+        assertContains(controller, "FactionRangedWeaponService.fireNightsisterBow",
+                "Nightsister archer ranged execution");
         assertContains(events, "arrow.getOwner() instanceof LivingEntity shooter", "recruit projectile filtering");
         assertContains(events, "sameOwner(other, recruit)", "same-owner recruit projectile protection");
     }

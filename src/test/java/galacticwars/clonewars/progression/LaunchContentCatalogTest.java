@@ -8,6 +8,13 @@ public final class LaunchContentCatalogTest {
         assertEquals(5, LaunchContentCatalog.VEHICLES.size(), "vehicles");
         assertEquals(6, LaunchContentCatalog.FORCE_ABILITIES.size(), "Force abilities");
         assertEquals(15, LaunchContentCatalog.QUESTS.size(), "quests");
+        assertEquals(15, LaunchContentCatalog.QUEST_UNLOCKS.size(), "quest unlock definitions");
+        assertEquals(java.util.Set.of("barc_speeder", "force_path"),
+                LaunchContentCatalog.questUnlocks("republic_chapter_2"), "Republic chapter 2 unlocks");
+        assertEquals(java.util.Set.of("vehicle_crafting"),
+                LaunchContentCatalog.questUnlocks("mandalorian_chapter_2"), "Mandalorian chapter 2 unlocks");
+        assertEquals(java.util.Set.of("vehicle_crafting"),
+                LaunchContentCatalog.questUnlocks("hutt_cartel_chapter_2"), "Hutt chapter 2 unlocks");
         System.out.println("LaunchContentCatalogTest passed");
     }
 
