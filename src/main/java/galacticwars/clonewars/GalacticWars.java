@@ -14,9 +14,9 @@ import galacticwars.clonewars.registry.ModDataComponents;
 import galacticwars.clonewars.registry.ModEntityTypes;
 import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.registry.ModMenuTypes;
+import galacticwars.clonewars.world.FactionNaturalSpawnRules;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.SpawnPlacementTypes;
-import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
@@ -81,7 +81,7 @@ public class GalacticWars {
                 entityType,
                 SpawnPlacementTypes.ON_GROUND,
                 Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                Animal::checkAnimalSpawnRules,
+                FactionNaturalSpawnRules::check,
                 RegisterSpawnPlacementsEvent.Operation.REPLACE);
     }
 }

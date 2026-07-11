@@ -16,8 +16,20 @@ public final class FactionHiringPolicyTest {
         resolvesFactionRelations();
         acceptsEligibleHiringRequest();
         rejectsHiringRequestWithStableReasonCodes();
+        handlesLargeRecruitLimitsWithoutOverflow();
 
         System.out.println("FactionHiringPolicyTest passed");
+    }
+
+    private static void handlesLargeRecruitLimitsWithoutOverflow() {
+        FactionStrategyDefinition strategy = new FactionStrategyDefinition(
+                "large", Integer.MAX_VALUE, 100, 100, 0, "capacity", "none");
+        FactionDefinition faction = new FactionDefinition(
+                FactionId.of("large"), "Large", 0, 0, Integer.MAX_VALUE,
+                Set.of(), Set.of(), 0, "", 0, 0, 0, strategy);
+        FactionAlignment alignment = FactionAlignment.empty(UUID.randomUUID());
+        assertTrue(HiringPolicy.canHire(alignment, faction, 0, Integer.MAX_VALUE).accepted(),
+                "overflow-safe recruit limit");
     }
 
     private static void storesFactionDefinitionValues() {

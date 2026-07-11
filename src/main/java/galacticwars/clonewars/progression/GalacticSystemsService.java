@@ -70,6 +70,8 @@ public final class GalacticSystemsService {
                 ProgressionEventType.FORCE_ABILITY_UNLOCKED, abilityId, 1));
     }
 
+    /** @deprecated Runtime purchases must use physical Credit Chips through PhysicalTradeService. */
+    @Deprecated
     public static SystemDecision purchase(
             ProgressionState state,
             UUID eventId,

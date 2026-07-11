@@ -1,0 +1,11 @@
+{
+  "id": "galacticwars:hutt_civilian",
+  "display_name": "Cartel Civilian",
+  "faction": "galacticwars:hutt_cartel",
+  "entity_type": "galacticwars:hutt_civilian",
+  "professions": ["merchant", "courier", "cook", "animal_farmer"],
+  "max_health": 18,
+  "movement_speed": 0.28,
+  "base_morale": 45,
+  "home_type": "market_quarters"
+}

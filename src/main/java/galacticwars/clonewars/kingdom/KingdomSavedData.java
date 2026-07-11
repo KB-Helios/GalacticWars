@@ -20,6 +20,7 @@ import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyLocation;
 import galacticwars.clonewars.army.ArmyMemberSnapshot;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
+import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
@@ -28,14 +29,18 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 public final class KingdomSavedData extends SavedData {
-    public static final int CURRENT_SCHEMA_VERSION = 4;
+    public static final int CURRENT_SCHEMA_VERSION = 5;
     public static final Codec<KingdomSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("schema_version", CURRENT_SCHEMA_VERSION).forGetter(KingdomSavedData::schemaVersion),
             KingdomCodecs.KINGDOM_RECORD.listOf().optionalFieldOf("kingdoms", List.of()).forGetter(KingdomSavedData::kingdoms),
             net.minecraft.core.UUIDUtil.CODEC.listOf().optionalFieldOf("inactive_hall_owners", List.of())
                     .forGetter(data -> List.copyOf(data.inactiveHallOwners)),
             KingdomCodecs.ARMY_GROUP.listOf().optionalFieldOf("army_groups", List.of())
-                    .forGetter(KingdomSavedData::armyGroups)
+                    .forGetter(KingdomSavedData::armyGroups),
+            KingdomCodecs.KINGDOM_DIPLOMACY.listOf().optionalFieldOf("diplomacy", List.of())
+                    .forGetter(KingdomSavedData::diplomacy),
+            KingdomCodecs.KINGDOM_SIEGE.listOf().optionalFieldOf("sieges", List.of())
+                    .forGetter(KingdomSavedData::sieges)
     ).apply(instance, KingdomSavedData::new));
     public static final SavedDataType<KingdomSavedData> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath(GalacticWars.MODID, "kingdoms"),
@@ -44,22 +49,36 @@ public final class KingdomSavedData extends SavedData {
 
     private final int schemaVersion;
     private final Map<UUID, KingdomRecord> kingdomsByOwner = new LinkedHashMap<>();
+    private final Map<UUID, KingdomRecord> kingdomsById = new LinkedHashMap<>();
+    private final Map<UUID, UUID> kingdomIdsByMember = new LinkedHashMap<>();
+    private final Map<UUID, UUID> kingdomIdsBySettlement = new LinkedHashMap<>();
+    private final Map<UUID, UUID> kingdomIdsByRecruit = new LinkedHashMap<>();
+    private final Map<UUID, UUID> kingdomIdsByArmyGroup = new LinkedHashMap<>();
+    private final Map<ClaimKey, KingdomClaim> claimsByChunk = new LinkedHashMap<>();
     private final LinkedHashSet<UUID> inactiveHallOwners = new LinkedHashSet<>();
     private final Map<UUID, ArmyGroupRecord> armyGroupsById = new LinkedHashMap<>();
+    private final Map<DiplomacyKey, KingdomDiplomacy> diplomacyByPair = new LinkedHashMap<>();
+    private final Map<UUID, KingdomSiege> siegesById = new LinkedHashMap<>();
 
     public KingdomSavedData() {
-        this(CURRENT_SCHEMA_VERSION, List.of(), List.of(), List.of());
+        this(CURRENT_SCHEMA_VERSION, List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     private KingdomSavedData(
             int schemaVersion,
             List<KingdomRecord> kingdoms,
             List<UUID> inactiveHallOwners,
-            List<ArmyGroupRecord> armyGroups
+            List<ArmyGroupRecord> armyGroups,
+            List<KingdomDiplomacy> diplomacy,
+            List<KingdomSiege> sieges
     ) {
         this.schemaVersion = Math.max(CURRENT_SCHEMA_VERSION, schemaVersion);
         for (KingdomRecord kingdom : kingdoms) {
-            this.kingdomsByOwner.putIfAbsent(kingdom.ownerId(), kingdom);
+            if (!this.kingdomsByOwner.containsKey(kingdom.ownerId())
+                    && !this.kingdomsById.containsKey(kingdom.id())
+                    && kingdom.members().stream().noneMatch(member -> kingdomIdsByMember.containsKey(member.playerId()))) {
+                indexKingdom(kingdom);
+            }
         }
         this.inactiveHallOwners.addAll(inactiveHallOwners);
         this.inactiveHallOwners.retainAll(this.kingdomsByOwner.keySet());
@@ -69,6 +88,20 @@ public final class KingdomSavedData extends SavedData {
                             && kingdom.ownerId().equals(armyGroup.ownerId()));
             if (knownKingdom) {
                 this.armyGroupsById.putIfAbsent(armyGroup.id(), armyGroup);
+                this.kingdomIdsByArmyGroup.putIfAbsent(armyGroup.id(), armyGroup.kingdomId());
+            }
+        }
+        for (KingdomDiplomacy relation : diplomacy) {
+            if (kingdomsById.containsKey(relation.firstKingdomId())
+                    && kingdomsById.containsKey(relation.secondKingdomId())) {
+                diplomacyByPair.putIfAbsent(DiplomacyKey.of(
+                        relation.firstKingdomId(), relation.secondKingdomId()), relation);
+            }
+        }
+        for (KingdomSiege siege : sieges) {
+            if (kingdomsById.containsKey(siege.attackerKingdomId())
+                    && kingdomsById.containsKey(siege.defenderKingdomId())) {
+                siegesById.putIfAbsent(siege.id(), siege);
             }
         }
     }
@@ -89,6 +122,14 @@ public final class KingdomSavedData extends SavedData {
         return List.copyOf(armyGroupsById.values());
     }
 
+    public List<KingdomDiplomacy> diplomacy() {
+        return List.copyOf(diplomacyByPair.values());
+    }
+
+    public List<KingdomSiege> sieges() {
+        return List.copyOf(siegesById.values());
+    }
+
     public Optional<ArmyGroupRecord> armyGroup(UUID groupId) {
         return Optional.ofNullable(armyGroupsById.get(groupId));
     }
@@ -101,8 +142,83 @@ public final class KingdomSavedData extends SavedData {
         return armyGroupsById.values().stream().filter(group -> group.contains(recruitId)).findFirst();
     }
 
+    public Optional<ArmyGroupRecord> armyGroupForCommander(UUID commanderId) {
+        return armyGroupsById.values().stream()
+                .filter(group -> group.commanderId().filter(commanderId::equals).isPresent()).findFirst();
+    }
+
     public Optional<KingdomRecord> kingdomForOwner(UUID ownerId) {
         return Optional.ofNullable(kingdomsByOwner.get(ownerId));
+    }
+
+    public List<ArmyGroupRecord> armyGroupsForKingdom(UUID kingdomId) {
+        return armyGroupsById.values().stream().filter(group -> group.kingdomId().equals(kingdomId)).toList();
+    }
+
+    public Optional<KingdomRecord> kingdom(UUID kingdomId) {
+        return Optional.ofNullable(kingdomsById.get(kingdomId));
+    }
+
+    public Optional<KingdomRecord> kingdomForPlayer(UUID playerId) {
+        UUID kingdomId = kingdomIdsByMember.get(playerId);
+        return kingdomId == null ? Optional.empty() : kingdom(kingdomId);
+    }
+
+    public Optional<KingdomRecord> kingdomForSettlement(UUID settlementId) {
+        UUID kingdomId = kingdomIdsBySettlement.get(settlementId);
+        return kingdomId == null ? Optional.empty() : kingdom(kingdomId);
+    }
+
+    public Optional<KingdomRecord> kingdomForRecruit(UUID recruitId) {
+        UUID kingdomId = kingdomIdsByRecruit.get(recruitId);
+        return kingdomId == null ? Optional.empty() : kingdom(kingdomId);
+    }
+
+    public boolean allows(UUID playerId, KingdomPermission permission) {
+        return kingdomForPlayer(playerId).map(kingdom -> kingdom.allows(playerId, permission)).orElse(false);
+    }
+
+    public boolean addMember(UUID actorId, UUID playerId, KingdomMemberRole role, String pledgedFactionId) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_MEMBERS)
+                || kingdomIdsByMember.containsKey(playerId)
+                || (pledgedFactionId != null && !pledgedFactionId.isBlank()
+                        && !kingdom.factionId().equals(pledgedFactionId))) {
+            return false;
+        }
+        if (role == KingdomMemberRole.OWNER) {
+            return false;
+        }
+        storeKingdom(kingdom.withMember(playerId, role));
+        this.setDirty();
+        return true;
+    }
+
+    public boolean updateMemberRole(UUID actorId, UUID playerId, KingdomMemberRole role) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_MEMBERS)
+                || kingdom.member(playerId).isEmpty() || role == KingdomMemberRole.OWNER) {
+            return false;
+        }
+        storeKingdom(kingdom.withMember(playerId, role));
+        this.setDirty();
+        return true;
+    }
+
+    public boolean removeMember(UUID actorId, UUID playerId) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        boolean selfRemoval = actorId.equals(playerId);
+        if (kingdom == null || kingdom.ownerId().equals(playerId)
+                || (!selfRemoval && !kingdom.allows(actorId, KingdomPermission.MANAGE_MEMBERS))) {
+            return false;
+        }
+        KingdomRecord updated = kingdom.withoutMember(playerId);
+        if (updated == kingdom) {
+            return false;
+        }
+        storeKingdom(updated);
+        this.setDirty();
+        return true;
     }
 
     public boolean isHallActive(UUID ownerId) {
@@ -119,7 +235,7 @@ public final class KingdomSavedData extends SavedData {
                 ownerId,
                 factionId,
                 SettlementRecord.create(dimensionId, hallPos.getX(), hallPos.getY(), hallPos.getZ()));
-        kingdomsByOwner.put(ownerId, kingdom);
+        storeKingdom(kingdom);
         this.setDirty();
         return kingdom;
     }
@@ -146,7 +262,7 @@ public final class KingdomSavedData extends SavedData {
         }
         KingdomRecord relocated = existing.withSettlement(
                 settlement.withHallLocation(dimensionId, hallPos.getX(), hallPos.getY(), hallPos.getZ()));
-        kingdomsByOwner.put(ownerId, relocated);
+        storeKingdom(relocated);
         inactiveHallOwners.remove(ownerId);
         this.setDirty();
         return Optional.of(relocated);
@@ -169,13 +285,39 @@ public final class KingdomSavedData extends SavedData {
         return true;
     }
 
-    public boolean registerRecruit(UUID ownerId, UUID recruitId) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null || !kingdom.settlement().hasHousingSpace()) {
+    public boolean registerRecruit(UUID actorId, UUID recruitId) {
+        return registerRecruit(actorId, recruitId, NpcServiceBranch.MILITARY);
+    }
+
+    public boolean registerRecruit(UUID actorId, UUID recruitId, NpcServiceBranch serviceBranch) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.RECRUIT)
+                || kingdomIdsByRecruit.containsKey(recruitId) || !kingdom.settlement().hasHousingSpace()) {
             return false;
         }
         SettlementRecord updated = kingdom.settlement().withRecruit(recruitId);
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated).withNpcBranch(recruitId, serviceBranch));
+        this.setDirty();
+        return true;
+    }
+
+    public boolean setNpcServiceBranch(UUID actorId, UUID recruitId, NpcServiceBranch serviceBranch) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        KingdomNpcRecord npc = kingdom == null ? null : kingdom.npc(recruitId).orElse(null);
+        if (kingdom == null || npc == null
+                || !(kingdom.allows(actorId, KingdomPermission.RECRUIT)
+                        || kingdom.allows(actorId, KingdomPermission.MANAGE_WORKSITES))) {
+            return false;
+        }
+        if (serviceBranch == NpcServiceBranch.CIVILIAN && armyGroupForRecruit(recruitId).isPresent()) {
+            return false;
+        }
+        boolean assignedWorksite = kingdom.settlements().stream()
+                .anyMatch(settlement -> settlement.assignedWorksite(recruitId).isPresent());
+        if (serviceBranch == NpcServiceBranch.MILITARY && assignedWorksite) {
+            return false;
+        }
+        storeKingdom(kingdom.withNpcBranch(recruitId, serviceBranch));
         this.setDirty();
         return true;
     }
@@ -189,7 +331,7 @@ public final class KingdomSavedData extends SavedData {
         if (updated == kingdom.settlement()) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return true;
     }
@@ -208,7 +350,7 @@ public final class KingdomSavedData extends SavedData {
             }
         }
         if (cancelled > 0) {
-            kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+            storeKingdom(kingdom.withSettlement(updated));
             this.setDirty();
         }
         return cancelled;
@@ -222,35 +364,44 @@ public final class KingdomSavedData extends SavedData {
         if (!kingdom.settlement().recruitIds().isEmpty() || kingdom.settlement().hasActiveCampaign()) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withFaction(factionId));
+        storeKingdom(kingdom.withFaction(factionId));
         this.setDirty();
         return true;
     }
 
-    public boolean promoteCommander(UUID ownerId, UUID recruitId) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null || kingdom.settlement().commanderId().isPresent()
-                || !kingdom.settlement().hasCommanderSlot()
-                || !kingdom.settlement().containsRecruit(recruitId)) {
+    public boolean promoteCommander(UUID actorId, UUID recruitId) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || kingdom.npc(recruitId).map(KingdomNpcRecord::serviceBranch)
+                        .filter(NpcServiceBranch.MILITARY::equals).isEmpty()
+                || armyGroupForRecruit(recruitId).isPresent()) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(kingdom.settlement().withCommander(recruitId)));
+        SettlementRecord settlement = kingdom.settlements().stream()
+                .filter(candidate -> candidate.containsRecruit(recruitId) && candidate.hasCommanderSlot())
+                .findFirst().orElse(null);
+        if (settlement == null) {
+            return false;
+        }
+        storeKingdom(kingdom.replaceSettlement(settlement.withCommander(recruitId)));
         this.setDirty();
         return true;
     }
 
     public Optional<ArmyGroupRecord> createOrReclaimArmyGroup(
-            UUID ownerId,
+            UUID actorId,
             UUID commanderId,
             ArmyFormation formation,
             ArmyLocation anchor,
             long gameTime
     ) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null || kingdom.settlement().commanderId().filter(commanderId::equals).isEmpty()) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || kingdom.settlements().stream().noneMatch(
+                        settlement -> settlement.commanderIds().contains(commanderId))) {
             return Optional.empty();
         }
-        Optional<ArmyGroupRecord> existing = armyGroupForOwner(ownerId);
+        Optional<ArmyGroupRecord> existing = armyGroupForCommander(commanderId);
         if (existing.isPresent()) {
             ArmyGroupRecord reclaimed = existing.orElseThrow().withCommander(commanderId);
             armyGroupsById.put(reclaimed.id(), reclaimed);
@@ -263,17 +414,24 @@ public final class KingdomSavedData extends SavedData {
         List<UUID> members = kingdom.settlement().recruitIds().stream()
                 .filter(recruitId -> !recruitId.equals(commanderId))
                 .filter(recruitId -> !workerIds.contains(recruitId))
+                .filter(recruitId -> kingdom.npc(recruitId)
+                        .map(KingdomNpcRecord::serviceBranch)
+                        .filter(NpcServiceBranch.MILITARY::equals).isPresent())
+                .filter(recruitId -> armyGroupForRecruit(recruitId).isEmpty())
                 .toList();
         ArmyGroupRecord group = ArmyGroupRecord.create(
-                ownerId, kingdom.id(), commanderId, members, formation, anchor, gameTime);
+                kingdom.ownerId(), kingdom.id(), commanderId, members, formation, anchor, gameTime);
         armyGroupsById.put(group.id(), group);
+        kingdomIdsByArmyGroup.put(group.id(), kingdom.id());
         this.setDirty();
         return Optional.of(group);
     }
 
-    public boolean issueArmyOrder(UUID ownerId, UUID groupId, ArmyGroupOrder order) {
+    public boolean issueArmyOrder(UUID actorId, UUID groupId, ArmyGroupOrder order) {
         ArmyGroupRecord group = armyGroupsById.get(groupId);
-        if (group == null || !group.ownerId().equals(ownerId)
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (group == null || kingdom == null || !group.kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
                 || group.commanderId().isEmpty()
                 || group.simulation().lifecycleState() == galacticwars.clonewars.army.ArmyGroupLifecycleState.ORPHANED) {
             return false;
@@ -324,9 +482,12 @@ public final class KingdomSavedData extends SavedData {
         return true;
     }
 
-    public boolean releaseArmyMember(UUID ownerId, UUID recruitId, boolean commander, ArmyLocation lastLocation) {
+    public boolean releaseArmyMember(UUID actorId, UUID recruitId, boolean commander, ArmyLocation lastLocation) {
         Optional<ArmyGroupRecord> groupOptional = armyGroupForRecruit(recruitId);
-        if (groupOptional.isEmpty() || !groupOptional.orElseThrow().ownerId().equals(ownerId)) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (groupOptional.isEmpty() || kingdom == null
+                || !groupOptional.orElseThrow().kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)) {
             return false;
         }
         ArmyGroupRecord group = groupOptional.orElseThrow();
@@ -371,7 +532,7 @@ public final class KingdomSavedData extends SavedData {
         if (updated == kingdom.settlement()) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return true;
     }
@@ -420,7 +581,7 @@ public final class KingdomSavedData extends SavedData {
         if (updated == kingdom.settlement()) {
             return Optional.empty();
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return Optional.of(project);
     }
@@ -434,36 +595,41 @@ public final class KingdomSavedData extends SavedData {
         if (updated == kingdom.settlement()) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return true;
     }
 
-    public boolean reserveWorksite(UUID ownerId, UUID recruitId, WorkerProfession profession) {
-        return reserveWorksite(ownerId, recruitId, profession, Optional.empty());
+    public boolean reserveWorksite(UUID actorId, UUID recruitId, WorkerProfession profession) {
+        return reserveWorksite(actorId, recruitId, profession, Optional.empty());
     }
 
     public boolean reserveWorksite(
-            UUID ownerId,
+            UUID actorId,
             UUID recruitId,
             WorkerProfession profession,
             Optional<UUID> preferredProjectId
     ) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null || inactiveHallOwners.contains(ownerId)
-                || !kingdom.settlement().containsRecruit(recruitId)) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_WORKSITES)
+                || inactiveHallOwners.contains(kingdom.ownerId()) || armyGroupForRecruit(recruitId).isPresent()) {
             return false;
         }
-        SettlementRecord updated = kingdom.settlement()
+        SettlementRecord settlement = kingdom.settlements().stream()
+                .filter(candidate -> candidate.containsRecruit(recruitId)).findFirst().orElse(null);
+        if (settlement == null) {
+            return false;
+        }
+        SettlementRecord updated = settlement
                 .reserveWorksite(recruitId, profession, preferredProjectId);
-        if (updated == kingdom.settlement()) {
-            return kingdom.settlement().assignedWorksite(recruitId)
+        if (updated == settlement) {
+            return settlement.assignedWorksite(recruitId)
                     .filter(worksite -> worksite.accepts(profession))
                     .filter(worksite -> preferredProjectId.isEmpty()
                             || worksite.sourceProjectId().equals(preferredProjectId))
                     .isPresent();
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.replaceSettlement(updated).withNpcBranch(recruitId, NpcServiceBranch.CIVILIAN));
         this.setDirty();
         return true;
     }
@@ -493,35 +659,45 @@ public final class KingdomSavedData extends SavedData {
         if (updated == kingdom.settlement()) {
             return Optional.empty();
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return updated.assignedWorksite(recruitId);
     }
 
-    public boolean releaseWorksite(UUID ownerId, UUID recruitId) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null) {
+    public boolean releaseWorksite(UUID actorId, UUID recruitId) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_WORKSITES)) {
             return false;
         }
-        SettlementRecord updated = kingdom.settlement().releaseWorksite(recruitId);
-        if (updated == kingdom.settlement()) {
+        SettlementRecord settlement = kingdom.settlements().stream()
+                .filter(candidate -> candidate.containsRecruit(recruitId)).findFirst().orElse(null);
+        if (settlement == null) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        SettlementRecord updated = settlement.releaseWorksite(recruitId);
+        if (updated == settlement) {
+            return false;
+        }
+        storeKingdom(kingdom.replaceSettlement(updated));
         this.setDirty();
         return true;
     }
 
-    public boolean releaseWorkerAssignments(UUID ownerId, UUID recruitId) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null) {
+    public boolean releaseWorkerAssignments(UUID actorId, UUID recruitId) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_WORKSITES)) {
             return false;
         }
-        SettlementRecord updated = kingdom.settlement().releaseWorkerAssignments(recruitId);
-        if (updated == kingdom.settlement()) {
+        SettlementRecord settlement = kingdom.settlements().stream()
+                .filter(candidate -> candidate.containsRecruit(recruitId)).findFirst().orElse(null);
+        if (settlement == null) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        SettlementRecord updated = settlement.releaseWorkerAssignments(recruitId);
+        if (updated == settlement) {
+            return false;
+        }
+        storeKingdom(kingdom.replaceSettlement(updated));
         this.setDirty();
         return true;
     }
@@ -591,7 +767,7 @@ public final class KingdomSavedData extends SavedData {
         if (queued == kingdom.settlement() || updated == queued) {
             return Optional.empty();
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return Optional.of(claimed);
     }
@@ -694,7 +870,7 @@ public final class KingdomSavedData extends SavedData {
         if (updated == kingdom.settlement()) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return true;
     }
@@ -765,27 +941,28 @@ public final class KingdomSavedData extends SavedData {
                 && Math.abs(target.getZ() - settlement.hallZ()) <= settlement.claimRadius();
     }
 
-    public boolean clearCommander(UUID ownerId, UUID recruitId) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null) {
+    public boolean clearCommander(UUID actorId, UUID recruitId) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)) {
             return false;
         }
-        SettlementRecord updated = kingdom.settlement().withoutCommander(recruitId);
-        if (updated == kingdom.settlement()) {
+        SettlementRecord settlement = kingdom.settlements().stream()
+                .filter(candidate -> candidate.commanderIds().contains(recruitId)).findFirst().orElse(null);
+        if (settlement == null) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.replaceSettlement(settlement.withoutCommander(recruitId)));
         this.setDirty();
         return true;
     }
 
-    public boolean updateCommanderPolicy(UUID ownerId, int expectedRevision, CommanderPolicy policy) {
-        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
-        if (kingdom == null || kingdom.settlement().revision() != expectedRevision) {
+    public boolean updateCommanderPolicy(UUID actorId, int expectedRevision, CommanderPolicy policy) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || kingdom.settlement().revision() != expectedRevision) {
             return false;
         }
-        kingdomsByOwner.put(ownerId,
-                kingdom.withSettlement(kingdom.settlement().withCommanderPolicy(policy)));
+        storeKingdom(kingdom.withSettlement(kingdom.settlement().withCommanderPolicy(policy)));
         this.setDirty();
         return true;
     }
@@ -796,8 +973,7 @@ public final class KingdomSavedData extends SavedData {
             return false;
         }
         RecruitmentCampaign campaign = decision.campaign().orElseThrow();
-        kingdomsByOwner.put(ownerId,
-                kingdom.withSettlement(kingdom.settlement().withCampaign(campaign)));
+        storeKingdom(kingdom.withSettlement(kingdom.settlement().withCampaign(campaign)));
         this.setDirty();
         return true;
     }
@@ -811,7 +987,7 @@ public final class KingdomSavedData extends SavedData {
         if (updated == kingdom.settlement()) {
             return false;
         }
-        kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+        storeKingdom(kingdom.withSettlement(updated));
         this.setDirty();
         return true;
     }
@@ -835,9 +1011,361 @@ public final class KingdomSavedData extends SavedData {
             }
         }
         if (totalRefunded > 0) {
-            kingdomsByOwner.put(ownerId, kingdom.withSettlement(updated));
+            storeKingdom(kingdom.withSettlement(updated));
             this.setDirty();
         }
         return totalRefunded;
+    }
+
+    public boolean addRecruitToArmy(UUID actorId, UUID groupId, UUID recruitId) {
+        ArmyGroupRecord group = armyGroupsById.get(groupId);
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (group == null || kingdom == null || !group.kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || !kingdomIdsByRecruit.getOrDefault(recruitId, new UUID(0L, 0L)).equals(kingdom.id())
+                || kingdom.npc(recruitId).map(KingdomNpcRecord::serviceBranch)
+                        .filter(NpcServiceBranch.MILITARY::equals).isEmpty()
+                || armyGroupForRecruit(recruitId).isPresent()) {
+            return false;
+        }
+        ArrayList<UUID> members = new ArrayList<>(group.memberIds());
+        members.add(recruitId);
+        armyGroupsById.put(group.id(), group.withMembers(members));
+        this.setDirty();
+        return true;
+    }
+
+    public boolean configureArmyGroup(
+            UUID actorId,
+            UUID groupId,
+            String name,
+            ArmyLocation rallyPoint,
+            List<ArmyLocation> patrolRoute,
+            Optional<UUID> defendedClaimId
+    ) {
+        ArmyGroupRecord group = armyGroupsById.get(groupId);
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (group == null || kingdom == null || !group.kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || defendedClaimId.flatMap(claimId -> kingdom.claims().stream()
+                        .filter(claim -> claim.id().equals(claimId)).findFirst()).isEmpty()
+                        && defendedClaimId.isPresent()) {
+            return false;
+        }
+        ArmyGroupRecord updated = group.withName(name).withRallyPoint(rallyPoint).withPatrolRoute(patrolRoute);
+        if (defendedClaimId.isPresent()) {
+            updated = updated.defendingClaim(defendedClaimId.orElseThrow());
+        }
+        armyGroupsById.put(groupId, updated);
+        this.setDirty();
+        return true;
+    }
+
+    public Optional<ArmyGroupRecord> splitArmyGroup(
+            UUID actorId,
+            UUID sourceGroupId,
+            UUID newCommanderId,
+            List<UUID> transferredMemberIds,
+            String name,
+            ArmyLocation anchor,
+            long gameTime
+    ) {
+        ArmyGroupRecord source = armyGroupsById.get(sourceGroupId);
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (source == null || kingdom == null || !source.kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || !source.memberIds().contains(newCommanderId)
+                || kingdom.npc(newCommanderId).map(KingdomNpcRecord::serviceBranch)
+                        .filter(NpcServiceBranch.MILITARY::equals).isEmpty()
+                || transferredMemberIds.stream().anyMatch(id -> kingdom.npc(id)
+                        .map(KingdomNpcRecord::serviceBranch)
+                        .filter(NpcServiceBranch.MILITARY::equals).isEmpty())
+                || transferredMemberIds.stream().anyMatch(id -> !source.memberIds().contains(id))) {
+            return Optional.empty();
+        }
+        SettlementRecord commanderSettlement = kingdom.settlements().stream()
+                .filter(settlement -> settlement.containsRecruit(newCommanderId) && settlement.hasCommanderSlot())
+                .findFirst().orElse(null);
+        if (commanderSettlement == null) {
+            return Optional.empty();
+        }
+        LinkedHashSet<UUID> transferred = new LinkedHashSet<>(transferredMemberIds);
+        transferred.remove(newCommanderId);
+        List<UUID> remaining = source.memberIds().stream()
+                .filter(id -> !id.equals(newCommanderId) && !transferred.contains(id)).toList();
+        ArmyGroupRecord created = ArmyGroupRecord.create(
+                kingdom.ownerId(), kingdom.id(), newCommanderId, List.copyOf(transferred),
+                source.order().formation(), anchor, gameTime).withName(name);
+        storeKingdom(kingdom.replaceSettlement(commanderSettlement.withCommander(newCommanderId)));
+        armyGroupsById.put(source.id(), source.withMembers(remaining));
+        armyGroupsById.put(created.id(), created);
+        kingdomIdsByArmyGroup.put(created.id(), kingdom.id());
+        this.setDirty();
+        return Optional.of(created);
+    }
+
+    public boolean mergeArmyGroups(UUID actorId, UUID targetGroupId, UUID sourceGroupId) {
+        if (targetGroupId.equals(sourceGroupId)) {
+            return false;
+        }
+        ArmyGroupRecord target = armyGroupsById.get(targetGroupId);
+        ArmyGroupRecord source = armyGroupsById.get(sourceGroupId);
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (target == null || source == null || kingdom == null
+                || !target.kingdomId().equals(kingdom.id()) || !source.kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)) {
+            return false;
+        }
+        LinkedHashSet<UUID> mergedMembers = new LinkedHashSet<>(target.memberIds());
+        source.commanderId().ifPresent(mergedMembers::add);
+        mergedMembers.addAll(source.memberIds());
+        KingdomRecord updatedKingdom = kingdom;
+        if (source.commanderId().isPresent()) {
+            UUID commanderId = source.commanderId().orElseThrow();
+            SettlementRecord settlement = kingdom.settlements().stream()
+                    .filter(candidate -> candidate.commanderIds().contains(commanderId)).findFirst().orElse(null);
+            if (settlement != null) {
+                updatedKingdom = kingdom.replaceSettlement(settlement.withoutCommander(commanderId));
+            }
+        }
+        storeKingdom(updatedKingdom);
+        armyGroupsById.put(target.id(), target.withMembers(List.copyOf(mergedMembers)));
+        armyGroupsById.remove(source.id());
+        kingdomIdsByArmyGroup.remove(source.id());
+        this.setDirty();
+        return true;
+    }
+
+    public boolean changeArmySupply(UUID actorId, UUID groupId, int delta) {
+        ArmyGroupRecord group = armyGroupsById.get(groupId);
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (group == null || kingdom == null || !group.kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)) {
+            return false;
+        }
+        int updated;
+        try {
+            updated = Math.addExact(group.supplyUnits(), delta);
+        } catch (ArithmeticException exception) {
+            return false;
+        }
+        if (updated < 0) {
+            return false;
+        }
+        armyGroupsById.put(groupId, group.withSupplyUnits(updated));
+        this.setDirty();
+        return true;
+    }
+
+    public Optional<KingdomClaim> claimAt(String dimensionId, net.minecraft.world.level.ChunkPos chunk) {
+        return Optional.ofNullable(claimsByChunk.get(new ClaimKey(dimensionId, chunk.x(), chunk.z())));
+    }
+
+    public boolean expandClaim(UUID actorId, UUID claimId, String dimensionId, net.minecraft.world.level.ChunkPos chunk) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_CLAIMS)
+                || claimAt(dimensionId, chunk).isPresent()) {
+            return false;
+        }
+        KingdomClaim claim = kingdom.claims().stream()
+                .filter(candidate -> candidate.id().equals(claimId) && candidate.dimensionId().equals(dimensionId))
+                .findFirst().orElse(null);
+        ClaimedChunk claimedChunk = new ClaimedChunk(chunk.x(), chunk.z());
+        if (claim == null || !claim.canExpandTo(claimedChunk)) {
+            return false;
+        }
+        storeKingdom(kingdom.replaceClaim(claim.expandedTo(claimedChunk)));
+        this.setDirty();
+        return true;
+    }
+
+    public Optional<KingdomClaim> addOutpost(UUID actorId, SettlementRecord outpost) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_CLAIMS)
+                || kingdom.settlements().stream().anyMatch(existing -> existing.id().equals(outpost.id()))) {
+            return Optional.empty();
+        }
+        KingdomClaim claim = KingdomClaim.outpost(kingdom.id(), outpost);
+        boolean overlap = claim.chunks().stream().anyMatch(chunk ->
+                claimsByChunk.containsKey(new ClaimKey(claim.dimensionId(), chunk.x(), chunk.z())));
+        if (overlap) {
+            return Optional.empty();
+        }
+        storeKingdom(kingdom.withOutpost(outpost).replaceClaim(claim));
+        this.setDirty();
+        return Optional.of(claim);
+    }
+
+    public KingdomDiplomacy relation(UUID firstKingdomId, UUID secondKingdomId) {
+        if (firstKingdomId.equals(secondKingdomId)) {
+            throw new IllegalArgumentException("kingdom cannot have diplomacy with itself");
+        }
+        return diplomacyByPair.getOrDefault(
+                DiplomacyKey.of(firstKingdomId, secondKingdomId),
+                KingdomDiplomacy.neutral(firstKingdomId, secondKingdomId));
+    }
+
+    public boolean setRelation(
+            UUID actorId,
+            UUID otherKingdomId,
+            KingdomRelation relation,
+            long gameTime,
+            long cooldownTicks
+    ) {
+        KingdomRecord ownKingdom = kingdomForPlayer(actorId).orElse(null);
+        if (ownKingdom == null || !ownKingdom.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)
+                || !kingdomsById.containsKey(otherKingdomId) || ownKingdom.id().equals(otherKingdomId)) {
+            return false;
+        }
+        KingdomDiplomacy current = relation(ownKingdom.id(), otherKingdomId);
+        if (current.cooldownUntilGameTime() > gameTime) {
+            return false;
+        }
+        KingdomDiplomacy updated = current.withRelation(relation, Math.addExact(gameTime, Math.max(0L, cooldownTicks)));
+        diplomacyByPair.put(DiplomacyKey.of(ownKingdom.id(), otherKingdomId), updated);
+        this.setDirty();
+        return true;
+    }
+
+    public boolean establishTreaty(
+            UUID actorId,
+            UUID otherKingdomId,
+            long gameTime,
+            long durationTicks,
+            long cooldownTicks
+    ) {
+        KingdomRecord ownKingdom = kingdomForPlayer(actorId).orElse(null);
+        if (ownKingdom == null || !ownKingdom.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)
+                || !kingdomsById.containsKey(otherKingdomId)
+                || ownKingdom.id().equals(otherKingdomId)
+                || durationTicks <= 0L) {
+            return false;
+        }
+        KingdomDiplomacy current = relation(ownKingdom.id(), otherKingdomId);
+        if (current.cooldownUntilGameTime() > gameTime || current.relation() == KingdomRelation.ENEMY) {
+            return false;
+        }
+        KingdomDiplomacy updated = current.withTreaty(
+                Math.addExact(gameTime, durationTicks),
+                Math.addExact(gameTime, Math.max(0L, cooldownTicks)));
+        diplomacyByPair.put(DiplomacyKey.of(ownKingdom.id(), otherKingdomId), updated);
+        this.setDirty();
+        return true;
+    }
+
+    public boolean setEmbargo(UUID actorId, UUID otherKingdomId, boolean embargo) {
+        KingdomRecord ownKingdom = kingdomForPlayer(actorId).orElse(null);
+        if (ownKingdom == null || !ownKingdom.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)
+                || ownKingdom.id().equals(otherKingdomId)
+                || !kingdomsById.containsKey(otherKingdomId)) {
+            return false;
+        }
+        KingdomDiplomacy updated = relation(ownKingdom.id(), otherKingdomId).withEmbargo(embargo);
+        diplomacyByPair.put(DiplomacyKey.of(ownKingdom.id(), otherKingdomId), updated);
+        this.setDirty();
+        return true;
+    }
+
+    public Optional<KingdomSiege> startSiege(
+            UUID actorId,
+            UUID claimId,
+            boolean defenderOnline,
+            boolean withinSiegeWindow,
+            int captureGoal,
+            long gameTime
+    ) {
+        KingdomRecord attacker = kingdomForPlayer(actorId).orElse(null);
+        KingdomClaim claim = kingdomsById.values().stream().flatMap(kingdom -> kingdom.claims().stream())
+                .filter(candidate -> candidate.id().equals(claimId)).findFirst().orElse(null);
+        KingdomRecord defender = claim == null ? null : kingdomsById.get(claim.kingdomId());
+        if (attacker == null || defender == null || attacker.id().equals(defender.id())
+                || !attacker.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || relation(attacker.id(), defender.id()).relation() != KingdomRelation.ENEMY
+                || !defenderOnline || !withinSiegeWindow || captureGoal <= 0
+                || siegesById.values().stream().anyMatch(siege -> siege.claimId().equals(claimId)
+                        && siege.state() == SiegeState.ACTIVE)
+                || (claim.capital() && defender.claims().stream().anyMatch(candidate -> !candidate.capital()))) {
+            return Optional.empty();
+        }
+        KingdomSiege siege = KingdomSiege.start(claimId, attacker.id(), defender.id(), captureGoal, gameTime);
+        siegesById.put(siege.id(), siege);
+        this.setDirty();
+        return Optional.of(siege);
+    }
+
+    public Optional<KingdomSiege> progressSiege(
+            UUID siegeId,
+            int attackerStrength,
+            int defenderStrength,
+            long gameTime,
+            List<UUID> attackers,
+            List<UUID> defenders
+    ) {
+        KingdomSiege current = siegesById.get(siegeId);
+        if (current == null || current.state() != SiegeState.ACTIVE) {
+            return Optional.empty();
+        }
+        KingdomSiege updated = current.progress(
+                attackerStrength, defenderStrength, gameTime, attackers, defenders);
+        siegesById.put(siegeId, updated);
+        if (updated.state() == SiegeState.CAPTURED) {
+            transferCapturedClaim(updated);
+        }
+        this.setDirty();
+        return Optional.of(updated);
+    }
+
+    private void transferCapturedClaim(KingdomSiege siege) {
+        KingdomRecord defender = kingdomsById.get(siege.defenderKingdomId());
+        KingdomRecord attacker = kingdomsById.get(siege.attackerKingdomId());
+        if (defender == null || attacker == null) {
+            return;
+        }
+        KingdomClaim captured = defender.claims().stream()
+                .filter(claim -> claim.id().equals(siege.claimId())).findFirst().orElse(null);
+        if (captured == null || captured.capital()) {
+            return;
+        }
+        storeKingdom(defender.withoutClaim(captured.id()));
+        storeKingdom(attacker.replaceClaim(captured.transferredTo(attacker.id())));
+    }
+
+    private void indexKingdom(KingdomRecord kingdom) {
+        kingdomsByOwner.put(kingdom.ownerId(), kingdom);
+        kingdomsById.put(kingdom.id(), kingdom);
+        kingdom.members().forEach(member -> kingdomIdsByMember.put(member.playerId(), kingdom.id()));
+        kingdom.settlements().forEach(settlement -> {
+            kingdomIdsBySettlement.put(settlement.id(), kingdom.id());
+            settlement.recruitIds().forEach(recruitId -> kingdomIdsByRecruit.put(recruitId, kingdom.id()));
+        });
+        kingdom.claims().forEach(claim -> claim.chunks().forEach(chunk ->
+                claimsByChunk.put(new ClaimKey(claim.dimensionId(), chunk.x(), chunk.z()), claim)));
+    }
+
+    private void storeKingdom(KingdomRecord kingdom) {
+        KingdomRecord previous = kingdomsById.get(kingdom.id());
+        if (previous != null) {
+            previous.members().forEach(member -> kingdomIdsByMember.remove(member.playerId(), previous.id()));
+            previous.settlements().forEach(settlement -> {
+                kingdomIdsBySettlement.remove(settlement.id(), previous.id());
+                settlement.recruitIds().forEach(recruitId -> kingdomIdsByRecruit.remove(recruitId, previous.id()));
+            });
+            previous.claims().forEach(claim -> claim.chunks().forEach(chunk ->
+                    claimsByChunk.remove(new ClaimKey(claim.dimensionId(), chunk.x(), chunk.z()), claim)));
+        }
+        indexKingdom(kingdom);
+    }
+
+    private record ClaimKey(String dimensionId, int x, int z) {
+        private ClaimKey {
+            dimensionId = KingdomNormalizers.normalize(dimensionId, "dimensionId");
+        }
+    }
+
+    private record DiplomacyKey(UUID first, UUID second) {
+        static DiplomacyKey of(UUID first, UUID second) {
+            KingdomDiplomacy normalized = KingdomDiplomacy.neutral(first, second);
+            return new DiplomacyKey(normalized.firstKingdomId(), normalized.secondKingdomId());
+        }
     }
 }

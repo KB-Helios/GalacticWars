@@ -1,6 +1,6 @@
 {
   "id": "galacticwars:hutt_cartel",
-  "display_name": "Dwarven Kingdom",
+  "display_name": "Hutt Cartel",
   "selection_order": 3,
   "hire_cost": 28,
   "minimum_hiring_alignment": 10,
@@ -9,6 +9,15 @@
   "enemies": [
     "galacticwars:separatist"
   ],
+  "strategy": {
+    "archetype": "mercantile_cartel",
+    "recruitment_capacity_bonus": 4,
+    "upkeep_percent": 100,
+    "production_percent": 115,
+    "morale_bonus": -10,
+    "strength": "markets_and_mercenaries",
+    "weakness": "low_loyalty"
+  },
   "pledge": {
     "token_item": "galacticwars:hutt_cartel_identity_chip",
     "direct_delta": 10,

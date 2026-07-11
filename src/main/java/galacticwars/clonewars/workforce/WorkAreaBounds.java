@@ -1,0 +1,15 @@
+package galacticwars.clonewars.workforce;
+
+public record WorkAreaBounds(int width, int height, int depth) {
+    public WorkAreaBounds {
+        if (width < 1 || width > 64 || height < 1 || height > 64 || depth < 1 || depth > 64) {
+            throw new IllegalArgumentException("work area dimensions must be between 1 and 64");
+        }
+    }
+
+    public static WorkAreaBounds radius(int radius) {
+        int diameter = Math.addExact(Math.multiplyExact(radius, 2), 1);
+        int bounded = Math.min(64, diameter);
+        return new WorkAreaBounds(bounded, bounded, bounded);
+    }
+}

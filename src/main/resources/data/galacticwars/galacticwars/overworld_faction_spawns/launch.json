@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "faction": "galacticwars:republic",
+      "outpost_radius": 96,
+      "minimum_outpost_spacing": 320,
+      "military_capacity": 14,
+      "civilian_capacity": 6,
+      "entities": [
+        {"entity_type": "galacticwars:clone_trooper", "service_branch": "military"},
+        {"entity_type": "galacticwars:arc_trooper", "service_branch": "military"},
+        {"entity_type": "galacticwars:republic_civilian", "service_branch": "civilian"}
+      ]
+    },
+    {
+      "faction": "galacticwars:separatist",
+      "outpost_radius": 112,
+      "minimum_outpost_spacing": 320,
+      "military_capacity": 18,
+      "civilian_capacity": 8,
+      "entities": [
+        {"entity_type": "galacticwars:b1_battle_droid", "service_branch": "military"},
+        {"entity_type": "galacticwars:b2_super_battle_droid", "service_branch": "military"},
+        {"entity_type": "galacticwars:separatist_technician", "service_branch": "civilian"}
+      ]
+    },
+    {
+      "faction": "galacticwars:mandalorian",
+      "outpost_radius": 80,
+      "minimum_outpost_spacing": 384,
+      "military_capacity": 8,
+      "civilian_capacity": 4,
+      "entities": [
+        {"entity_type": "galacticwars:mandalorian_warrior", "service_branch": "military"},
+        {"entity_type": "galacticwars:mandalorian_marksman", "service_branch": "military"},
+        {"entity_type": "galacticwars:mandalorian_clansperson", "service_branch": "civilian"}
+      ]
+    },
+    {
+      "faction": "galacticwars:hutt_cartel",
+      "outpost_radius": 112,
+      "minimum_outpost_spacing": 288,
+      "military_capacity": 10,
+      "civilian_capacity": 6,
+      "entities": [
+        {"entity_type": "galacticwars:hutt_enforcer", "service_branch": "military"},
+        {"entity_type": "galacticwars:smuggler", "service_branch": "military"},
+        {"entity_type": "galacticwars:hutt_civilian", "service_branch": "civilian"}
+      ]
+    },
+    {
+      "faction": "galacticwars:nightsister",
+      "outpost_radius": 96,
+      "minimum_outpost_spacing": 352,
+      "military_capacity": 10,
+      "civilian_capacity": 5,
+      "entities": [
+        {"entity_type": "galacticwars:nightsister_archer", "service_branch": "military"},
+        {"entity_type": "galacticwars:nightsister_acolyte", "service_branch": "military"},
+        {"entity_type": "galacticwars:nightsister_civilian", "service_branch": "civilian"}
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package galacticwars.clonewars.world;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.army.ArmyTravelService;
 import galacticwars.clonewars.kingdom.KingdomRecord;
+import galacticwars.clonewars.kingdom.KingdomPermission;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.progression.ProgressionDecision;
 import galacticwars.clonewars.progression.ProgressionEvent;
@@ -38,7 +39,7 @@ public final class PlanetTravelService {
         ServerLevel destination = destinationKey == null ? null : source.getServer().getLevel(destinationKey);
         PlanetTravelPolicy.TravelAuthorization authorization = PlanetTravelPolicy.authorize(
                 planetId,
-                hall != null && hall.isOwner(player),
+                hall != null && hall.canUse(player, KingdomPermission.TRAVEL),
                 hall != null,
                 !state.factionId().isEmpty(),
                 state.unlocks().contains("planet_travel"),
@@ -102,8 +103,9 @@ public final class PlanetTravelService {
             ServerPlayer player,
             KingdomSavedData kingdoms
     ) {
-        KingdomRecord kingdom = kingdoms.kingdomForOwner(player.getUUID()).orElse(null);
-        if (kingdom == null || !kingdoms.isHallActive(player.getUUID())) {
+        KingdomRecord kingdom = kingdoms.kingdomForPlayer(player.getUUID()).orElse(null);
+        if (kingdom == null || !kingdom.allows(player.getUUID(), KingdomPermission.TRAVEL)
+                || !kingdoms.isHallActive(kingdom.ownerId())) {
             return Optional.empty();
         }
         var settlement = kingdom.settlement();
@@ -116,7 +118,7 @@ public final class PlanetTravelService {
         BlockPos hallPos = new BlockPos(settlement.hallX(), settlement.hallY(), settlement.hallZ());
         hallLevel.getChunkAt(hallPos);
         if (!(hallLevel.getBlockEntity(hallPos) instanceof CommandCenterBlockEntity hall)
-                || !hall.isOwner(player)) {
+                || !hall.canUse(player, KingdomPermission.TRAVEL)) {
             return Optional.empty();
         }
         return Optional.of(hall);

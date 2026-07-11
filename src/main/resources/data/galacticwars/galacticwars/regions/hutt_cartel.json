@@ -1,0 +1,13 @@
+{
+  "display_name": "Hutt Cartel",
+  "controlling_faction": "galacticwars:hutt_cartel",
+  "climate": "desert",
+  "base_temperature": 1.0,
+  "downfall": 0.0,
+  "spawn_weight": 7,
+  "features": [
+    "spaceports",
+    "market_compounds",
+    "smuggler_routes"
+  ]
+}

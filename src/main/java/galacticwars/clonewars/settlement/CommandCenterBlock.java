@@ -2,8 +2,10 @@ package galacticwars.clonewars.settlement;
 
 import com.mojang.serialization.MapCodec;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import galacticwars.clonewars.kingdom.KingdomRecord;
+import galacticwars.clonewars.kingdom.KingdomPermission;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.menu.CommandCenterNavigationMenuProvider;
@@ -92,22 +94,29 @@ public final class CommandCenterBlock extends BaseEntityBlock {
                 || !(level.getBlockEntity(pos) instanceof CommandCenterBlockEntity hall)) {
             return InteractionResult.SUCCESS;
         }
-        if (!hall.claim(player)) {
+        if (hall.ownerId() == null && !hall.claim(player)) {
+            player.sendSystemMessage(Component.translatable("message.galacticwars.command_center.not_owner"));
+            return InteractionResult.FAIL;
+        }
+
+        UUID authorityOwner = hall.ownerId();
+        if (authorityOwner == null || !hall.canUse(player, KingdomPermission.USE_STORAGE)) {
             player.sendSystemMessage(Component.translatable("message.galacticwars.command_center.not_owner"));
             return InteractionResult.FAIL;
         }
 
         KingdomSavedData data = KingdomSavedData.get(serverLevel);
-        Optional<KingdomRecord> existing = data.kingdomForOwner(player.getUUID());
+        Optional<KingdomRecord> existing = data.kingdomForOwner(authorityOwner);
         if (existing.isEmpty()) {
             if (player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.openMenu(new FactionSelectionMenuProvider(pos));
             }
             return InteractionResult.SUCCESS;
         }
-        Optional<KingdomRecord> activated = data.activateHall(
-                player.getUUID(), existing.orElseThrow().factionId(),
-                serverLevel.dimension().identifier().toString(), pos);
+        Optional<KingdomRecord> activated = hall.isOwner(player)
+                ? data.activateHall(authorityOwner, existing.orElseThrow().factionId(),
+                        serverLevel.dimension().identifier().toString(), pos)
+                : existing;
         if (activated.isEmpty()) {
             player.sendSystemMessage(Component.translatable(
                     "message.galacticwars.command_center.duplicate"));
@@ -117,6 +126,10 @@ public final class CommandCenterBlock extends BaseEntityBlock {
             hall.setFaction(activated.orElseThrow().factionId());
         }
         if (player.isShiftKeyDown()) {
+            if (!hall.canUse(player, KingdomPermission.COMMAND_ARMY)) {
+                player.sendSystemMessage(Component.translatable("message.galacticwars.command_center.command_denied"));
+                return InteractionResult.FAIL;
+            }
             if (!ProgressionSavedData.get(serverLevel).state(player.getUUID()).factionId().isEmpty()) {
                 player.openMenu(new CommandCenterNavigationMenuProvider());
                 return InteractionResult.SUCCESS;

@@ -36,10 +36,10 @@ public final class FactionSelectionScreen extends Screen implements MenuAccess<F
         warning.setFGColor(0xAAB7C4);
         this.addRenderableWidget(warning);
         int x = (this.width - BUTTON_WIDTH) / 2;
-        int firstY = Math.max(58, (this.height - FactionSelectionMenu.FACTION_IDS.size()
+        int firstY = Math.max(58, (this.height - this.menu.factionIds().size()
                 * (BUTTON_HEIGHT + GAP)) / 2);
-        for (int index = 0; index < FactionSelectionMenu.FACTION_IDS.size(); index++) {
-            String factionId = FactionSelectionMenu.FACTION_IDS.get(index);
+        for (int index = 0; index < this.menu.factionIds().size(); index++) {
+            String factionId = this.menu.factionIds().get(index);
             int buttonId = index;
             this.addRenderableWidget(Button.builder(
                             Component.translatable(FactionSelectionMenu.factionTranslation(factionId)),

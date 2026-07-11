@@ -44,13 +44,25 @@ public final class ModEntityTypes {
             registerRecruit("nightsister_archer", 0.60F, 2.05F);
     public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> NIGHTBROTHER_BRUTE =
             registerRecruit("nightbrother_brute", 0.72F, 2.10F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> REPUBLIC_CIVILIAN =
+            registerRecruit("republic_civilian", 0.60F, 1.90F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> SEPARATIST_TECHNICIAN =
+            registerRecruit("separatist_technician", 0.65F, 1.85F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> MANDALORIAN_CLANSPERSON =
+            registerRecruit("mandalorian_clansperson", 0.60F, 1.90F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> HUTT_CIVILIAN =
+            registerRecruit("hutt_civilian", 0.60F, 1.90F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> NIGHTSISTER_CIVILIAN =
+            registerRecruit("nightsister_civilian", 0.60F, 2.00F);
 
     private static final List<DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>>> RECRUITS = List.of(
             CLONE_TROOPER, ARC_TROOPER, JEDI_KNIGHT,
             B1_BATTLE_DROID, B2_SUPER_BATTLE_DROID, COMMANDO_DROID,
             MANDALORIAN_WARRIOR, MANDALORIAN_MARKSMAN, MANDALORIAN_HEAVY,
             HUTT_ENFORCER, BOUNTY_HUNTER, SMUGGLER,
-            NIGHTSISTER_ACOLYTE, NIGHTSISTER_ARCHER, NIGHTBROTHER_BRUTE);
+            NIGHTSISTER_ACOLYTE, NIGHTSISTER_ARCHER, NIGHTBROTHER_BRUTE,
+            REPUBLIC_CIVILIAN, SEPARATIST_TECHNICIAN, MANDALORIAN_CLANSPERSON,
+            HUTT_CIVILIAN, NIGHTSISTER_CIVILIAN);
 
     private ModEntityTypes() {
     }
@@ -61,6 +73,15 @@ public final class ModEntityTypes {
 
     public static List<DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>>> recruits() {
         return RECRUITS;
+    }
+
+    public static EntityType<GalacticRecruitEntity> renderAlias(EntityType<GalacticRecruitEntity> entityType) {
+        if (entityType == REPUBLIC_CIVILIAN.get()) return CLONE_TROOPER.get();
+        if (entityType == SEPARATIST_TECHNICIAN.get()) return B1_BATTLE_DROID.get();
+        if (entityType == MANDALORIAN_CLANSPERSON.get()) return MANDALORIAN_WARRIOR.get();
+        if (entityType == HUTT_CIVILIAN.get()) return SMUGGLER.get();
+        if (entityType == NIGHTSISTER_CIVILIAN.get()) return NIGHTSISTER_ACOLYTE.get();
+        return entityType;
     }
 
     private static DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> registerRecruit(

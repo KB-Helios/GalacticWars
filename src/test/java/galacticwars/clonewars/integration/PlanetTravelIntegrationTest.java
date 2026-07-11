@@ -24,6 +24,8 @@ public final class PlanetTravelIntegrationTest {
         assertContains(service, "player.teleportTo", "server dimension transfer");
         assertContains(service, "squadTravel.reserve()", "pre-teleport squad reservation");
         assertContains(service, "squadTravel.rollback", "failed-teleport squad rollback");
+        assertContains(armyTravel, "candidate.ownerId().equals(owner.getUUID())",
+                "traveler-owned squad selection");
         assertContains(service, "setRespawnPosition", "planet arrival respawn configuration");
         assertContains(service, "resolveCommandCenter", "cross-dimension Command Center authority");
         assertContains(service, "hallLevel.getChunkAt(hallPos)", "remote Command Center chunk resolution");

@@ -6,8 +6,8 @@
   "downfall": 0.4,
   "spawn_weight": 10,
   "features": [
-    "white_city_outskirts",
-    "beacon_hills",
-    "stone_roads"
+    "clone_garrisons",
+    "supply_corridors",
+    "landing_platforms"
   ]
 }

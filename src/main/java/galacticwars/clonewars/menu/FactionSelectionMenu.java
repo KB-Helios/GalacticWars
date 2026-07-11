@@ -28,24 +28,38 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 
 public final class FactionSelectionMenu extends AbstractContainerMenu {
+    @Deprecated
     public static final List<String> FACTION_IDS = LaunchContentCatalog.FACTIONS;
 
     private final BlockPos commandCenterPos;
+    private final List<String> factionIds;
 
     public FactionSelectionMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf extraData) {
-        this(containerId, inventory, BlockPos.ZERO);
+        this(containerId, inventory, extraData.readBlockPos(), readFactionIds(extraData));
     }
 
     public FactionSelectionMenu(int containerId, Inventory inventory, BlockPos commandCenterPos) {
+        this(containerId, inventory, commandCenterPos,
+                GameplayDataManager.snapshot().selectableFactions().stream()
+                        .map(definition -> definition.id().toString()).toList());
+    }
+
+    private FactionSelectionMenu(
+            int containerId,
+            Inventory inventory,
+            BlockPos commandCenterPos,
+            List<String> factionIds
+    ) {
         super(ModMenuTypes.FACTION_SELECTION.get(), containerId);
         this.commandCenterPos = commandCenterPos.immutable();
+        this.factionIds = List.copyOf(factionIds);
     }
 
     @Override
     public boolean clickMenuButton(Player player, int buttonId) {
         if (!(player instanceof ServerPlayer serverPlayer)
                 || buttonId < 0
-                || buttonId >= FACTION_IDS.size()
+                || buttonId >= factionIds.size()
                 || !this.stillValid(player)) {
             return false;
         }
@@ -55,7 +69,7 @@ public final class FactionSelectionMenu extends AbstractContainerMenu {
             return false;
         }
 
-        String factionId = FACTION_IDS.get(buttonId);
+        String factionId = factionIds.get(buttonId);
         FactionDefinition faction = GameplayDataManager.snapshot().factions()
                 .definition(FactionId.of(factionId)).orElse(null);
         if (faction == null) {
@@ -152,5 +166,21 @@ public final class FactionSelectionMenu extends AbstractContainerMenu {
         int separator = factionId.indexOf(':');
         String path = separator < 0 ? factionId : factionId.substring(separator + 1);
         return "faction.galacticwars." + path;
+    }
+
+    public List<String> factionIds() {
+        return factionIds;
+    }
+
+    private static List<String> readFactionIds(RegistryFriendlyByteBuf buffer) {
+        int size = buffer.readVarInt();
+        if (size < 0 || size > 64) {
+            throw new IllegalArgumentException("invalid faction selection payload size " + size);
+        }
+        java.util.ArrayList<String> ids = new java.util.ArrayList<>(size);
+        for (int index = 0; index < size; index++) {
+            ids.add(buffer.readUtf(128));
+        }
+        return List.copyOf(ids);
     }
 }

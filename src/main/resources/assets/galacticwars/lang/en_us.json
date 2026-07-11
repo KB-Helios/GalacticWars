@@ -292,6 +292,7 @@
   "message.galacticwars.travel.squad_transfer_conflict": "Travel stopped because your squad orders changed during launch.",
   "message.galacticwars.travel.unknown_planet": "That navigation target is not recognized.",
   "message.galacticwars.travel.not_owner": "Only the owner of the active Command Center may initiate travel.",
+  "message.galacticwars.command_center.command_denied": "Your kingdom role cannot command this army.",
   "message.galacticwars.travel.faction_required": "Pledge to a faction before using planetary navigation.",
   "message.galacticwars.travel.planet_travel_locked": "Complete a Forward Base to unlock planetary navigation.",
   "message.galacticwars.travel.upkeep_unpaid": "Command Center upkeep must be paid before departure.",

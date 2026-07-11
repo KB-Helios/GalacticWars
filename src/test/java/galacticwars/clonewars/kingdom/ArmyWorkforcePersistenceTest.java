@@ -8,6 +8,11 @@ import galacticwars.clonewars.army.ArmyGroupLifecycleState;
 import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyLocation;
 import galacticwars.clonewars.workforce.WorkerProfession;
+import galacticwars.clonewars.workforce.CourierTransferAction;
+import galacticwars.clonewars.workforce.CourierTransferType;
+import galacticwars.clonewars.workforce.CourierWaypoint;
+import galacticwars.clonewars.workforce.WorkAreaBounds;
+import galacticwars.clonewars.workforce.WorkAreaConfiguration;
 
 public final class ArmyWorkforcePersistenceTest {
     private ArmyWorkforcePersistenceTest() {
@@ -15,9 +20,12 @@ public final class ArmyWorkforcePersistenceTest {
 
     public static void main(String[] args) {
         armyMembershipOrderAndOrphaningPersistInDomainRecords();
+        namedSquadLogisticsAndPatrolMetadataPersist();
+        settlementsSupportRewardBoundedMultipleCommanders();
         worksiteCapacityAndAssignmentsAreAuthoritative();
         projectSlotsAndAssignmentReleaseAreAtomic();
         frontierWorksitesMigrateAndPersistConfiguration();
+        workAreasPersistBoundsFiltersPriorityAndCourierRoutes();
         workOrdersUseGuardedRevisionedTransitions();
         System.out.println("ArmyWorkforcePersistenceTest passed");
     }
@@ -124,6 +132,58 @@ public final class ArmyWorkforcePersistenceTest {
         WorksiteRecord frontier = configured.assignedWorksite(worker).orElseThrow();
         assertEquals(5, frontier.x(), "frontier x");
         assertEquals(12, frontier.radius(), "frontier radius");
+        assertEquals(25, frontier.configuration().bounds().width(), "frontier bounds follow radius");
+    }
+
+    private static void namedSquadLogisticsAndPatrolMetadataPersist() {
+        ArmyLocation anchor = new ArmyLocation("minecraft:overworld", 4, 64, 8);
+        ArmyLocation second = new ArmyLocation("minecraft:overworld", 24, 64, 8);
+        UUID claimId = UUID.randomUUID();
+        ArmyGroupRecord configured = ArmyGroupRecord.create(
+                        UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), List.of(),
+                        ArmyFormation.LINE, anchor, 100L)
+                .withName("501st Vanguard")
+                .withRallyPoint(anchor)
+                .withPatrolRoute(List.of(anchor, second))
+                .defendingClaim(claimId)
+                .withSupplyUnits(64);
+        assertEquals("501st Vanguard", configured.name(), "squad name");
+        assertEquals(List.of(anchor, second), configured.patrolRoute(), "patrol route");
+        assertEquals(claimId, configured.defendedClaimId().orElseThrow(), "defended claim");
+        assertEquals(64, configured.supplyUnits(), "military supply");
+    }
+
+    private static void settlementsSupportRewardBoundedMultipleCommanders() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        SettlementRecord settlement = new SettlementRecord(
+                UUID.randomUUID(), "minecraft:overworld", 0, 64, 0, 48, 4,
+                List.of(first, second), Optional.empty(), CommanderPolicy.defaults(), List.of(),
+                List.of(), List.of(), List.of(), new SettlementRewards(0, 2), 0)
+                .withCommander(first)
+                .withCommander(second);
+        assertEquals(List.of(first, second), settlement.commanderIds(), "multiple commanders");
+        assertTrue(!settlement.hasCommanderSlot(), "commander reward capacity");
+    }
+
+    private static void workAreasPersistBoundsFiltersPriorityAndCourierRoutes() {
+        CourierWaypoint source = new CourierWaypoint(
+                "minecraft:overworld", 1, 64, 2,
+                List.of(new CourierTransferAction(CourierTransferType.TAKE, "galacticwars:energy_cell", 16)));
+        CourierWaypoint destination = new CourierWaypoint(
+                "minecraft:overworld", 20, 64, 2,
+                List.of(new CourierTransferAction(CourierTransferType.FILL, "galacticwars:energy_cell", 32)));
+        WorkAreaConfiguration configuration = new WorkAreaConfiguration(
+                new WorkAreaBounds(12, 6, 8), true, 80, true,
+                List.of("galacticwars:energy_cell", "galacticwars:energy_cell"),
+                List.of(source, destination));
+        WorksiteRecord configured = new WorksiteRecord(
+                UUID.randomUUID(), "courier", "minecraft:overworld", 0, 64, 0, 8, 2)
+                .configured(configuration);
+        assertEquals(new WorkAreaBounds(12, 6, 8), configured.configuration().bounds(), "work area bounds");
+        assertEquals(1, configured.configuration().itemFilters().size(), "normalized filters");
+        assertEquals(80, configured.configuration().priority(), "work priority");
+        assertEquals(2, configured.configuration().courierRoute().size(), "courier route");
     }
 
     private static void assertEquals(Object expected, Object actual, String label) {

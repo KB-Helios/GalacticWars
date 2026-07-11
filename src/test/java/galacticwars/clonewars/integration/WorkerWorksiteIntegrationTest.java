@@ -42,11 +42,11 @@ public final class WorkerWorksiteIntegrationTest {
                 "WorkerWorksite( area, this.workTarget.getX(), this.workTarget.getY(), this.workTarget.getZ(), this.workRadius)",
                 "worksite uses recruit radius");
         assertContains(entity, "worksiteScanRadius()", "scan uses configured work radius");
-        assertContains(entity, "BUTTON_SET_WORKSITE", "set worksite handling");
-        assertContains(entity, "BUTTON_RETURN_WORKSITE", "return worksite handling");
-        assertContains(entity, "BUTTON_CLEAR_WORKSITE", "clear worksite handling");
-        assertContains(entity, "BUTTON_WORK_RADIUS_DECREASE", "decrease radius handling");
-        assertContains(entity, "BUTTON_WORK_RADIUS_INCREASE", "increase radius handling");
+        assertContains(entity, "case SET_WORKSITE", "set worksite handling");
+        assertContains(entity, "case RETURN_WORKSITE", "return worksite handling");
+        assertContains(entity, "case CLEAR_WORKSITE", "clear worksite handling");
+        assertContains(entity, "case WORK_RADIUS_DECREASE", "decrease radius handling");
+        assertContains(entity, "case WORK_RADIUS_INCREASE", "increase radius handling");
         assertContains(entity, "WorkerTaskPlanner.plan", "task planner hook");
     }
 

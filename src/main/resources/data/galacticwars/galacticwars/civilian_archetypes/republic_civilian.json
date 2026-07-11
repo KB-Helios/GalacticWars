@@ -1,0 +1,11 @@
+{
+  "id": "galacticwars:republic_civilian",
+  "display_name": "Republic Support Civilian",
+  "faction": "galacticwars:republic",
+  "entity_type": "galacticwars:republic_civilian",
+  "professions": ["farmer", "cook", "courier", "builder"],
+  "max_health": 20,
+  "movement_speed": 0.27,
+  "base_morale": 75,
+  "home_type": "republic_hab"
+}
