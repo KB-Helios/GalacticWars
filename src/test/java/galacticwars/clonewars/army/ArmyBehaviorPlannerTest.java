@@ -102,13 +102,13 @@ public final class ArmyBehaviorPlannerTest {
     }
 
     private static ArmyBehaviorContext context(
-            ArmyPosition snightsisterPosition,
+            ArmyPosition selfPosition,
             ArmyPosition ownerPosition,
             UUID visibleThreatToOwner,
             boolean commandTargetAlive,
             int followRange
     ) {
-        return ArmyBehaviorContext.of(snightsisterPosition, ownerPosition, visibleThreatToOwner, commandTargetAlive, followRange);
+        return ArmyBehaviorContext.of(selfPosition, ownerPosition, visibleThreatToOwner, commandTargetAlive, followRange);
     }
 
     private static void assertEquals(Object expected, Object actual, String label) {

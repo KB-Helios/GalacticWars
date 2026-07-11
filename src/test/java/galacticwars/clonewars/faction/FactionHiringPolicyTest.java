@@ -36,7 +36,7 @@ public final class FactionHiringPolicyTest {
         FactionCatalog catalog = testCatalog();
 
         assertEquals(FactionRelation.SAME, catalog.relation(FactionId.of("republic"), FactionId.of("republic")),
-                "snightsister relation");
+                "same relation");
         assertEquals(FactionRelation.ALLY, catalog.relation(FactionId.of("republic"), FactionId.of("mandalorian")),
                 "ally relation");
         assertEquals(FactionRelation.ENEMY, catalog.relation(FactionId.of("mandalorian"), FactionId.of("separatist")),

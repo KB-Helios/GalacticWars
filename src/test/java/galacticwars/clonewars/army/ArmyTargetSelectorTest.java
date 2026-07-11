@@ -75,7 +75,7 @@ public final class ArmyTargetSelectorTest {
                 16).orElseThrow();
 
         assertEquals(recruitAttacker, selection.targetId(), "recruit attacker target");
-        assertEquals("snightsister_defense", selection.reasonCode(), "recruit attacker reason");
+        assertEquals("self_defense", selection.reasonCode(), "recruit attacker reason");
     }
 
     private static void usesThreatBeforeDistanceForOrdinaryEnemies() {

@@ -23,7 +23,7 @@ public final class ArmyBehaviorPlanner {
     }
 
     private static ArmyBehaviorDecision planFollowOwner(ArmyBehaviorContext context, String followReason) {
-        if (horizontalDistanceSquared(context.snightsisterPosition(), context.ownerPosition()) > squared(context.followRange())) {
+        if (horizontalDistanceSquared(context.selfPosition(), context.ownerPosition()) > squared(context.followRange())) {
             return ArmyBehaviorDecision.follow(context.ownerPosition(), followReason);
         }
         return ArmyBehaviorDecision.idle("within_follow_range");
@@ -34,7 +34,7 @@ public final class ArmyBehaviorPlanner {
         if (visibleThreat != null) {
             return ArmyBehaviorDecision.attack(visibleThreat, "owner_threat_visible");
         }
-        if (horizontalDistanceSquared(context.snightsisterPosition(), context.ownerPosition()) > squared(context.followRange())) {
+        if (horizontalDistanceSquared(context.selfPosition(), context.ownerPosition()) > squared(context.followRange())) {
             return ArmyBehaviorDecision.follow(context.ownerPosition(), "protect_follow_owner");
         }
         return ArmyBehaviorDecision.protect(context.ownerPosition(), "protect_owner");

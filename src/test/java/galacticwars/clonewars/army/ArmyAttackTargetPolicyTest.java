@@ -19,7 +19,7 @@ public final class ArmyAttackTargetPolicyTest {
 
     public static void main(String[] args) {
         enemySoldierIsAccepted();
-        snightsisterAllyAndNeutralRecruitsAreRejected();
+        sameAllyAndNeutralRecruitsAreRejected();
         workersAndSameOwnerRecruitsAreRejected();
         explicitAndRetaliatoryMonstersAreAccepted();
         System.out.println("ArmyAttackTargetPolicyTest passed");
@@ -30,7 +30,7 @@ public final class ArmyAttackTargetPolicyTest {
                 factions(), REPUBLIC, SEPARATIST, false, RecruitDuty.SOLDIER), "enemy soldier");
     }
 
-    private static void snightsisterAllyAndNeutralRecruitsAreRejected() {
+    private static void sameAllyAndNeutralRecruitsAreRejected() {
         assertFalse(ArmyAttackTargetPolicy.canAttackRecruit(
                 factions(), REPUBLIC, REPUBLIC, false, RecruitDuty.SOLDIER), "same faction");
         assertFalse(ArmyAttackTargetPolicy.canAttackRecruit(

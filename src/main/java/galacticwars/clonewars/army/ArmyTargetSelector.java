@@ -102,7 +102,7 @@ public final class ArmyTargetSelector {
             return "protect_owner";
         }
         if (candidate.attackingRecruit()) {
-            return "snightsister_defense";
+            return "self_defense";
         }
         return "hostile_threat";
     }

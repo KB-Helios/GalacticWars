@@ -147,7 +147,7 @@ Create item models for the three block items and `beskar_ingot`.
 
 - [ ] **Step 4: Add loot tables**
 
-Create snightsister-drop loot tables for the three seed blocks.
+Create self-drop loot tables for the three seed blocks.
 
 - [ ] **Step 5: Add mining tags**
 

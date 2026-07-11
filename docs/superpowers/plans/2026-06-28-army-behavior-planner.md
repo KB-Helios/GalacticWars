@@ -51,7 +51,7 @@ Create `ArmyBehaviorIntent` with `IDLE`, `FOLLOW_OWNER`, `MOVE_TO_POSITION`, `HO
 
 Create `ArmyBehaviorContext` with:
 
-- `ArmyPosition snightsisterPosition`
+- `ArmyPosition selfPosition`
 - `ArmyPosition ownerPosition`
 - `UUID visibleThreatToOwner`
 - `boolean commandTargetAlive`

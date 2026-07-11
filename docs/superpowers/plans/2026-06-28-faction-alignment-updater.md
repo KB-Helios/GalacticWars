@@ -58,7 +58,7 @@ For each catalog definition:
 - source faction gets `directDelta`.
 - factions where `catalog.relation(sourceFaction, candidate)` is `ALLY` get `allyDelta`.
 - factions where the relation is `ENEMY` get `enemyDelta`.
-- `SNIGHTSISTER` and `NEUTRAL` candidates other than the source produce no additional change.
+- `SAME` and `NEUTRAL` candidates other than the source produce no additional change.
 - zero deltas are skipped.
 
 - [ ] **Step 5: Run focused harness**

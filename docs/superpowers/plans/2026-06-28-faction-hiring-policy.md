@@ -29,7 +29,7 @@
 Create `FactionHiringPolicyTest` with a `main` method that checks:
 
 - `FactionDefinition` stores hire cost, minimum alignment, max recruits, allies, and enemies.
-- `FactionCatalog.relation(a, b)` returns `SNIGHTSISTER`, `ALLY`, `ENEMY`, or `NEUTRAL`.
+- `FactionCatalog.relation(a, b)` returns `SAME`, `ALLY`, `ENEMY`, or `NEUTRAL`.
 - `HiringPolicy.canHire` accepts a player with enough alignment, enough coins, and room under the recruit cap.
 - `HiringPolicy.canHire` rejects low alignment, low coins, and max-recruit cases with stable reason codes.
 
@@ -47,7 +47,7 @@ Expected: compile fails because `FactionDefinition`, `FactionCatalog`, `FactionR
 
 - [ ] **Step 1: Add relation enum**
 
-Create `FactionRelation` with `SNIGHTSISTER`, `ALLY`, `NEUTRAL`, and `ENEMY`.
+Create `FactionRelation` with `SAME`, `ALLY`, `NEUTRAL`, and `ENEMY`.
 
 - [ ] **Step 2: Add immutable faction definitions**
 

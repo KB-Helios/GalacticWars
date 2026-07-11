@@ -60,13 +60,13 @@ public final class ArmyRecruitRuntimeController {
         ownsRuntimeControl = true;
 
         LivingEntity owner = living(level.getEntity(group.ownerId()));
-        ArmyPosition snightsister = position(recruit);
-        ArmyPosition ownerPosition = owner == null ? snightsister : position(owner);
+        ArmyPosition self = position(recruit);
+        ArmyPosition ownerPosition = owner == null ? self : position(owner);
         int followRange = Math.max(4, (int) Math.round(recruit.getAttributeValue(Attributes.FOLLOW_RANGE)));
 
         if (Math.floorMod(recruit.getUUID().hashCode(), TARGET_INTERVAL)
                 == Math.floorMod(recruit.tickCount, TARGET_INTERVAL)) {
-            selectedTargetId = selectTarget(recruit, level, group, snightsister, followRange);
+            selectedTargetId = selectTarget(recruit, level, group, self, followRange);
         }
         LivingEntity selectedTarget = living(selectedTargetId == null ? null : level.getEntity(selectedTargetId));
         if (!validTarget(recruit, group, selectedTarget)) {
@@ -81,7 +81,7 @@ public final class ArmyRecruitRuntimeController {
         boolean commandTargetAlive = memberCommand.targetEntityId() != null
                 && living(level.getEntity(memberCommand.targetEntityId())) != null;
         ArmyBehaviorDecision behavior = ArmyBehaviorPlanner.plan(state, new ArmyBehaviorContext(
-                snightsister, memberOrder.behaviorAnchor(), visibleThreat, commandTargetAlive, followRange));
+                self, memberOrder.behaviorAnchor(), visibleThreat, commandTargetAlive, followRange));
 
         if (selectedTarget != null && group.order().type() != ArmyCommandType.CLEAR_TARGET) {
             behavior = ArmyBehaviorDecision.attack(selectedTarget.getUUID(), "planner_selected_target");
