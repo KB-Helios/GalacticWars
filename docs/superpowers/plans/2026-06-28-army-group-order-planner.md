@@ -60,7 +60,7 @@ Run:
 
 ```powershell
 javac -d build\group-order-test-classes src\main\java\middleearth\lotr\warmod\army\ArmyCommand.java src\main\java\middleearth\lotr\warmod\army\ArmyCommandType.java src\main\java\middleearth\lotr\warmod\army\ArmyFormation.java src\main\java\middleearth\lotr\warmod\army\ArmyGroupOrderAssignment.java src\main\java\middleearth\lotr\warmod\army\ArmyGroupOrderPlanner.java src\main\java\middleearth\lotr\warmod\army\ArmyGroupState.java src\main\java\middleearth\lotr\warmod\army\ArmyPosition.java src\main\java\middleearth\lotr\warmod\army\FormationPlanner.java src\main\java\middleearth\lotr\warmod\army\FormationSlot.java src\test\java\middleearth\lotr\warmod\army\ArmyGroupOrderPlannerTest.java
-java -cp build\group-order-test-classes middleearth.lotr.warmod.army.ArmyGroupOrderPlannerTest
+java -cp build\group-order-test-classes galacticwars.clonewars.army.ArmyGroupOrderPlannerTest
 ```
 
 Expected: prints `ArmyGroupOrderPlannerTest passed`.

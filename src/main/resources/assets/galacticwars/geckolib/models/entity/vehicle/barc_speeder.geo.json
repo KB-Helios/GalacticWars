@@ -1,0 +1,171 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.galacticwars.vehicle.barc_speeder",
+        "texture_width": 256,
+        "texture_height": 256,
+        "visible_bounds_width": 4,
+        "visible_bounds_height": 3,
+        "visible_bounds_offset": [
+          0,
+          1,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "root",
+          "pivot": [
+            0,
+            8,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -8,
+                4,
+                -16
+              ],
+              "size": [
+                16,
+                4,
+                32
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            },
+            {
+              "origin": [
+                -5,
+                5,
+                -28
+              ],
+              "size": [
+                10,
+                3,
+                12
+              ],
+              "uv": [
+                100,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "engine_left",
+          "parent": "root",
+          "pivot": [
+            -9,
+            6,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -11,
+                3,
+                -8
+              ],
+              "size": [
+                4,
+                6,
+                16
+              ],
+              "uv": [
+                146,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "engine_right",
+          "parent": "root",
+          "pivot": [
+            9,
+            6,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                7,
+                3,
+                -8
+              ],
+              "size": [
+                4,
+                6,
+                16
+              ],
+              "uv": [
+                188,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "seat",
+          "parent": "root",
+          "pivot": [
+            0,
+            8,
+            2
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -5,
+                8,
+                -1
+              ],
+              "size": [
+                10,
+                6,
+                8
+              ],
+              "uv": [
+                0,
+                38
+              ]
+            }
+          ]
+        },
+        {
+          "name": "handlebars",
+          "parent": "root",
+          "pivot": [
+            0,
+            14,
+            -9
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -10,
+                14,
+                -10
+              ],
+              "size": [
+                20,
+                2,
+                2
+              ],
+              "uv": [
+                38,
+                38
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

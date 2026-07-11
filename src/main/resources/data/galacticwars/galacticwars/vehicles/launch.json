@@ -1,0 +1,7 @@
+{"schema_version":1,"vehicles":[
+  {"id":"barc_speeder","movement":"hover","seats":1,"max_health":40,"fuel_capacity":1200,"unlock":"republic_chapter_2"},
+  {"id":"at_rt","movement":"walker","seats":1,"max_health":70,"fuel_capacity":1600,"unlock":"republic_chapter_3"},
+  {"id":"stap","movement":"hover","seats":1,"max_health":35,"fuel_capacity":1200,"unlock":"separatist_chapter_2"},
+  {"id":"aat","movement":"hover","seats":2,"max_health":160,"fuel_capacity":3000,"unlock":"separatist_chapter_3"},
+  {"id":"laat_gunship","movement":"flight","seats":8,"max_health":220,"fuel_capacity":5000,"unlock":"vehicle_mastery"}
+]}

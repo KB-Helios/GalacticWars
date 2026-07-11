@@ -17,9 +17,9 @@
 - Create: `src/main/java/middleearth/lotr/warmod/army/ArmyUnitRole.java`
 - Create: `src/main/java/middleearth/lotr/warmod/army/ArmyUnitDefinition.java`
 - Create: `src/main/java/middleearth/lotr/warmod/army/ArmyUnitCatalog.java`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/units/gondor_soldier.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/units/rohan_rider.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/units/mordor_orc.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/units/clone_trooper.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/units/mandalorian_rider.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/units/b1_battle_droid.json`
 
 ### Task 1: Red Tests
 
@@ -27,8 +27,8 @@
 
 Create `ArmyUnitCatalogTest` with a `main` method that checks:
 
-- Unit IDs normalize to `kingdomwarsmiddleearth:<path>`.
-- A Gondor soldier stores faction, role, hire cost, health, attack damage, and default formation.
+- Unit IDs normalize to `galacticwars:<path>`.
+- A Republic soldier stores faction, role, hire cost, health, attack damage, and default formation.
 - Catalog lookup returns units by ID.
 - Catalog filtering returns units by faction and by role.
 - Duplicate unit IDs are rejected.
@@ -74,17 +74,17 @@ Create `ArmyUnitCatalog` with immutable definitions by ID, `definition(ArmyUnitI
 
 ### Task 3: Unit Resources
 
-- [ ] **Step 1: Add Gondor soldier JSON**
+- [ ] **Step 1: Add Republic soldier JSON**
 
-Create `gondor_soldier.json` with faction `kingdomwarsmiddleearth:gondor`, role `infantry`, hire cost `25`, max health `24`, attack damage `5`, and default formation `line`.
+Create `clone_trooper.json` with faction `galacticwars:republic`, role `infantry`, hire cost `25`, max health `24`, attack damage `5`, and default formation `line`.
 
-- [ ] **Step 2: Add Rohan rider JSON**
+- [ ] **Step 2: Add Mandalorian rider JSON**
 
-Create `rohan_rider.json` with faction `kingdomwarsmiddleearth:rohan`, role `cavalry`, hire cost `35`, max health `26`, attack damage `6`, and default formation `wedge`.
+Create `mandalorian_rider.json` with faction `galacticwars:mandalorian`, role `cavalry`, hire cost `35`, max health `26`, attack damage `6`, and default formation `wedge`.
 
-- [ ] **Step 3: Add Mordor orc JSON**
+- [ ] **Step 3: Add Separatist orc JSON**
 
-Create `mordor_orc.json` with faction `kingdomwarsmiddleearth:mordor`, role `brute`, hire cost `20`, max health `22`, attack damage `5`, and default formation `column`.
+Create `b1_battle_droid.json` with faction `galacticwars:separatist`, role `brute`, hire cost `20`, max health `22`, attack damage `5`, and default formation `column`.
 
 ### Task 4: Verification
 
@@ -94,7 +94,7 @@ Run:
 
 ```powershell
 javac -d build\unit-catalog-test-classes src\main\java\middleearth\lotr\warmod\army\ArmyFormation.java src\main\java\middleearth\lotr\warmod\army\ArmyUnitId.java src\main\java\middleearth\lotr\warmod\army\ArmyUnitRole.java src\main\java\middleearth\lotr\warmod\army\ArmyUnitDefinition.java src\main\java\middleearth\lotr\warmod\army\ArmyUnitCatalog.java src\main\java\middleearth\lotr\warmod\faction\FactionId.java src\test\java\middleearth\lotr\warmod\army\ArmyUnitCatalogTest.java
-java -cp build\unit-catalog-test-classes middleearth.lotr.warmod.army.ArmyUnitCatalogTest
+java -cp build\unit-catalog-test-classes galacticwars.clonewars.army.ArmyUnitCatalogTest
 ```
 
 Expected: prints `ArmyUnitCatalogTest passed`.
@@ -120,8 +120,8 @@ Expected: all JSON files print with no parse errors.
 Run:
 
 ```powershell
-rtk rg -n "ArmyUnitId|ArmyUnitRole|ArmyUnitDefinition|ArmyUnitCatalog|gondor_soldier|rohan_rider|mordor_orc" src docs\superpowers\plans\2026-06-28-army-unit-catalog.md
-rtk rg -n "talhanation|AbstractRecruit|RecruitEntity|PatrolLeader|package com\.talhanation|net\.talhanation" src\main\java src\test\java src\main\resources\data\kingdomwarsmiddleearth\kingdomwars
+rtk rg -n "ArmyUnitId|ArmyUnitRole|ArmyUnitDefinition|ArmyUnitCatalog|clone_trooper|mandalorian_rider|b1_battle_droid" src docs\superpowers\plans\2026-06-28-army-unit-catalog.md
+rtk rg -n "talhanation|AbstractRecruit|RecruitEntity|PatrolLeader|package com\.talhanation|net\.talhanation" src\main\java src\test\java src\main\resources\data\galacticwars\kingdomwars
 ```
 
 Expected: first command finds the new unit code/resources/tests; second command finds no upstream class/package names.

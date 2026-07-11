@@ -1,0 +1,23 @@
+{
+  "id": "galacticwars:nightsister_acolyte",
+  "display_name": "Nightsister Acolyte",
+  "faction": "galacticwars:nightsister",
+  "entity_type": "galacticwars:nightsister_acolyte",
+  "role": "infantry",
+  "hire_cost": 28,
+  "attributes": {
+    "max_health": 24,
+    "attack_damage": 6,
+    "movement_speed": 0.30,
+    "follow_range": 28.0,
+    "armor": 0.0
+  },
+  "equipment": {
+    "main_hand": "galacticwars:vibroblade",
+    "head": "galacticwars:nightsister_weave_helmet",
+    "chest": "galacticwars:nightsister_weave_chestplate",
+    "legs": "galacticwars:nightsister_weave_leggings",
+    "feet": "galacticwars:nightsister_weave_boots"
+  },
+  "default_formation": "line"
+}

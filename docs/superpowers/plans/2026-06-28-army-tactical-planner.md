@@ -86,7 +86,7 @@ Run:
 
 ```powershell
 javac -d build\tactical-test-classes src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorDecision.java src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorIntent.java src\main\java\middleearth\lotr\warmod\army\ArmyPosition.java src\main\java\middleearth\lotr\warmod\army\RecruitVitals.java src\main\java\middleearth\lotr\warmod\army\ArmyTacticalIntent.java src\main\java\middleearth\lotr\warmod\army\ArmyTacticalDecision.java src\main\java\middleearth\lotr\warmod\army\ArmyTacticalPlanner.java src\test\java\middleearth\lotr\warmod\army\ArmyTacticalPlannerTest.java
-java -cp build\tactical-test-classes middleearth.lotr.warmod.army.ArmyTacticalPlannerTest
+java -cp build\tactical-test-classes galacticwars.clonewars.army.ArmyTacticalPlannerTest
 ```
 
 Expected: prints `ArmyTacticalPlannerTest passed`.

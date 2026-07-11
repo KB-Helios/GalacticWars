@@ -32,6 +32,10 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Python asset tools ###
+__pycache__/
+*.pyc
+
 ### Minecraft Modding ###
 run/
 !**/src/**/run/

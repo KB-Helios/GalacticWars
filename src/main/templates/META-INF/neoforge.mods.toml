@@ -40,9 +40,10 @@ authors="KB"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-KingdomWars-Middle-Earth is a NeoForge 26.2 Middle-earth port foundation.
-LOTR-derived material is handled under GPLv3-compatible terms.
-Army behavior is a clean-room implementation inspired by observed recruit command behavior.
+Galactic Wars: Clone Wars is an unofficial NeoForge 26.2 faction, army,
+settlement, planetary progression, and conquest fan mod.
+New artwork and gameplay are project-owned originals. Historical GPL-derived
+code retains its required attribution, and army behavior remains clean-room.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
@@ -87,7 +88,7 @@ config="${mod_id}.mixins.json"
 [[dependencies.${mod_id}]]
     modId="geckolib"
     type="required"
-    reason="Animated Middle-earth entities use GeckoLib keyframe animation runtime."
+    reason="Animated Galactic Wars entities use GeckoLib keyframe animation runtime."
     versionRange="[${geckolib_version},)"
     ordering="AFTER"
     side="BOTH"

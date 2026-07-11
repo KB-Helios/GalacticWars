@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":[" C ","RAR"," C "],"key":{"C":"minecraft:copper_ingot","R":"minecraft:redstone","A":"minecraft:amethyst_shard"},"result":{"id":"galacticwars:energy_cell","count":8}}

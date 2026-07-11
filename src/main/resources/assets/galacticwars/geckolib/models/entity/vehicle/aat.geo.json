@@ -1,0 +1,171 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.galacticwars.vehicle.aat",
+        "texture_width": 256,
+        "texture_height": 256,
+        "visible_bounds_width": 6,
+        "visible_bounds_height": 4,
+        "visible_bounds_offset": [
+          0,
+          1,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "root",
+          "pivot": [
+            0,
+            10,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -16,
+                6,
+                -20
+              ],
+              "size": [
+                32,
+                10,
+                40
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            },
+            {
+              "origin": [
+                -18,
+                0,
+                -22
+              ],
+              "size": [
+                36,
+                8,
+                44
+              ],
+              "uv": [
+                0,
+                52
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turret",
+          "parent": "root",
+          "pivot": [
+            0,
+            16,
+            -2
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -10,
+                16,
+                -12
+              ],
+              "size": [
+                20,
+                12,
+                20
+              ],
+              "uv": [
+                162,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "main_cannon",
+          "parent": "turret",
+          "pivot": [
+            0,
+            23,
+            -10
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -3,
+                20,
+                -40
+              ],
+              "size": [
+                6,
+                6,
+                30
+              ],
+              "uv": [
+                162,
+                34
+              ]
+            }
+          ]
+        },
+        {
+          "name": "left_pod",
+          "parent": "root",
+          "pivot": [
+            -15,
+            10,
+            -4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -20,
+                8,
+                -12
+              ],
+              "size": [
+                8,
+                8,
+                16
+              ],
+              "uv": [
+                162,
+                72
+              ]
+            }
+          ]
+        },
+        {
+          "name": "right_pod",
+          "parent": "root",
+          "pivot": [
+            15,
+            10,
+            -4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                12,
+                8,
+                -12
+              ],
+              "size": [
+                8,
+                8,
+                16
+              ],
+              "uv": [
+                162,
+                98
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

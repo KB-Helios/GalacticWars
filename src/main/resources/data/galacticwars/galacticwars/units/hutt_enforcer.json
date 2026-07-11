@@ -1,0 +1,23 @@
+{
+  "id": "galacticwars:hutt_enforcer",
+  "display_name": "Hutt Enforcer",
+  "faction": "galacticwars:hutt_cartel",
+  "entity_type": "galacticwars:hutt_enforcer",
+  "role": "infantry",
+  "hire_cost": 28,
+  "attributes": {
+    "max_health": 28,
+    "attack_damage": 6,
+    "movement_speed": 0.25,
+    "follow_range": 24.0,
+    "armor": 2.0
+  },
+  "equipment": {
+    "main_hand": "galacticwars:scatter_blaster",
+    "head": "galacticwars:beskar_helmet",
+    "chest": "galacticwars:beskar_chestplate",
+    "legs": "galacticwars:beskar_leggings",
+    "feet": "galacticwars:beskar_boots"
+  },
+  "default_formation": "line"
+}

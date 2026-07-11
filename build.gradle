@@ -231,20 +231,21 @@ tasks.register('runHarnesses') {
 }
 
 tasks.register('generateRecruitTextures', JavaExec) {
-    group = 'kingdomwars assets'
-    description = 'Regenerates the project-owned recruit skin atlases and spawn egg textures.'
+    group = 'galacticwars assets'
+    description = 'Archived deterministic texture generator; authored Galactic Wars textures are owned by the art workflow.'
+    enabled = false
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('middleearth.lotr.warmod.integration.RecruitTextureAtlasGenerator')
+    mainClass.set('galacticwars.clonewars.integration.RecruitTextureAtlasGenerator')
     workingDir = project.projectDir
 }
 
 tasks.register('generateContentAssets', JavaExec) {
-    group = 'kingdomwars assets'
-    description = 'Regenerates survival-content models, recipes, loot tables, tags, and project-owned pixel art.'
+    group = 'galacticwars assets'
+    description = 'Regenerates models, recipes, loot tables, and tags without overwriting authored PNG textures.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('middleearth.lotr.warmod.integration.ContentAssetGenerator')
+    mainClass.set('galacticwars.clonewars.integration.ContentAssetGenerator')
     workingDir = project.projectDir
 }
 

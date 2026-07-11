@@ -1,6 +1,6 @@
-# KingdomWars-Middle-Earth Notices
+# Galactic Wars: Clone Wars Notices
 
-This project is being developed as a GPL-3.0-only compatible NeoForge 26.2 port.
+This project is developed as an unofficial GPL-3.0-only NeoForge 26.2 fan mod.
 
 ## LOTR-Derived Material
 
@@ -10,14 +10,14 @@ Code or assets ported from `quentin452/The-Lord-of-the-Rings` are derived from G
 
 `talhanation/recruits` is All Rights Reserved. It is used only as behavioral reference. No source files, assets, UI, packet names, or class structure from that project are included here.
 
-## Project-Owned Recruit Assets
+## Project-Owned Galactic Wars Assets
 
-The Gondor, Rohan, Mordor orc, dwarf, and elf recruit skin atlases, faction-specific GeckoLib models, and spawn egg textures are original project assets. The distributable 64x64 pixels are generated from the deterministic faction design and humanoid UV recipe in `RecruitTextureAtlasGenerator`; high-resolution concept references are not included in the mod and no third-party pixels are used.
+New Galactic Wars textures, models, faction designs, GUI artwork, and writing are project assets. Generated texture prompts and transformations are recorded in `docs/galacticwars-asset-provenance.md`; the required dimensions and UV contracts are recorded in `docs/galacticwars-asset-manifest.json`. Official Star Wars artwork, film stills, logos, audio, and third-party mod assets are not bundled.
 
 ## User-Provided Resource Pack Assets
 
-`assets/kingdomwarsmiddleearth/textures/block/mallorn_log.png`, `assets/kingdomwarsmiddleearth/textures/block/mallorn_log_top.png`, `assets/kingdomwarsmiddleearth/textures/block/middle_earth_stone.png`, `assets/kingdomwarsmiddleearth/textures/block/mithril_ore.png`, and `assets/kingdomwarsmiddleearth/textures/item/mithril_ingot.png` are derived from the user-provided resource pack `§6Lord Of The Packs§f §b[1.3.1]§f.zip` by Fabuland. The pack metadata does not declare redistribution terms; confirm permission before public distribution.
+Legacy texture inputs from the prior conversion must not be distributed unless their provenance permits it. The Galactic Wars art pass replaces these files with generated project-bound artwork before release; Beskar generation may use the prior Mithril silhouette as a user-requested visual reference, but final PNGs contain newly generated pixels and are documented separately.
 
 ## Third-Party Runtime Libraries
 
-GeckoLib is used as an MIT-licensed runtime dependency for animated Middle-earth recruit entities and models. Keep GeckoLib code and assets as an external dependency; do not vendor its source into this repository.
+GeckoLib is used as an MIT-licensed runtime dependency for animated Galactic Wars entities and models. Keep GeckoLib code and assets as an external dependency; do not vendor its source into this repository.

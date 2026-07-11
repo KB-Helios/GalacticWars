@@ -1,0 +1,6 @@
+{"schema_version":1,"planets":[
+  {"id":"tatooine","dimension":"galacticwars:tatooine","arrival":"spaceport","theme":"desert","faction":"hutt_cartel"},
+  {"id":"geonosis","dimension":"galacticwars:geonosis","arrival":"foundry_outpost","theme":"canyon","faction":"separatist"},
+  {"id":"kamino","dimension":"galacticwars:kamino","arrival":"platform_city","theme":"storm_ocean","faction":"republic"},
+  {"id":"coruscant","dimension":"galacticwars:coruscant","arrival":"senate_district","theme":"city","faction":"republic"}
+]}

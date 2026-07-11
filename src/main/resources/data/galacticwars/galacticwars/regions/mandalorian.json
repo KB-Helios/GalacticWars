@@ -1,0 +1,13 @@
+{
+  "display_name": "Mandalorian",
+  "controlling_faction": "galacticwars:mandalorian",
+  "climate": "plains",
+  "base_temperature": 0.7,
+  "downfall": 0.3,
+  "spawn_weight": 8,
+  "features": [
+    "horse_lords_plains",
+    "thatched_villages",
+    "watch_mounds"
+  ]
+}

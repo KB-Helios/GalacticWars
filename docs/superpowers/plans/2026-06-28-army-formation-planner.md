@@ -76,7 +76,7 @@ Expected: compile succeeds.
 Run:
 
 ```powershell
-java -cp build\formation-test-classes middleearth.lotr.warmod.army.FormationPlannerTest
+java -cp build\formation-test-classes galacticwars.clonewars.army.FormationPlannerTest
 ```
 
 Expected: prints `FormationPlannerTest passed`.
@@ -87,9 +87,9 @@ Run:
 
 ```powershell
 javac -d build\army-core-test-classes src\main\java\middleearth\lotr\warmod\army\*.java src\main\java\middleearth\lotr\warmod\faction\*.java src\test\java\middleearth\lotr\warmod\army\ArmyCoreTest.java
-java -cp build\army-core-test-classes middleearth.lotr.warmod.army.ArmyCoreTest
+java -cp build\army-core-test-classes galacticwars.clonewars.army.ArmyCoreTest
 javac -d build\faction-policy-test-classes src\main\java\middleearth\lotr\warmod\army\HiringDecision.java src\main\java\middleearth\lotr\warmod\army\HiringPolicy.java src\main\java\middleearth\lotr\warmod\faction\*.java src\test\java\middleearth\lotr\warmod\faction\FactionHiringPolicyTest.java
-java -cp build\faction-policy-test-classes middleearth.lotr.warmod.faction.FactionHiringPolicyTest
+java -cp build\faction-policy-test-classes galacticwars.clonewars.faction.FactionHiringPolicyTest
 ```
 
 Expected: both harnesses print their `passed` messages.

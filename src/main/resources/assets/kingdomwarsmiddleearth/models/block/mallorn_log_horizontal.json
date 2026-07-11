@@ -1,7 +1,0 @@
-{
-  "parent": "minecraft:block/cube_column_horizontal",
-  "textures": {
-    "end": "kingdomwarsmiddleearth:block/mallorn_log_top",
-    "side": "kingdomwarsmiddleearth:block/mallorn_log"
-  }
-}

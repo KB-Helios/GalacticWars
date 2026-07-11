@@ -1,0 +1,20 @@
+{
+  "id": "galacticwars:mandalorian",
+  "display_name": "Mandalorian",
+  "selection_order": 1,
+  "hire_cost": 20,
+  "minimum_hiring_alignment": 8,
+  "max_owned_recruits": 10,
+  "allies": [
+    "galacticwars:republic"
+  ],
+  "enemies": [
+    "galacticwars:separatist"
+  ],
+  "pledge": {
+    "token_item": "galacticwars:mandalorian_identity_chip",
+    "direct_delta": 10,
+    "ally_delta": 2,
+    "enemy_delta": -5
+  }
+}

@@ -71,7 +71,7 @@ Run:
 
 ```powershell
 javac -d build\engagement-test-classes src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorDecision.java src\main\java\middleearth\lotr\warmod\army\ArmyBehaviorIntent.java src\main\java\middleearth\lotr\warmod\army\ArmyPosition.java src\main\java\middleearth\lotr\warmod\army\ArmyTargetCandidate.java src\main\java\middleearth\lotr\warmod\army\ArmyTargetSelection.java src\main\java\middleearth\lotr\warmod\army\ArmyTargetSelector.java src\main\java\middleearth\lotr\warmod\army\ArmyEngagementStance.java src\main\java\middleearth\lotr\warmod\army\ArmyEngagementDecision.java src\main\java\middleearth\lotr\warmod\army\ArmyEngagementPlanner.java src\main\java\middleearth\lotr\warmod\faction\FactionId.java src\main\java\middleearth\lotr\warmod\faction\FactionRelation.java src\main\java\middleearth\lotr\warmod\faction\FactionDefinition.java src\main\java\middleearth\lotr\warmod\faction\FactionCatalog.java src\test\java\middleearth\lotr\warmod\army\ArmyEngagementPlannerTest.java
-java -cp build\engagement-test-classes middleearth.lotr.warmod.army.ArmyEngagementPlannerTest
+java -cp build\engagement-test-classes galacticwars.clonewars.army.ArmyEngagementPlannerTest
 ```
 
 Expected: prints `ArmyEngagementPlannerTest passed`.

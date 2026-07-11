@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column_horizontal",
+  "textures": {
+    "end": "galacticwars:block/nightsister_weave_log_top",
+    "side": "galacticwars:block/nightsister_weave_log"
+  }
+}

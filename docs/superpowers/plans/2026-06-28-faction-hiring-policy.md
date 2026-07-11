@@ -18,9 +18,9 @@
 - Create: `src/main/java/middleearth/lotr/warmod/faction/FactionCatalog.java`
 - Create: `src/main/java/middleearth/lotr/warmod/army/HiringDecision.java`
 - Create: `src/main/java/middleearth/lotr/warmod/army/HiringPolicy.java`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/factions/gondor.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/factions/rohan.json`
-- Create: `src/main/resources/data/kingdomwarsmiddleearth/kingdomwars/factions/mordor.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/factions/republic.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/factions/mandalorian.json`
+- Create: `src/main/resources/data/galacticwars/kingdomwars/factions/separatist.json`
 
 ### Task 1: Red Tests
 
@@ -29,7 +29,7 @@
 Create `FactionHiringPolicyTest` with a `main` method that checks:
 
 - `FactionDefinition` stores hire cost, minimum alignment, max recruits, allies, and enemies.
-- `FactionCatalog.relation(a, b)` returns `SELF`, `ALLY`, `ENEMY`, or `NEUTRAL`.
+- `FactionCatalog.relation(a, b)` returns `SAME`, `ALLY`, `ENEMY`, or `NEUTRAL`.
 - `HiringPolicy.canHire` accepts a player with enough alignment, enough coins, and room under the recruit cap.
 - `HiringPolicy.canHire` rejects low alignment, low coins, and max-recruit cases with stable reason codes.
 
@@ -47,7 +47,7 @@ Expected: compile fails because `FactionDefinition`, `FactionCatalog`, `FactionR
 
 - [ ] **Step 1: Add relation enum**
 
-Create `FactionRelation` with `SELF`, `ALLY`, `NEUTRAL`, and `ENEMY`.
+Create `FactionRelation` with `SAME`, `ALLY`, `NEUTRAL`, and `ENEMY`.
 
 - [ ] **Step 2: Add immutable faction definitions**
 
@@ -86,17 +86,17 @@ Create `HiringPolicy.canHire(FactionAlignment alignment, FactionDefinition facti
 
 ### Task 3: Faction Resources
 
-- [ ] **Step 1: Add Gondor JSON**
+- [ ] **Step 1: Add Republic JSON**
 
-Create `gondor.json` with display name, hire cost `25`, minimum alignment `10`, max recruits `12`, ally `kingdomwarsmiddleearth:rohan`, and enemy `kingdomwarsmiddleearth:mordor`.
+Create `republic.json` with display name, hire cost `25`, minimum alignment `10`, max recruits `12`, ally `galacticwars:mandalorian`, and enemy `galacticwars:separatist`.
 
-- [ ] **Step 2: Add Rohan JSON**
+- [ ] **Step 2: Add Mandalorian JSON**
 
-Create `rohan.json` with display name, hire cost `20`, minimum alignment `8`, max recruits `10`, ally `kingdomwarsmiddleearth:gondor`, and enemy `kingdomwarsmiddleearth:mordor`.
+Create `mandalorian.json` with display name, hire cost `20`, minimum alignment `8`, max recruits `10`, ally `galacticwars:republic`, and enemy `galacticwars:separatist`.
 
-- [ ] **Step 3: Add Mordor JSON**
+- [ ] **Step 3: Add Separatist JSON**
 
-Create `mordor.json` with display name, hire cost `30`, minimum alignment `15`, max recruits `16`, no allies, and enemies `kingdomwarsmiddleearth:gondor` and `kingdomwarsmiddleearth:rohan`.
+Create `separatist.json` with display name, hire cost `30`, minimum alignment `15`, max recruits `16`, no allies, and enemies `galacticwars:republic` and `galacticwars:mandalorian`.
 
 ### Task 4: Verification
 
@@ -115,7 +115,7 @@ Expected: compile succeeds.
 Run:
 
 ```powershell
-java -cp build\faction-policy-test-classes middleearth.lotr.warmod.faction.FactionHiringPolicyTest
+java -cp build\faction-policy-test-classes galacticwars.clonewars.faction.FactionHiringPolicyTest
 ```
 
 Expected: prints `FactionHiringPolicyTest passed`.
@@ -125,17 +125,17 @@ Expected: prints `FactionHiringPolicyTest passed`.
 Run:
 
 ```powershell
-Get-ChildItem -LiteralPath 'src\main\resources\data\kingdomwarsmiddleearth\kingdomwars\factions' -File -Filter '*.json' | ForEach-Object { $null = Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json -AsHashtable; $_.Name }
+Get-ChildItem -LiteralPath 'src\main\resources\data\galacticwars\kingdomwars\factions' -File -Filter '*.json' | ForEach-Object { $null = Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json -AsHashtable; $_.Name }
 ```
 
-Expected: prints `gondor.json`, `mordor.json`, and `rohan.json` with no parse errors.
+Expected: prints `republic.json`, `separatist.json`, and `mandalorian.json` with no parse errors.
 
 - [ ] **Step 4: Run static scope checks**
 
 Run:
 
 ```powershell
-rtk rg -n "FactionDefinition|FactionCatalog|HiringPolicy|alignment_too_low|recruit_limit_reached|kingdomwarsmiddleearth:gondor|kingdomwarsmiddleearth:rohan|kingdomwarsmiddleearth:mordor" src docs\superpowers\plans\2026-06-28-faction-hiring-policy.md
+rtk rg -n "FactionDefinition|FactionCatalog|HiringPolicy|alignment_too_low|recruit_limit_reached|galacticwars:republic|galacticwars:mandalorian|galacticwars:separatist" src docs\superpowers\plans\2026-06-28-faction-hiring-policy.md
 ```
 
 Expected: matches exist in tests, production classes, resources, and plan.

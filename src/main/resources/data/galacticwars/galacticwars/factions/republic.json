@@ -1,0 +1,20 @@
+{
+  "id": "galacticwars:republic",
+  "display_name": "Republic",
+  "selection_order": 0,
+  "hire_cost": 25,
+  "minimum_hiring_alignment": 10,
+  "max_owned_recruits": 12,
+  "allies": [
+    "galacticwars:mandalorian"
+  ],
+  "enemies": [
+    "galacticwars:separatist"
+  ],
+  "pledge": {
+    "token_item": "galacticwars:republic_identity_chip",
+    "direct_delta": 10,
+    "ally_delta": 2,
+    "enemy_delta": -5
+  }
+}

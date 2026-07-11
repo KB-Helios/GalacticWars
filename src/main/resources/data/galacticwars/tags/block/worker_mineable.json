@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:stone",
+    "minecraft:coal_ore",
+    "minecraft:iron_ore",
+    "galacticwars:duracrete",
+    "galacticwars:beskar_ore"
+  ]
+}

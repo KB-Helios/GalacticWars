@@ -1,0 +1,21 @@
+{
+  "id": "galacticwars:separatist",
+  "display_name": "Separatist",
+  "selection_order": 2,
+  "hire_cost": 30,
+  "minimum_hiring_alignment": 15,
+  "max_owned_recruits": 16,
+  "allies": [],
+  "enemies": [
+    "galacticwars:republic",
+    "galacticwars:mandalorian",
+    "galacticwars:hutt_cartel",
+    "galacticwars:nightsister"
+  ],
+  "pledge": {
+    "token_item": "galacticwars:separatist_identity_chip",
+    "direct_delta": 10,
+    "ally_delta": 2,
+    "enemy_delta": -5
+  }
+}

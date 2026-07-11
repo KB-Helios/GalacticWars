@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "namespace": "galacticwars",
+  "style": {
+    "blocks_and_items": "Minecraft-readable cinematic pixel art",
+    "entities": "cinematic Clone Wars-inspired original fan art fitted to exact GeckoLib UVs",
+    "copyright_rule": "original generated artwork only; no official or third-party assets",
+    "alpha_rule": "unused UV space and inventory-icon backgrounds must be fully transparent"
+  },
+  "batches": [
+    {
+      "id": "core",
+      "assets": [
+        {"id":"command_center_side","kind":"block","size":"16x16","path":"textures/block/command_center_side.png","opaque":true},
+        {"id":"command_center_top","kind":"block","size":"16x16","path":"textures/block/command_center_top.png","opaque":true},
+        {"id":"command_center_bottom","kind":"block","size":"16x16","path":"textures/block/command_center_bottom.png","opaque":true},
+        {"id":"duracrete","kind":"block","size":"16x16","path":"textures/block/duracrete.png","opaque":true},
+        {"id":"beskar_ore","kind":"block","size":"16x16","path":"textures/block/beskar_ore.png","opaque":true,"source_hint":"rework the project-owned beskar ore texture"},
+        {"id":"raw_beskar","kind":"item","size":"16x16","path":"textures/item/raw_beskar.png","transparent":true,"source_hint":"rework raw beskar"},
+        {"id":"beskar_ingot","kind":"item","size":"16x16","path":"textures/item/beskar_ingot.png","transparent":true,"source_hint":"rework beskar ingot"},
+        {"id":"credit_chip","kind":"item","size":"16x16","path":"textures/item/credit_chip.png","transparent":true},
+        {"id":"energy_cell","kind":"item","size":"16x16","path":"textures/item/energy_cell.png","transparent":true},
+        {"id":"galactic_wars_tab","kind":"gui","size":"64x64","path":"textures/gui/galactic_wars_tab.png","transparent":true}
+      ]
+    },
+    {
+      "id": "factions",
+      "expand": {
+        "factions": ["republic","separatist","mandalorian","hutt_cartel","nightsister"],
+        "per_faction": [
+          {"suffix":"identity_chip","kind":"item","size":"16x16","path_template":"textures/item/{faction}_identity_chip.png","transparent":true},
+          {"suffix":"armor","kind":"armor_layers","sizes":["64x32","64x64","64x32"],"path_templates":["textures/entity/equipment/humanoid/{faction}.png","textures/entity/equipment/humanoid_baby/{faction}.png","textures/entity/equipment/humanoid_leggings/{faction}.png"],"transparent":true},
+          {"suffix":"helmet","kind":"item","size":"16x16","path_template":"textures/item/{faction}_helmet.png","transparent":true},
+          {"suffix":"chestplate","kind":"item","size":"16x16","path_template":"textures/item/{faction}_chestplate.png","transparent":true},
+          {"suffix":"leggings","kind":"item","size":"16x16","path_template":"textures/item/{faction}_leggings.png","transparent":true},
+          {"suffix":"boots","kind":"item","size":"16x16","path_template":"textures/item/{faction}_boots.png","transparent":true}
+        ]
+      }
+    },
+    {
+      "id": "units",
+      "kind": "geckolib_entity",
+      "size": "64x64",
+      "transparent": true,
+      "uv_template": "existing 64x64 humanoid GeckoLib template; droids receive compatible dedicated geometry",
+      "ids": ["clone_trooper","arc_trooper","jedi_knight","b1_battle_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute"],
+      "path_template": "textures/entity/{id}.png"
+    },
+    {
+      "id": "combat_and_tools",
+      "kind": "item",
+      "size": "16x16",
+      "transparent": true,
+      "ids": ["vibroblade","plasma_cutter","power_drill","sonic_excavator","hydrospanner","dc15_blaster","e5_blaster","westar_blaster","scatter_blaster","nightsister_bow","blue_lightsaber","green_lightsaber","red_lightsaber","beskar_vibroblade","blaster_bolt","force_light","force_dark"],
+      "path_template": "textures/item/{id}.png"
+    },
+    {
+      "id": "planets",
+      "assets": [
+        {"id":"tatooine","kind":"planet_icon","size":"128x128","path":"textures/gui/planet/tatooine.png","transparent":true},
+        {"id":"geonosis","kind":"planet_icon","size":"128x128","path":"textures/gui/planet/geonosis.png","transparent":true},
+        {"id":"kamino","kind":"planet_icon","size":"128x128","path":"textures/gui/planet/kamino.png","transparent":true},
+        {"id":"coruscant","kind":"planet_icon","size":"128x128","path":"textures/gui/planet/coruscant.png","transparent":true},
+        {"id":"tatooine_sand","kind":"block","size":"16x16","path":"textures/block/tatooine_sand.png","opaque":true},
+        {"id":"geonosis_rock","kind":"block","size":"16x16","path":"textures/block/geonosis_rock.png","opaque":true},
+        {"id":"kamino_panel","kind":"block","size":"16x16","path":"textures/block/kamino_panel.png","opaque":true},
+        {"id":"coruscant_panel","kind":"block","size":"16x16","path":"textures/block/coruscant_panel.png","opaque":true},
+        {"id":"navigation_console","kind":"gui","size":"256x256","path":"textures/gui/navigation_console.png","transparent":true}
+      ]
+    },
+    {
+      "id": "vehicles",
+      "kind": "geckolib_entity",
+      "size": "256x256",
+      "transparent": true,
+      "ids": ["barc_speeder","at_rt","stap","aat","laat_gunship"],
+      "path_template": "textures/entity/vehicle/{id}.png"
+    },
+    {
+      "id": "effects_and_gui",
+      "assets": [
+        {"id":"blaster_bolt","kind":"particle","size":"16x16","path":"textures/particle/blaster_bolt.png","transparent":true},
+        {"id":"force_wave","kind":"particle","size":"16x16","path":"textures/particle/force_wave.png","transparent":true},
+        {"id":"quest_panel","kind":"gui","size":"256x256","path":"textures/gui/quest_panel.png","transparent":true},
+        {"id":"conquest_panel","kind":"gui","size":"256x256","path":"textures/gui/conquest_panel.png","transparent":true},
+        {"id":"vehicle_hud","kind":"gui","size":"256x128","path":"textures/gui/vehicle_hud.png","transparent":true},
+        {"id":"force_meter","kind":"gui","size":"128x16","path":"textures/gui/force_meter.png","transparent":true}
+      ]
+    }
+  ]
+}

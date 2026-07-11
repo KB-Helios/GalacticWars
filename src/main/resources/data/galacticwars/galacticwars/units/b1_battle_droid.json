@@ -1,0 +1,23 @@
+{
+  "id": "galacticwars:b1_battle_droid",
+  "display_name": "B1 Battle Droid",
+  "faction": "galacticwars:separatist",
+  "entity_type": "galacticwars:b1_battle_droid",
+  "role": "archer",
+  "hire_cost": 20,
+  "attributes": {
+    "max_health": 22,
+    "attack_damage": 5,
+    "movement_speed": 0.27,
+    "follow_range": 24.0,
+    "armor": 1.0
+  },
+  "equipment": {
+    "main_hand": "galacticwars:e5_blaster",
+    "head": "galacticwars:separatist_alloy_helmet",
+    "chest": "galacticwars:separatist_alloy_chestplate",
+    "legs": "galacticwars:separatist_alloy_leggings",
+    "feet": "galacticwars:separatist_alloy_boots"
+  },
+  "default_formation": "column"
+}

@@ -1,0 +1,171 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.galacticwars.vehicle.stap",
+        "texture_width": 256,
+        "texture_height": 256,
+        "visible_bounds_width": 3,
+        "visible_bounds_height": 4,
+        "visible_bounds_offset": [
+          0,
+          1,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "root",
+          "pivot": [
+            0,
+            8,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -4,
+                4,
+                -16
+              ],
+              "size": [
+                8,
+                3,
+                32
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            },
+            {
+              "origin": [
+                -3,
+                5,
+                -26
+              ],
+              "size": [
+                6,
+                4,
+                10
+              ],
+              "uv": [
+                82,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "engine",
+          "parent": "root",
+          "pivot": [
+            0,
+            7,
+            4
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -4,
+                4,
+                -2
+              ],
+              "size": [
+                8,
+                8,
+                12
+              ],
+              "uv": [
+                116,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "steering_column",
+          "parent": "root",
+          "pivot": [
+            0,
+            7,
+            -8
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -1.5,
+                7,
+                -9.5
+              ],
+              "size": [
+                3,
+                20,
+                3
+              ],
+              "uv": [
+                158,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "controlbar",
+          "parent": "steering_column",
+          "pivot": [
+            0,
+            26,
+            -8
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -9,
+                25,
+                -9
+              ],
+              "size": [
+                18,
+                2,
+                2
+              ],
+              "uv": [
+                172,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "footrest",
+          "parent": "root",
+          "pivot": [
+            0,
+            8,
+            2
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -7,
+                7,
+                0
+              ],
+              "size": [
+                14,
+                2,
+                4
+              ],
+              "uv": [
+                0,
+                38
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

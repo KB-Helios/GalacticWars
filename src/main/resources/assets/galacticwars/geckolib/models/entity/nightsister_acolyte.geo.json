@@ -1,0 +1,77 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.galacticwars.nightsister_acolyte",
+        "texture_width": 64,
+        "texture_height": 64,
+        "visible_bounds_width": 2,
+        "visible_bounds_height": 3.2,
+        "visible_bounds_offset": [0, 1.55, 0]
+      },
+      "bones": [
+        {
+          "name": "head",
+          "pivot": [0, 25, 0],
+          "cubes": [
+            {"origin": [-3.75, 25, -3.75], "size": [7.5, 8, 7.5], "uv": [0, 0]},
+            {"origin": [-3.75, 25, -3.75], "size": [7.5, 8, 7.5], "uv": [32, 0], "inflate": 0.35},
+            {"origin": [-4, 17, 3], "size": [8, 15, 1], "uv": [32, 0]}
+          ]
+        },
+        {
+          "name": "body",
+          "pivot": [0, 25, 0],
+          "cubes": [
+            {"origin": [-3.75, 12, -2], "size": [7.5, 13, 4], "uv": [16, 16]},
+            {"origin": [-3.75, 12, -2], "size": [7.5, 13, 4], "uv": [16, 32], "inflate": 0.2},
+            {"origin": [-4.25, 11.5, 1.75], "size": [8.5, 13, 1], "uv": [16, 32]}
+          ]
+        },
+        {
+          "name": "right_arm",
+          "pivot": [-5, 22, 0],
+          "cubes": [
+            {"origin": [-7.5, 12, -1.75], "size": [3.5, 13, 3.5], "uv": [40, 16]},
+            {"origin": [-7.5, 12, -1.75], "size": [3.5, 13, 3.5], "uv": [40, 32], "inflate": 0.2}
+          ]
+        },
+        {
+          "name": "left_arm",
+          "pivot": [5, 22, 0],
+          "cubes": [
+            {"origin": [4, 12, -1.75], "size": [3.5, 13, 3.5], "uv": [40, 16], "mirror": true},
+            {"origin": [4, 12, -1.75], "size": [3.5, 13, 3.5], "uv": [40, 32], "inflate": 0.2, "mirror": true}
+          ]
+        },
+        {
+          "name": "RightHandItem",
+          "parent": "right_arm",
+          "pivot": [-6, 12, 0]
+        },
+        {
+          "name": "LeftHandItem",
+          "parent": "left_arm",
+          "pivot": [6, 12, 0]
+        },
+        {
+          "name": "right_leg",
+          "pivot": [-1.9, 12, 0],
+          "cubes": [
+            {"origin": [-4, 0, -2], "size": [4, 12, 4], "uv": [0, 16]},
+            {"origin": [-4, 0, -2], "size": [4, 12, 4], "uv": [0, 32], "inflate": 0.25}
+          ]
+        },
+        {
+          "name": "left_leg",
+          "pivot": [1.9, 12, 0],
+          "cubes": [
+            {"origin": [0, 0, -2], "size": [4, 12, 4], "uv": [16, 48], "mirror": true},
+            {"origin": [0, 0, -2], "size": [4, 12, 4], "uv": [0, 48], "inflate": 0.25, "mirror": true}
+          ]
+        }
+      ]
+    }
+  ]
+}

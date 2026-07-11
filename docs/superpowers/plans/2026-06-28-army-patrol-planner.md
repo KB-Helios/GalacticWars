@@ -91,7 +91,7 @@ Run:
 
 ```powershell
 javac -d build\patrol-test-classes src\main\java\middleearth\lotr\warmod\army\ArmyPosition.java src\main\java\middleearth\lotr\warmod\army\ArmyPatrolMode.java src\main\java\middleearth\lotr\warmod\army\ArmyPatrolRoute.java src\main\java\middleearth\lotr\warmod\army\ArmyPatrolState.java src\main\java\middleearth\lotr\warmod\army\ArmyPatrolDecision.java src\main\java\middleearth\lotr\warmod\army\ArmyPatrolPlanner.java src\test\java\middleearth\lotr\warmod\army\ArmyPatrolPlannerTest.java
-java -cp build\patrol-test-classes middleearth.lotr.warmod.army.ArmyPatrolPlannerTest
+java -cp build\patrol-test-classes galacticwars.clonewars.army.ArmyPatrolPlannerTest
 ```
 
 Expected: prints `ArmyPatrolPlannerTest passed`.
