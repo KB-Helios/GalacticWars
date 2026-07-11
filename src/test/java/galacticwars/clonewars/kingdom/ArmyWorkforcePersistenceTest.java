@@ -132,6 +132,7 @@ public final class ArmyWorkforcePersistenceTest {
         WorksiteRecord frontier = configured.assignedWorksite(worker).orElseThrow();
         assertEquals(5, frontier.x(), "frontier x");
         assertEquals(12, frontier.radius(), "frontier radius");
+        assertEquals(25, frontier.configuration().bounds().width(), "frontier bounds follow radius");
     }
 
     private static void namedSquadLogisticsAndPatrolMetadataPersist() {

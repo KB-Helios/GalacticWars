@@ -618,8 +618,8 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             throw new IllegalStateException("owned recruit cannot join a natural faction outpost");
         }
         this.factionOutpostId = Objects.requireNonNull(outpostId, "outpostId");
-        this.setRecruitDuty(RecruitDuty.SOLDIER);
         this.serviceBranch = Objects.requireNonNull(branch, "branch");
+        this.setRecruitDuty(branch == NpcServiceBranch.MILITARY ? RecruitDuty.SOLDIER : RecruitDuty.WORKER);
         this.setRecruitCommand(RecruitmentAction.HOLD_POSITION);
         if (branch == NpcServiceBranch.CIVILIAN) {
             assignNaturalCivilianProfession();

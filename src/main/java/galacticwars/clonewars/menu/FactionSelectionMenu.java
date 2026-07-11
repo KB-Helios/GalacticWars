@@ -52,7 +52,7 @@ public final class FactionSelectionMenu extends AbstractContainerMenu {
     ) {
         super(ModMenuTypes.FACTION_SELECTION.get(), containerId);
         this.commandCenterPos = commandCenterPos.immutable();
-        this.factionIds = factionIds.isEmpty() ? FACTION_IDS : List.copyOf(factionIds);
+        this.factionIds = List.copyOf(factionIds);
     }
 
     @Override

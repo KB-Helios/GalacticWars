@@ -11,7 +11,14 @@ public enum NpcServiceBranch {
     }
 
     public static NpcServiceBranch byId(String id) {
-        return valueOf(id.trim().toUpperCase(Locale.ROOT));
+        if (id == null || id.isBlank()) {
+            return CIVILIAN;
+        }
+        try {
+            return valueOf(id.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return CIVILIAN;
+        }
     }
 
     public static NpcServiceBranch migrate(RecruitDuty duty) {

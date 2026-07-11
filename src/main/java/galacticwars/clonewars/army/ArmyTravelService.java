@@ -4,6 +4,7 @@ import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.kingdom.KingdomPermission;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,7 +34,11 @@ public final class ArmyTravelService {
                 ? null
                 : data.armyGroupsForKingdom(kingdom.id()).stream()
                         .filter(candidate -> candidate.ownerId().equals(owner.getUUID()))
-                        .filter(candidate -> eligible(owner, candidate)).findFirst().orElse(null);
+                        .filter(candidate -> eligible(owner, candidate))
+                        .min(Comparator
+                                .comparingDouble((ArmyGroupRecord candidate) -> distanceToOwnerSquared(owner, candidate))
+                                .thenComparing(candidate -> candidate.id().toString()))
+                        .orElse(null);
         if (group == null || !eligible(owner, group)) {
             return TravelPlan.noop(data);
         }
@@ -91,6 +96,11 @@ public final class ArmyTravelService {
                 && (order == ArmyCommandType.FOLLOW_OWNER || order == ArmyCommandType.PROTECT_OWNER)
                 && anchor.dimensionId().equals(owner.level().dimension().identifier().toString())
                 && owner.distanceToSqr(anchor.x(), anchor.y(), anchor.z()) <= TRANSFER_RADIUS_SQUARED;
+    }
+
+    private static double distanceToOwnerSquared(ServerPlayer owner, ArmyGroupRecord group) {
+        ArmyLocation anchor = group.simulation().anchor();
+        return owner.distanceToSqr(anchor.x(), anchor.y(), anchor.z());
     }
 
     private static Set<UUID> expectedMembers(ArmyGroupRecord group) {

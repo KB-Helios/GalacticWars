@@ -207,8 +207,7 @@ public record SettlementRecord(
         }
         if (commanderId.filter(recruitId::equals).isPresent()) {
             Optional<UUID> promotedPrimary = additionalCommanderIds.stream().findFirst();
-            List<UUID> remaining = promotedPrimary.isEmpty() ? List.of() : additionalCommanderIds.subList(
-                    1, additionalCommanderIds.size());
+            List<UUID> remaining = additionalCommanderIds.stream().skip(1).toList();
             return copy(recruitIds, promotedPrimary, commanderPolicy, recruitmentCampaigns, revision + 1, remaining);
         }
         return copy(recruitIds, commanderId, commanderPolicy, recruitmentCampaigns, revision + 1,

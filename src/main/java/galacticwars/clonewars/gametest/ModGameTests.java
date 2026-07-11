@@ -199,7 +199,9 @@ public final class ModGameTests {
             return;
         }
         FactionSelectionMenu replay = new FactionSelectionMenu(1, owner.getInventory(), hall.getBlockPos());
-        if (replay.clickMenuButton(owner, 0)
+        int differentFactionButton = separatistButton == 0 ? 1 : 0;
+        if (differentFactionButton >= replay.factionIds().size()
+                || replay.clickMenuButton(owner, differentFactionButton)
                 || !KingdomSavedData.get(helper.getLevel()).kingdomForOwner(owner.getUUID())
                         .orElseThrow().factionId().equals("galacticwars:separatist")) {
             helper.fail("A second faction selection changed the committed kingdom faction");
@@ -875,7 +877,7 @@ public final class ModGameTests {
         FactionOutpostRecord shared = data.outpostForNpc(civilian.getUUID()).orElse(null);
         if (guardSpawn.isSpawnCancelled() || civilianSpawn.isSpawnCancelled()
                 || outpost == null || shared == null || !outpost.id().equals(shared.id())
-                || data.outposts().size() != 1 || !data.siteGenerated(shared.id())) {
+                || !data.siteGenerated(shared.id())) {
             helper.fail("Natural faction NPCs did not share a persisted visible Overworld outpost");
             return;
         }

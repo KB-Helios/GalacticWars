@@ -127,7 +127,7 @@ public final class CommandCenterBlock extends BaseEntityBlock {
         }
         if (player.isShiftKeyDown()) {
             if (!hall.canUse(player, KingdomPermission.COMMAND_ARMY)) {
-                player.sendSystemMessage(Component.translatable("message.galacticwars.command_center.not_owner"));
+                player.sendSystemMessage(Component.translatable("message.galacticwars.command_center.command_denied"));
                 return InteractionResult.FAIL;
             }
             if (!ProgressionSavedData.get(serverLevel).state(player.getUUID()).factionId().isEmpty()) {

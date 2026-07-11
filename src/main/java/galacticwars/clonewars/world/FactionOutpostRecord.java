@@ -62,8 +62,8 @@ public record FactionOutpostRecord(
     public FactionOutpostRecord withoutNpc(UUID npcId, long gameTime) {
         if (!contains(npcId)) return this;
         return new FactionOutpostRecord(id, factionId, dimensionId, x, y, z, radius,
-                militaryNpcIds.stream().filter(id -> !id.equals(npcId)).toList(),
-                civilianNpcIds.stream().filter(id -> !id.equals(npcId)).toList(), gameTime);
+                militaryNpcIds.stream().filter(existingNpcId -> !existingNpcId.equals(npcId)).toList(),
+                civilianNpcIds.stream().filter(existingNpcId -> !existingNpcId.equals(npcId)).toList(), gameTime);
     }
 
     private static String required(String value, String label) {

@@ -12,6 +12,9 @@ public final class NpcServiceBranchTest {
         assertEquals(NpcServiceBranch.MILITARY, NpcServiceBranch.migrate(RecruitDuty.COMMANDER),
                 "commander migration");
         assertEquals(NpcServiceBranch.CIVILIAN, NpcServiceBranch.byId("civilian"), "branch id");
+        assertEquals(NpcServiceBranch.CIVILIAN, NpcServiceBranch.byId(null), "null branch fallback");
+        assertEquals(NpcServiceBranch.CIVILIAN, NpcServiceBranch.byId("legacy-invalid"),
+                "malformed branch fallback");
         System.out.println("NpcServiceBranchTest passed");
     }
 

@@ -1256,6 +1256,7 @@ public final class KingdomSavedData extends SavedData {
     public boolean setEmbargo(UUID actorId, UUID otherKingdomId, boolean embargo) {
         KingdomRecord ownKingdom = kingdomForPlayer(actorId).orElse(null);
         if (ownKingdom == null || !ownKingdom.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)
+                || ownKingdom.id().equals(otherKingdomId)
                 || !kingdomsById.containsKey(otherKingdomId)) {
             return false;
         }

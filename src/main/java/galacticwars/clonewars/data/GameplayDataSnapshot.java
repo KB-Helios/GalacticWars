@@ -106,6 +106,9 @@ public record GameplayDataSnapshot(
     }
 
     public Optional<OverworldFactionSpawnProfile> overworldSpawnProfileForEntity(String entityTypeId) {
+        if (entityTypeId == null || entityTypeId.isBlank()) {
+            return Optional.empty();
+        }
         return overworldSpawnProfiles.values().stream().filter(profile -> profile.supports(entityTypeId)).findFirst();
     }
 

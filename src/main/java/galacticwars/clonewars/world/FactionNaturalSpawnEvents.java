@@ -22,7 +22,7 @@ public final class FactionNaturalSpawnEvents {
     @SubscribeEvent
     public static void onFinalizeSpawn(FinalizeSpawnEvent event) {
         if (!(event.getEntity() instanceof GalacticRecruitEntity recruit)
-                || event.getLevel().getLevel().dimension() != Level.OVERWORLD
+                || !event.getLevel().getLevel().dimension().equals(Level.OVERWORLD)
                 || event.getSpawnType() != EntitySpawnReason.NATURAL
                         && event.getSpawnType() != EntitySpawnReason.CHUNK_GENERATION) {
             return;

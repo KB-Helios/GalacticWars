@@ -8,6 +8,7 @@ import java.util.UUID;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.workforce.WorkerProfessionCatalog;
 import galacticwars.clonewars.workforce.WorkAreaConfiguration;
+import galacticwars.clonewars.workforce.WorkAreaBounds;
 
 public record WorksiteRecord(
         UUID id,
@@ -111,7 +112,7 @@ public record WorksiteRecord(
     public WorksiteRecord withLocationAndRadius(String dimensionId, int x, int y, int z, int radius) {
         return new WorksiteRecord(id, type, dimensionId, x, y, z, radius, capacity,
                 acceptedProfessions, sourceProjectId, assignmentIds, storageEndpoints,
-                new WorkAreaConfiguration(configuration.bounds(), configuration.kingdomAccess(),
+                new WorkAreaConfiguration(WorkAreaBounds.radius(radius), configuration.kingdomAccess(),
                         configuration.priority(), configuration.overlayVisible(), configuration.itemFilters(),
                         configuration.courierRoute()));
     }
