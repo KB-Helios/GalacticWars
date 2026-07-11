@@ -5,9 +5,6 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class GalacticProgressionCoordinator {
-    private static final Set<String> FACTIONS = Set.of(
-            "galacticwars:republic", "galacticwars:separatist", "galacticwars:mandalorian",
-            "galacticwars:hutt_cartel", "galacticwars:nightsister");
     private static final Set<String> PLANETS = Set.of("tatooine", "geonosis", "kamino", "coruscant");
 
     private GalacticProgressionCoordinator() {
@@ -24,7 +21,7 @@ public final class GalacticProgressionCoordinator {
         }
         String faction = state.factionId();
         if (event.type() == ProgressionEventType.FACTION_PLEDGED) {
-            if (!FACTIONS.contains(event.subjectId())) {
+            if (!LaunchContentCatalog.FACTIONS.contains(event.subjectId())) {
                 return ProgressionDecision.rejected("unknown_faction", state);
             }
             if (!faction.isEmpty()) {
@@ -80,7 +77,33 @@ public final class GalacticProgressionCoordinator {
                 return ProgressionDecision.rejected("quest_prerequisite_missing", state);
             }
         }
+        for (String objective : LaunchContentCatalog.questObjectives(questId)) {
+            if (!objectiveComplete(state, objective)) {
+                return ProgressionDecision.rejected("quest_objective_missing:" + objective, state);
+            }
+        }
         return null;
+    }
+
+    private static boolean objectiveComplete(ProgressionState state, String objective) {
+        return switch (objective) {
+            case "faction_pledged" -> !state.factionId().isEmpty();
+            case "command_center", "forward_base", "supply_depot" ->
+                    state.hasSubjectPath(ProgressionEventType.BUILDING_COMPLETED, objective);
+            case "tatooine", "geonosis", "kamino", "coruscant" ->
+                    state.hasSubjectPath(ProgressionEventType.PLANET_VISITED, objective);
+            case "clone_trooper", "b1_battle_droid", "mandalorian_warrior", "hutt_enforcer",
+                    "nightsister_acolyte", "bounty_hunter", "smuggler" ->
+                    state.hasSubjectPath(ProgressionEventType.RECRUIT_HIRED, objective);
+            case "delivery_completed" -> state.total(ProgressionEventType.DELIVERY_COMPLETED) > 0;
+            case "vehicle_acquired" -> state.total(ProgressionEventType.VEHICLE_ACQUIRED) > 0;
+            case "trade_completed" -> state.total(ProgressionEventType.TRADE_COMPLETED) > 0;
+            case "region_captured" -> state.total(ProgressionEventType.REGION_CAPTURED) > 0;
+            case "force_ability_unlocked" -> state.total(ProgressionEventType.FORCE_ABILITY_UNLOCKED) > 0;
+            case "beskar_ingot" -> state.hasSubjectPath(
+                    ProgressionEventType.TRADE_COMPLETED, "mandalorian_armorer");
+            default -> false;
+        };
     }
 
     private static Set<String> unlocks(ProgressionState state, ProgressionEvent event) {

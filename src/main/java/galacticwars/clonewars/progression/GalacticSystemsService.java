@@ -7,12 +7,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class GalacticSystemsService {
-    private static final Map<String, TradeDefinition> TRADES = Map.of(
-            "republic_quartermaster", new TradeDefinition("republic", 12, "energy_cell", "faction_intro"),
-            "separatist_foundry", new TradeDefinition("separatist", 12, "energy_cell", "faction_intro"),
-            "mandalorian_armorer", new TradeDefinition("mandalorian", 40, "beskar_ingot", "advanced_trading"),
-            "hutt_broker", new TradeDefinition("hutt_cartel", 28, "scatter_blaster", "advanced_trading"),
-            "nightsister_matron", new TradeDefinition("nightsister", 35, "nightsister_bow", "force_path"));
     private static final Set<String> REGIONS = Set.of(
             "tatooine_spaceport", "geonosis_foundry", "kamino_platform", "coruscant_district");
     private static final Map<String, String> VEHICLE_REQUIREMENTS = Map.of(
@@ -81,7 +75,7 @@ public final class GalacticSystemsService {
             UUID eventId,
             String tradeId
     ) {
-        TradeDefinition trade = TRADES.get(tradeId);
+        LaunchContentCatalog.TradeDefinition trade = LaunchContentCatalog.TRADES.get(tradeId);
         if (trade == null) {
             return SystemDecision.rejected("unknown_trade", state);
         }
@@ -108,7 +102,7 @@ public final class GalacticSystemsService {
             return SystemDecision.rejected(completion.reason(), state);
         }
         return new SystemDecision(true, completion.changed(), completion.reason(), completion.state(),
-                completion.changed() ? trade.itemId() : "");
+                completion.changed() ? trade.itemId() : "", completion.changed() ? trade.itemCount() : 0);
     }
 
     public static SystemDecision captureRegion(
@@ -119,7 +113,12 @@ public final class GalacticSystemsService {
         if (!REGIONS.contains(regionId)) {
             return SystemDecision.rejected("unknown_region", state);
         }
-        if (!state.unlocks().contains("conquest")) {
+        String factionPath = state.factionId().contains(":")
+                ? state.factionId().substring(state.factionId().indexOf(':') + 1)
+                : state.factionId();
+        boolean chapterTwoComplete = state.hasSubject(
+                ProgressionEventType.QUEST_ADVANCED, factionPath + "_chapter_2");
+        if (!state.unlocks().contains("conquest") && !chapterTwoComplete) {
             return SystemDecision.rejected("conquest_locked", state);
         }
         return apply(state, new ProgressionEvent(eventId, state.playerId(),
@@ -129,7 +128,7 @@ public final class GalacticSystemsService {
     private static SystemDecision apply(ProgressionState state, ProgressionEvent event) {
         ProgressionDecision decision = GalacticProgressionCoordinator.apply(state, event);
         return new SystemDecision(decision.accepted(), decision.changed(), decision.reason(), decision.state(),
-                decision.changed() ? event.subjectId() : "");
+                decision.changed() ? event.subjectId() : "", decision.changed() ? 1 : 0);
     }
 
     private static UUID derived(UUID id, String suffix) {
@@ -146,23 +145,24 @@ public final class GalacticSystemsService {
             boolean changed,
             String reason,
             ProgressionState state,
-            String resultId
+            String resultId,
+            int resultCount
     ) {
         public SystemDecision {
             Objects.requireNonNull(reason, "reason");
             Objects.requireNonNull(state, "state");
             Objects.requireNonNull(resultId, "resultId");
+            if (resultCount < 0 || (resultId.isEmpty() != (resultCount == 0))) {
+                throw new IllegalArgumentException("System result id and count must describe the same reward");
+            }
         }
 
         static SystemDecision rejected(String reason, ProgressionState state) {
-            return new SystemDecision(false, false, reason, state, "");
+            return new SystemDecision(false, false, reason, state, "", 0);
         }
 
         static SystemDecision duplicate(ProgressionState state) {
-            return new SystemDecision(true, false, "duplicate_event", state, "");
+            return new SystemDecision(true, false, "duplicate_event", state, "", 0);
         }
-    }
-
-    private record TradeDefinition(String factionId, int price, String itemId, String requiredUnlock) {
     }
 }

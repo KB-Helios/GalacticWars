@@ -11,9 +11,23 @@ public final class CommandCenterIntegrationTest {
     public static void main(String[] args) throws IOException {
         hallIsRegisteredAsPhysicalOwnedStorage();
         hallFoundsAuthoritativeKingdomState();
+        hallRequiresExplicitFactionSelection();
         hallAssetsAreComplete();
         hallOpensPlanetNavigationAfterPledge();
         System.out.println("CommandCenterIntegrationTest passed");
+    }
+
+    private static void hallRequiresExplicitFactionSelection() throws IOException {
+        String block = read("src/main/java/galacticwars/clonewars/settlement/CommandCenterBlock.java");
+        String menu = read("src/main/java/galacticwars/clonewars/menu/FactionSelectionMenu.java");
+        String menus = read("src/main/java/galacticwars/clonewars/registry/ModMenuTypes.java");
+        String client = read("src/main/java/galacticwars/clonewars/GalacticWarsClient.java");
+        assertContains(block, "FactionSelectionMenuProvider", "placement-time faction picker");
+        assertContains(menu, "ProgressionEventType.FACTION_PLEDGED", "server-authoritative pledge");
+        assertContains(menu, "activateHall", "selected faction kingdom activation");
+        assertContains(menu, "FactionAlignmentSavedData", "selected faction alignment");
+        assertContains(menus, "FACTION_SELECTION", "faction menu registration");
+        assertContains(client, "FactionSelectionScreen", "faction screen registration");
     }
 
     private static void hallOpensPlanetNavigationAfterPledge() throws IOException {
@@ -54,7 +68,7 @@ public final class CommandCenterIntegrationTest {
         String lifecycle = read("src/main/java/galacticwars/clonewars/settlement/CommandCenterLifecycleService.java");
         assertContains(block, "KingdomSavedData.get(serverLevel)", "overworld saved data access");
         assertContains(block, "activateHall", "kingdom founding and relocation");
-        assertContains(block, "changeFaction", "guarded faction selection");
+        assertContains(block, "FactionSelectionMenuProvider", "explicit faction selection");
         assertContains(block, "player.openMenu(hall)", "hall treasury menu");
         assertContains(block, "onExplosionHit", "explosion-resistant owner removal path");
         assertContains(block, "playerWillDestroy", "pre-removal lifecycle transaction");

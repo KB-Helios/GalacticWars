@@ -7,9 +7,11 @@ import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.menu.CommandCenterNavigationMenuProvider;
+import galacticwars.clonewars.menu.FactionSelectionMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
@@ -50,21 +52,32 @@ public final class CommandCenterBlock extends BaseEntityBlock {
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
-        if (!(placer instanceof Player player)
+        if (!(placer instanceof ServerPlayer player)
                 || !(level instanceof ServerLevel serverLevel)
                 || !(level.getBlockEntity(pos) instanceof CommandCenterBlockEntity hall)) {
             return;
         }
-        Optional<KingdomRecord> activated = KingdomSavedData.get(serverLevel).activateHall(
-                player.getUUID(), hall.factionId(), serverLevel.dimension().identifier().toString(), pos);
-        if (activated.isEmpty()) {
-            player.sendSystemMessage(Component.translatable(
-                    "message.galacticwars.command_center.duplicate"));
-            serverLevel.destroyBlock(pos, true, player);
+        if (!hall.claim(player)) {
             return;
         }
-        hall.claim(player);
-        hall.setFaction(activated.orElseThrow().factionId());
+        KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        Optional<KingdomRecord> existing = data.kingdomForOwner(player.getUUID());
+        if (existing.isPresent()) {
+            Optional<KingdomRecord> activated = data.activateHall(
+                    player.getUUID(), existing.orElseThrow().factionId(),
+                    serverLevel.dimension().identifier().toString(), pos);
+            if (activated.isEmpty()) {
+                player.sendSystemMessage(Component.translatable(
+                        "message.galacticwars.command_center.duplicate"));
+                serverLevel.destroyBlock(pos, true, player);
+                return;
+            }
+            hall.setFaction(activated.orElseThrow().factionId());
+        }
+        if (existing.isEmpty()
+                || ProgressionSavedData.get(serverLevel).state(player.getUUID()).factionId().isEmpty()) {
+            player.openMenu(new FactionSelectionMenuProvider(pos));
+        }
     }
 
     @Override
@@ -85,8 +98,16 @@ public final class CommandCenterBlock extends BaseEntityBlock {
         }
 
         KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        Optional<KingdomRecord> existing = data.kingdomForOwner(player.getUUID());
+        if (existing.isEmpty()) {
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.openMenu(new FactionSelectionMenuProvider(pos));
+            }
+            return InteractionResult.SUCCESS;
+        }
         Optional<KingdomRecord> activated = data.activateHall(
-                player.getUUID(), hall.factionId(), serverLevel.dimension().identifier().toString(), pos);
+                player.getUUID(), existing.orElseThrow().factionId(),
+                serverLevel.dimension().identifier().toString(), pos);
         if (activated.isEmpty()) {
             player.sendSystemMessage(Component.translatable(
                     "message.galacticwars.command_center.duplicate"));
@@ -100,16 +121,9 @@ public final class CommandCenterBlock extends BaseEntityBlock {
                 player.openMenu(new CommandCenterNavigationMenuProvider());
                 return InteractionResult.SUCCESS;
             }
-            String previousFaction = hall.factionId();
-            String nextFaction = hall.cycleFaction();
-            if (!data.changeFaction(player.getUUID(), nextFaction)) {
-                hall.setFaction(previousFaction);
-                player.sendSystemMessage(Component.translatable("message.galacticwars.command_center.faction_locked"));
-                return InteractionResult.FAIL;
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.openMenu(new FactionSelectionMenuProvider(pos));
             }
-            player.sendSystemMessage(Component.translatable(
-                    "message.galacticwars.command_center.faction",
-                    Component.literal(nextFaction)));
             return InteractionResult.SUCCESS;
         }
 

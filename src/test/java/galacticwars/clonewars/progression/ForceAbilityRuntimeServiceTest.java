@@ -8,8 +8,18 @@ public final class ForceAbilityRuntimeServiceTest {
         ProgressionState progression = ProgressionState.create(player);
         progression = apply(progression, player, ProgressionEventType.FACTION_PLEDGED,
                 "galacticwars:republic");
+        progression = apply(progression, player, ProgressionEventType.BUILDING_COMPLETED,
+                "command_center");
+        progression = apply(progression, player, ProgressionEventType.RECRUIT_HIRED,
+                "galacticwars:clone_trooper");
         progression = apply(progression, player, ProgressionEventType.QUEST_ADVANCED,
                 "republic_chapter_1");
+        progression = apply(progression, player, ProgressionEventType.DELIVERY_COMPLETED,
+                "starter_delivery");
+        progression = apply(progression, player, ProgressionEventType.BUILDING_COMPLETED,
+                "forward_base");
+        progression = apply(progression, player, ProgressionEventType.PLANET_VISITED,
+                "kamino");
         progression = apply(progression, player, ProgressionEventType.QUEST_ADVANCED,
                 "republic_chapter_2");
         progression = GalacticSystemsService.unlockForceAbility(

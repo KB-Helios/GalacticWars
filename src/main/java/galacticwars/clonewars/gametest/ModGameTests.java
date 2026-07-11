@@ -29,6 +29,7 @@ import galacticwars.clonewars.kingdom.WorkOrderType;
 import galacticwars.clonewars.kingdom.WorksiteRecord;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
 import galacticwars.clonewars.menu.CommandCenterNavigationMenu;
+import galacticwars.clonewars.menu.FactionSelectionMenu;
 import galacticwars.clonewars.progression.ProgressionEvent;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
@@ -119,6 +120,7 @@ public final class ModGameTests {
     private static Map<Identifier, Consumer<GameTestHelper>> createTests() {
         LinkedHashMap<Identifier, Consumer<GameTestHelper>> tests = new LinkedHashMap<>();
         tests.put(id("command_center_authority"), ModGameTests::kingdomHallAuthority);
+        tests.put(id("faction_selection_transaction"), ModGameTests::factionSelectionTransaction);
         tests.put(id("recruit_entity_contract"), ModGameTests::recruitEntityContract);
         tests.put(id("worker_tags_and_loot"), ModGameTests::workerTagsAndLoot);
         tests.put(id("recruit_contract_lifecycle"), ModGameTests::recruitContractLifecycle);
@@ -131,6 +133,44 @@ public final class ModGameTests {
         tests.put(id("planet_travel_failure_atomicity"), ModGameTests::planetTravelFailureAtomicity);
         tests.put(id("planet_arrival_runtime"), ModGameTests::planetArrivalRuntime);
         return Map.copyOf(tests);
+    }
+
+    private static void factionSelectionTransaction(GameTestHelper helper) {
+        BlockPos relativeHall = new BlockPos(1, 1, 1);
+        helper.setBlock(relativeHall, ModBlocks.COMMAND_CENTER.get());
+        CommandCenterBlockEntity hall = helper.getBlockEntity(relativeHall, CommandCenterBlockEntity.class);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        owner.setPos(hall.getBlockPos().getX() + 0.5D, hall.getBlockPos().getY(), hall.getBlockPos().getZ() + 0.5D);
+        if (!hall.claim(owner)) {
+            helper.fail("Faction selection setup could not claim the Command Center");
+            return;
+        }
+        FactionSelectionMenu menu = new FactionSelectionMenu(0, owner.getInventory(), hall.getBlockPos());
+        if (!menu.clickMenuButton(owner, 1)) {
+            helper.fail("Server rejected the Separatist faction selection");
+            return;
+        }
+        KingdomRecord kingdom = KingdomSavedData.get(helper.getLevel())
+                .kingdomForOwner(owner.getUUID()).orElse(null);
+        String pledged = ProgressionSavedData.get(helper.getLevel()).state(owner.getUUID()).factionId();
+        int alignment = FactionAlignmentSavedData.get(helper.getLevel()).alignment(owner.getUUID())
+                .score(FactionId.of("galacticwars:separatist"));
+        if (kingdom == null
+                || !kingdom.factionId().equals("galacticwars:separatist")
+                || !hall.factionId().equals("galacticwars:separatist")
+                || !pledged.equals("galacticwars:separatist")
+                || alignment <= 0) {
+            helper.fail("Faction selection did not atomically bind kingdom, Hall, progression, and alignment");
+            return;
+        }
+        FactionSelectionMenu replay = new FactionSelectionMenu(1, owner.getInventory(), hall.getBlockPos());
+        if (replay.clickMenuButton(owner, 0)
+                || !KingdomSavedData.get(helper.getLevel()).kingdomForOwner(owner.getUUID())
+                        .orElseThrow().factionId().equals("galacticwars:separatist")) {
+            helper.fail("A second faction selection changed the committed kingdom faction");
+            return;
+        }
+        helper.succeed();
     }
 
     private static void planetArrivalRuntime(GameTestHelper helper) {
@@ -283,10 +323,20 @@ public final class ModGameTests {
         ServerPlayer player = makeConnectedMockPlayer(helper, GameType.CREATIVE);
         List<SpawnEggCase> cases = List.of(
                 new SpawnEggCase(ModItems.CLONE_TROOPER_SPAWN_EGG.get(), ModEntityTypes.CLONE_TROOPER.get()),
+                new SpawnEggCase(ModItems.ARC_TROOPER_SPAWN_EGG.get(), ModEntityTypes.ARC_TROOPER.get()),
+                new SpawnEggCase(ModItems.JEDI_KNIGHT_SPAWN_EGG.get(), ModEntityTypes.JEDI_KNIGHT.get()),
                 new SpawnEggCase(ModItems.MANDALORIAN_WARRIOR_SPAWN_EGG.get(), ModEntityTypes.MANDALORIAN_WARRIOR.get()),
+                new SpawnEggCase(ModItems.MANDALORIAN_MARKSMAN_SPAWN_EGG.get(), ModEntityTypes.MANDALORIAN_MARKSMAN.get()),
+                new SpawnEggCase(ModItems.MANDALORIAN_HEAVY_SPAWN_EGG.get(), ModEntityTypes.MANDALORIAN_HEAVY.get()),
                 new SpawnEggCase(ModItems.B1_BATTLE_DROID_SPAWN_EGG.get(), ModEntityTypes.B1_BATTLE_DROID.get()),
+                new SpawnEggCase(ModItems.B2_SUPER_BATTLE_DROID_SPAWN_EGG.get(), ModEntityTypes.B2_SUPER_BATTLE_DROID.get()),
+                new SpawnEggCase(ModItems.COMMANDO_DROID_SPAWN_EGG.get(), ModEntityTypes.COMMANDO_DROID.get()),
                 new SpawnEggCase(ModItems.HUTT_ENFORCER_SPAWN_EGG.get(), ModEntityTypes.HUTT_ENFORCER.get()),
-                new SpawnEggCase(ModItems.NIGHTSISTER_ACOLYTE_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_ACOLYTE.get()));
+                new SpawnEggCase(ModItems.BOUNTY_HUNTER_SPAWN_EGG.get(), ModEntityTypes.BOUNTY_HUNTER.get()),
+                new SpawnEggCase(ModItems.SMUGGLER_SPAWN_EGG.get(), ModEntityTypes.SMUGGLER.get()),
+                new SpawnEggCase(ModItems.NIGHTSISTER_ACOLYTE_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_ACOLYTE.get()),
+                new SpawnEggCase(ModItems.NIGHTSISTER_ARCHER_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_ARCHER.get()),
+                new SpawnEggCase(ModItems.NIGHTBROTHER_BRUTE_SPAWN_EGG.get(), ModEntityTypes.NIGHTBROTHER_BRUTE.get()));
 
         for (int index = 0; index < cases.size(); index++) {
             SpawnEggCase testCase = cases.get(index);
@@ -880,7 +930,13 @@ public final class ModGameTests {
                 builderOrder = (UUID) getRecruitField(recruit, "workOrderId");
             }
             if (!recruit.getWorkerStatus().reasonCode().equals("withdraw_build_material")) {
-                helper.fail("Builder did not request its next material at placement " + placementIndex);
+                BuildProject current = data.kingdomForOwner(owner.getUUID()).orElseThrow().settlement()
+                        .buildProjects().stream().filter(project -> project.id().equals(barracksProject.id()))
+                        .findFirst().orElseThrow();
+                helper.fail("Builder did not request its next material at placement " + placementIndex
+                        + "; reason=" + recruit.getWorkerStatus().reasonCode()
+                        + ", placed=" + current.completedPlacements().size()
+                        + ", inventory=" + workerInventoryCount(recruit));
             }
             interactWorkerAt(recruit, hallPos, "withdraw_build_material");
             setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);

@@ -20,7 +20,7 @@ This is a clean-break conversion. Existing KingdomWars-Middle-Earth worlds and r
 
 ## Controls
 
-- Claim and activate a Command Center, then use an identity chip on your center to pledge its faction.
+- Place a Command Center to open the faction picker. Choosing a faction atomically creates and pledges your kingdom; the Command Center, recruitment rules, alignment, and progression all use that saved choice.
 - Interact with a recruit to open the command screen. Hire first, then choose combat orders, formations, a worksite, storage, a profession, or construction controls.
 - Use a blaster to fire; each accepted shot consumes one Energy Cell, applies weapon durability and a short server-authoritative cooldown.
 - Place blueprint structures through the recruit command screen. Builders withdraw real blocks from Command Center or linked storage before placing them.

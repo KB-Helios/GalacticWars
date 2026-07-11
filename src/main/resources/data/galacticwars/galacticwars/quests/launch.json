@@ -1,17 +1,17 @@
 {"schema_version":1,"quests":[
   {"id":"republic_chapter_1","objectives":["faction_pledged","command_center","clone_trooper"],"reward_credits":40,"unlocks":["workforce"]},
   {"id":"republic_chapter_2","objectives":["delivery_completed","forward_base","kamino"],"reward_credits":70,"unlocks":["barc_speeder","force_path"]},
-  {"id":"republic_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest"]},
+  {"id":"republic_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery"]},
   {"id":"separatist_chapter_1","objectives":["faction_pledged","command_center","b1_battle_droid"],"reward_credits":40,"unlocks":["workforce"]},
   {"id":"separatist_chapter_2","objectives":["delivery_completed","forward_base","geonosis"],"reward_credits":70,"unlocks":["stap"]},
-  {"id":"separatist_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest"]},
+  {"id":"separatist_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery"]},
   {"id":"mandalorian_chapter_1","objectives":["faction_pledged","command_center","mandalorian_warrior"],"reward_credits":40,"unlocks":["workforce"]},
   {"id":"mandalorian_chapter_2","objectives":["delivery_completed","beskar_ingot","tatooine"],"reward_credits":75,"unlocks":["vehicle_crafting"]},
-  {"id":"mandalorian_chapter_3","objectives":["vehicle_acquired","bounty_hunter","region_captured"],"reward_credits":125,"unlocks":["conquest"]},
+  {"id":"mandalorian_chapter_3","objectives":["vehicle_acquired","bounty_hunter","region_captured"],"reward_credits":125,"unlocks":["conquest","vehicle_mastery"]},
   {"id":"hutt_cartel_chapter_1","objectives":["faction_pledged","command_center","hutt_enforcer"],"reward_credits":50,"unlocks":["trading"]},
   {"id":"hutt_cartel_chapter_2","objectives":["trade_completed","supply_depot","tatooine"],"reward_credits":80,"unlocks":["vehicle_crafting"]},
-  {"id":"hutt_cartel_chapter_3","objectives":["vehicle_acquired","smuggler","region_captured"],"reward_credits":130,"unlocks":["conquest"]},
+  {"id":"hutt_cartel_chapter_3","objectives":["vehicle_acquired","smuggler","region_captured"],"reward_credits":130,"unlocks":["conquest","vehicle_mastery"]},
   {"id":"nightsister_chapter_1","objectives":["faction_pledged","command_center","nightsister_acolyte"],"reward_credits":40,"unlocks":["workforce"]},
   {"id":"nightsister_chapter_2","objectives":["delivery_completed","forward_base","coruscant"],"reward_credits":70,"unlocks":["force_path"]},
-  {"id":"nightsister_chapter_3","objectives":["force_ability_unlocked","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest"]}
+  {"id":"nightsister_chapter_3","objectives":["force_ability_unlocked","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery"]}
 ]}

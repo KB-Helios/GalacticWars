@@ -57,10 +57,20 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.HUTT_CARTEL_FACTION_TOKEN.get());
                         output.accept(ModItems.NIGHTSISTER_FACTION_TOKEN.get());
                         output.accept(ModItems.CLONE_TROOPER_SPAWN_EGG.get());
+                        output.accept(ModItems.ARC_TROOPER_SPAWN_EGG.get());
+                        output.accept(ModItems.JEDI_KNIGHT_SPAWN_EGG.get());
                         output.accept(ModItems.MANDALORIAN_WARRIOR_SPAWN_EGG.get());
+                        output.accept(ModItems.MANDALORIAN_MARKSMAN_SPAWN_EGG.get());
+                        output.accept(ModItems.MANDALORIAN_HEAVY_SPAWN_EGG.get());
                         output.accept(ModItems.B1_BATTLE_DROID_SPAWN_EGG.get());
+                        output.accept(ModItems.B2_SUPER_BATTLE_DROID_SPAWN_EGG.get());
+                        output.accept(ModItems.COMMANDO_DROID_SPAWN_EGG.get());
                         output.accept(ModItems.HUTT_ENFORCER_SPAWN_EGG.get());
+                        output.accept(ModItems.BOUNTY_HUNTER_SPAWN_EGG.get());
+                        output.accept(ModItems.SMUGGLER_SPAWN_EGG.get());
                         output.accept(ModItems.NIGHTSISTER_ACOLYTE_SPAWN_EGG.get());
+                        output.accept(ModItems.NIGHTSISTER_ARCHER_SPAWN_EGG.get());
+                        output.accept(ModItems.NIGHTBROTHER_BRUTE_SPAWN_EGG.get());
                     })
                     .build());
 

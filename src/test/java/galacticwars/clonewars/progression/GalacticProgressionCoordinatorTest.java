@@ -37,7 +37,12 @@ public final class GalacticProgressionCoordinatorTest {
                 event(player, ProgressionEventType.QUEST_ADVANCED, "nightsister_chapter_1", 1));
         assertTrue(!hostileQuest.accepted() && hostileQuest.reason().equals("wrong_faction_quest"),
                 "another faction's quest cannot be advanced");
+        state = accepted(state, event(player, ProgressionEventType.RECRUIT_HIRED,
+                "galacticwars:clone_trooper", 1));
         state = accepted(state, event(player, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_1", 1));
+        assertEquals(65, state.credits(), "chapter 1 configured credit reward");
+        state = accepted(state, event(player, ProgressionEventType.DELIVERY_COMPLETED, "starter_delivery", 1));
+        state = accepted(state, event(player, ProgressionEventType.PLANET_VISITED, "kamino", 1));
         state = accepted(state, event(player, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2", 1));
         ProgressionState questReplay = accepted(state,
                 event(player, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2", 1));
@@ -49,7 +54,19 @@ public final class GalacticProgressionCoordinatorTest {
         mandalorian = accepted(mandalorian, event(mandalorianPlayer,
                 ProgressionEventType.FACTION_PLEDGED, "galacticwars:mandalorian", 1));
         mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.BUILDING_COMPLETED, "command_center", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.RECRUIT_HIRED, "galacticwars:mandalorian_warrior", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
                 ProgressionEventType.QUEST_ADVANCED, "mandalorian_chapter_1", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.DELIVERY_COMPLETED, "beskar_delivery", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.BUILDING_COMPLETED, "forward_base", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.TRADE_COMPLETED, "mandalorian_armorer", 1));
+        mandalorian = accepted(mandalorian, event(mandalorianPlayer,
+                ProgressionEventType.PLANET_VISITED, "tatooine", 1));
         mandalorian = accepted(mandalorian, event(mandalorianPlayer,
                 ProgressionEventType.QUEST_ADVANCED, "mandalorian_chapter_2", 1));
         assertTrue(mandalorian.unlocks().contains("vehicle_crafting"),

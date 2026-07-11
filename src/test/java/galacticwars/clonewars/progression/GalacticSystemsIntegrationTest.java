@@ -10,6 +10,9 @@ public final class GalacticSystemsIntegrationTest {
         state = event(state, ProgressionEventType.CREDIT_TRANSACTION, "starter_reward", 100);
         state = event(state, ProgressionEventType.BUILDING_COMPLETED, "command_center", 1);
         state = event(state, ProgressionEventType.BUILDING_COMPLETED, "forward_base", 1);
+        state = event(state, ProgressionEventType.RECRUIT_HIRED, "galacticwars:clone_trooper", 1);
+        state = event(state, ProgressionEventType.DELIVERY_COMPLETED, "starter_delivery", 1);
+        state = event(state, ProgressionEventType.PLANET_VISITED, "kamino", 1);
         assertTrue(!state.unlocks().contains("vehicle_crafting"),
                 "vehicle acquisition test starts without Supply Depot crafting access");
 
@@ -32,13 +35,15 @@ public final class GalacticSystemsIntegrationTest {
         UUID tradeEventId = UUID.randomUUID();
         GalacticSystemsService.SystemDecision trade = GalacticSystemsService.purchase(
                 state, tradeEventId, "republic_quartermaster");
-        assertTrue(trade.accepted() && trade.changed() && trade.state().credits() == 88,
+        assertTrue(trade.accepted() && trade.changed() && trade.state().credits() == 198,
                 "trade charges exactly once");
+        assertTrue(trade.resultId().equals("galacticwars:energy_cell") && trade.resultCount() == 8,
+                "trade returns the namespaced item and configured stack count");
         ProgressionState afterTrade = trade.state();
         GalacticSystemsService.SystemDecision replayedTrade = GalacticSystemsService.purchase(
                 afterTrade, tradeEventId, "republic_quartermaster");
         assertTrue(replayedTrade.accepted() && !replayedTrade.changed()
-                        && replayedTrade.resultId().isEmpty() && replayedTrade.state().credits() == 88,
+                        && replayedTrade.resultId().isEmpty() && replayedTrade.state().credits() == 198,
                 "duplicate trade cannot charge or grant twice");
 
         state = afterTrade;
@@ -58,12 +63,17 @@ public final class GalacticSystemsIntegrationTest {
         assertTrue(!prematureLeap.accepted() && prematureLeap.reason().equals("force_quest_locked"),
                 "advanced Force ability requires its exact quest");
 
-        state = event(force.state(), ProgressionEventType.QUEST_ADVANCED, "republic_chapter_3", 1);
         GalacticSystemsService.SystemDecision conquest = GalacticSystemsService.captureRegion(
-                state, UUID.randomUUID(), "kamino_platform");
+                force.state(), UUID.randomUUID(), "kamino_platform");
         assertTrue(conquest.accepted() && conquest.changed()
                         && conquest.state().unlocks().contains("veteran_trades"),
-                "quest progression enables conquest and its rewards");
+                "chapter 2 permits the campaign capture required by chapter 3");
+        state = event(conquest.state(), ProgressionEventType.QUEST_ADVANCED, "republic_chapter_3", 1);
+        assertTrue(state.unlocks().contains("conquest") && state.unlocks().contains("vehicle_mastery"),
+                "chapter 3 enables conquest and the attainable LAAT mastery gate");
+        GalacticSystemsService.SystemDecision laat = GalacticSystemsService.acquireVehicle(
+                state, UUID.randomUUID(), "laat_gunship");
+        assertTrue(laat.accepted(), "LAAT becomes attainable after chapter 3: " + laat.reason());
         System.out.println("GalacticSystemsIntegrationTest passed");
     }
 

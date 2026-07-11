@@ -53,6 +53,13 @@ public record ProgressionState(
         return eventSubjects.getOrDefault(type, Set.of()).contains(subjectId);
     }
 
+    public boolean hasSubjectPath(ProgressionEventType type, String subjectPath) {
+        return eventSubjects.getOrDefault(type, Set.of()).stream().anyMatch(subject -> {
+            int separator = subject.indexOf(':');
+            return (separator < 0 ? subject : subject.substring(separator + 1)).equals(subjectPath);
+        });
+    }
+
     ProgressionState apply(ProgressionEvent event, String faction, Set<String> addedUnlocks) {
         if (!playerId.equals(event.playerId())) {
             throw new SecurityException("Progression event belongs to another player");
@@ -60,8 +67,13 @@ public record ProgressionState(
         if (processed(event.id())) {
             return this;
         }
-        int updatedCredits = event.type() == ProgressionEventType.CREDIT_TRANSACTION
-                ? Math.addExact(credits, event.amount()) : credits;
+        int creditDelta = switch (event.type()) {
+            case CREDIT_TRANSACTION -> event.amount();
+            case QUEST_ADVANCED -> LaunchContentCatalog.questRewardCredits(event.subjectId());
+            case REGION_CAPTURED -> LaunchContentCatalog.regionRewardCredits(event.subjectId());
+            default -> 0;
+        };
+        int updatedCredits = Math.addExact(credits, creditDelta);
         if (updatedCredits < 0) {
             throw new IllegalStateException("insufficient_credits");
         }

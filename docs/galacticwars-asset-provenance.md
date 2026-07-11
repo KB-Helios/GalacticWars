@@ -1,5 +1,9 @@
 # Galactic Wars Asset Provenance
 
+## Polished clone, droid, and lightsaber pass
+
+The detailed Clone Trooper, B1 Battle Droid, and lightsaber direction was generated with the built-in image generation workflow as project-owned concept material. Because general image generation does not preserve Minecraft cube UV coordinates, `tools/generate_polished_textures.py` translates that direction into deterministic UV-safe 64x64 GeckoLib skins and native 16x16 item sprites. The existing Gondorian-derived clone/droid geometry, bone names, pivots, animations, and UV origins remain unchanged; only the texture pixels are replaced.
+
 All assets listed here are original, project-bound artwork. No official Star Wars artwork, film stills, logos, third-party mod textures, or other third-party assets were used.
 
 ## Method
@@ -153,3 +157,7 @@ All six sources were generated on a uniform magenta background, visually reviewe
 | `textures/gui/force_meter.png` | `exec-b0ddd5b5-edf8-46b4-a8da-87d793538ace.png` |
 
 The particle sprites resolve through `particles/blaster_bolt.json` and `particles/force_wave.json`; GUI textures are direct named resources for their render layers. Validation passed exact sizes, transparent corners and interiors, non-empty visible coverage, zero residual chroma, six distinct SHA-256 hashes, JSON/reference resolution, and native-resolution readability.
+
+## Armor icon refinement
+
+The twenty armor inventory icons were regenerated as one cohesive project-owned pixel-art sheet (`exec-35cea704-fd2a-43e4-a596-d48046a7341d.png`). The retained source is `tools/source_art/generated_armor_icons.png`; `tools/generate_polished_textures.py` removes its flat green key, isolates the fixed five-by-four cells, fits each silhouette into a transparent 16x16 canvas, and writes the helmet, chestplate, leggings, and boots icons for all five armor families. This keeps the small in-game assets reproducible while preserving distinct Republic plastoid, Separatist alloy, Mandalorian alloy, Nightsister weave, and Beskar material language.

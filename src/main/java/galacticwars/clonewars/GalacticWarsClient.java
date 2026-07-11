@@ -2,6 +2,7 @@ package galacticwars.clonewars;
 
 import galacticwars.clonewars.client.gui.RecruitCommandScreen;
 import galacticwars.clonewars.client.gui.CommandCenterNavigationScreen;
+import galacticwars.clonewars.client.gui.FactionSelectionScreen;
 import galacticwars.clonewars.client.render.GalacticRecruitRenderer;
 import galacticwars.clonewars.registry.ModEntityTypes;
 import galacticwars.clonewars.registry.ModMenuTypes;
@@ -43,5 +44,6 @@ public class GalacticWarsClient {
     static void registerMenuScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenuTypes.RECRUIT_COMMAND.get(), RecruitCommandScreen::new);
         event.register(ModMenuTypes.COMMAND_CENTER_NAVIGATION.get(), CommandCenterNavigationScreen::new);
+        event.register(ModMenuTypes.FACTION_SELECTION.get(), FactionSelectionScreen::new);
     }
 }

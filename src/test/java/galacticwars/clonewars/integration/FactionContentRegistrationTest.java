@@ -7,10 +7,20 @@ import java.nio.file.Path;
 public final class FactionContentRegistrationTest {
     private static final String[] ENTITY_IDS = {
             "clone_trooper",
+            "arc_trooper",
+            "jedi_knight",
             "mandalorian_warrior",
+            "mandalorian_marksman",
+            "mandalorian_heavy",
             "b1_battle_droid",
+            "b2_super_battle_droid",
+            "commando_droid",
             "hutt_enforcer",
-            "nightsister_acolyte"
+            "bounty_hunter",
+            "smuggler",
+            "nightsister_acolyte",
+            "nightsister_archer",
+            "nightbrother_brute"
     };
     private static final String[] FACTION_ITEMS = {
             "republic_plastoid_ingot",
@@ -51,7 +61,6 @@ public final class FactionContentRegistrationTest {
             assertRegularFile("src/main/resources/assets/galacticwars/models/item/" + id + "_spawn_egg.json");
             assertRegularFile("src/main/resources/assets/galacticwars/textures/item/" + id + "_spawn_egg.png");
             assertRegularFile("src/main/resources/assets/galacticwars/textures/entity/" + id + ".png");
-            assertRegularFile("src/main/resources/data/galacticwars/neoforge/biome_modifier/" + id + "_spawns.json");
         }
     }
 

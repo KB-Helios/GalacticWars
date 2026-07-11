@@ -27,14 +27,18 @@ final class LaunchContentValidator {
         assertIds(manager, "vehicles", "vehicles", Set.copyOf(LaunchContentCatalog.VEHICLES));
         assertIds(manager, "force_abilities", "abilities", LaunchContentCatalog.FORCE_ABILITIES);
         assertIds(manager, "quests", "quests", Set.copyOf(LaunchContentCatalog.QUESTS));
-        assertQuestUnlocks(manager);
-        assertCount(manager, "trades", "trades", 5);
+        assertIds(manager, "trades", "trades", LaunchContentCatalog.TRADES.keySet());
+        assertQuestContracts(manager);
+        assertTradeContracts(manager);
         assertCount(manager, "conquest_regions", "regions", 4);
+        assertRegionRewards(manager);
     }
 
-    private static void assertQuestUnlocks(ResourceManager manager) throws IOException {
+    private static void assertQuestContracts(ResourceManager manager) throws IOException {
         FileToIdConverter converter = FileToIdConverter.json("galacticwars/quests");
-        Map<String, Set<String>> actual = new HashMap<>();
+        Map<String, Set<String>> actualUnlocks = new HashMap<>();
+        Map<String, java.util.List<String>> actualObjectives = new HashMap<>();
+        Map<String, Integer> actualRewards = new HashMap<>();
         for (Map.Entry<Identifier, Resource> entry
                 : converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID).entrySet()) {
             try (BufferedReader reader = entry.getValue().openAsReader()) {
@@ -47,20 +51,79 @@ final class LaunchContentValidator {
                     JsonObject quest = element.getAsJsonObject();
                     String id = quest.get("id").getAsString();
                     JsonArray unlocksJson = quest.getAsJsonArray("unlocks");
-                    if (unlocksJson == null) {
-                        throw new IllegalArgumentException("Quest " + id + " is missing unlocks");
+                    JsonArray objectivesJson = quest.getAsJsonArray("objectives");
+                    if (unlocksJson == null || objectivesJson == null || !quest.has("reward_credits")) {
+                        throw new IllegalArgumentException("Quest " + id + " has an incomplete progression contract");
                     }
                     HashSet<String> unlocks = new HashSet<>();
                     unlocksJson.forEach(unlock -> unlocks.add(unlock.getAsString()));
-                    if (actual.putIfAbsent(id, Set.copyOf(unlocks)) != null) {
+                    java.util.ArrayList<String> objectives = new java.util.ArrayList<>();
+                    objectivesJson.forEach(objective -> objectives.add(objective.getAsString()));
+                    if (actualUnlocks.putIfAbsent(id, Set.copyOf(unlocks)) != null) {
                         throw new IllegalArgumentException("Duplicate quest id " + id);
+                    }
+                    actualObjectives.put(id, java.util.List.copyOf(objectives));
+                    actualRewards.put(id, quest.get("reward_credits").getAsInt());
+                }
+            }
+        }
+        if (!actualUnlocks.equals(LaunchContentCatalog.QUEST_UNLOCKS)
+                || !actualObjectives.equals(LaunchContentCatalog.QUEST_OBJECTIVES)
+                || !actualRewards.equals(LaunchContentCatalog.QUEST_REWARD_CREDITS)) {
+            throw new IllegalArgumentException("Quest unlocks do not match launch data contract; expected "
+                    + LaunchContentCatalog.QUEST_UNLOCKS + " but found " + actualUnlocks);
+        }
+    }
+
+    private static void assertRegionRewards(ResourceManager manager) throws IOException {
+        FileToIdConverter converter = FileToIdConverter.json("galacticwars/conquest_regions");
+        Map<String, Integer> actual = new HashMap<>();
+        for (Map.Entry<Identifier, Resource> entry
+                : converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID).entrySet()) {
+            try (BufferedReader reader = entry.getValue().openAsReader()) {
+                JsonArray regions = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonArray("regions");
+                for (JsonElement element : regions) {
+                    JsonObject region = element.getAsJsonObject();
+                    String id = region.get("id").getAsString();
+                    if (!region.has("reward_credits")
+                            || actual.putIfAbsent(id, region.get("reward_credits").getAsInt()) != null) {
+                        throw new IllegalArgumentException("Invalid conquest reward contract for " + id);
                     }
                 }
             }
         }
-        if (!actual.equals(LaunchContentCatalog.QUEST_UNLOCKS)) {
-            throw new IllegalArgumentException("Quest unlocks do not match launch data contract; expected "
-                    + LaunchContentCatalog.QUEST_UNLOCKS + " but found " + actual);
+        if (!actual.equals(LaunchContentCatalog.REGION_REWARD_CREDITS)) {
+            throw new IllegalArgumentException("Conquest rewards do not match launch data contract");
+        }
+    }
+
+    private static void assertTradeContracts(ResourceManager manager) throws IOException {
+        FileToIdConverter converter = FileToIdConverter.json("galacticwars/trades");
+        Map<String, LaunchContentCatalog.TradeDefinition> actual = new HashMap<>();
+        for (Map.Entry<Identifier, Resource> entry
+                : converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID).entrySet()) {
+            try (BufferedReader reader = entry.getValue().openAsReader()) {
+                JsonArray trades = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonArray("trades");
+                if (trades == null) {
+                    throw new IllegalArgumentException("Missing trades in " + entry.getKey());
+                }
+                for (JsonElement element : trades) {
+                    JsonObject trade = element.getAsJsonObject();
+                    String id = trade.get("id").getAsString();
+                    LaunchContentCatalog.TradeDefinition definition = new LaunchContentCatalog.TradeDefinition(
+                            trade.get("faction").getAsString(),
+                            trade.get("cost").getAsInt(),
+                            trade.get("item").getAsString(),
+                            trade.get("count").getAsInt(),
+                            trade.get("unlock").getAsString());
+                    if (actual.putIfAbsent(id, definition) != null) {
+                        throw new IllegalArgumentException("Duplicate trade id " + id);
+                    }
+                }
+            }
+        }
+        if (!actual.equals(LaunchContentCatalog.TRADES)) {
+            throw new IllegalArgumentException("Trade definitions do not match launch data contract");
         }
     }
 
