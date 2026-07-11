@@ -147,12 +147,15 @@ public final class AssetReferenceIntegrityTest {
         return references;
     }
 
-    private static void exactRegisteredItemDefinitionsExist() {
+    private static void exactRegisteredItemDefinitionsExist() throws IOException {
         assertRegularFile(MOD_ASSET_ROOT.resolve("items/nightsister_weave.json"),
                 "Nightsister Weave exact item definition");
         if (Files.exists(MOD_ASSET_ROOT.resolve("items/nightsister_weave_weave.json"))) {
             throw new AssertionError("stale Nightsister Weave duplicate item definition");
         }
+        String navigatorModel = Files.readString(MOD_ASSET_ROOT.resolve("models/item/hyperspace_navigator.json"));
+        assertContains(navigatorModel, "\"parent\": \"minecraft:item/compass_16\"",
+                "Hyperspace Navigator vanilla model parent");
     }
 
     private static Set<String> textureReferencesIn(Path file) throws IOException {
