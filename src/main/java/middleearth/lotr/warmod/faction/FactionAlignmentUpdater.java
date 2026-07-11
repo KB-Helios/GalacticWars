@@ -70,10 +70,14 @@ public final class FactionAlignmentUpdater {
 
         int beforeScore = alignment.score(factionId);
         FactionAlignment updated = alignment.withAddedScore(factionId, delta);
+        int appliedDelta = updated.score(factionId) - beforeScore;
+        if (appliedDelta == 0) {
+            return new AlignmentApplication(updated, List.of());
+        }
         return new AlignmentApplication(updated, List.of(new FactionAlignmentChange(
                 factionId,
                 beforeScore,
-                delta,
+                appliedDelta,
                 updated.score(factionId),
                 reasonCode)));
     }

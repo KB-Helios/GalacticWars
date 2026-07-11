@@ -2,9 +2,22 @@
   "id": "kingdomwarsmiddleearth:dwarf_warrior",
   "display_name": "Dwarf Warrior",
   "faction": "kingdomwarsmiddleearth:dwarf",
+  "entity_type": "kingdomwarsmiddleearth:dwarf_recruit",
   "role": "infantry",
   "hire_cost": 28,
-  "max_health": 28,
-  "attack_damage": 6,
+  "attributes": {
+    "max_health": 28,
+    "attack_damage": 6,
+    "movement_speed": 0.25,
+    "follow_range": 24.0,
+    "armor": 2.0
+  },
+  "equipment": {
+    "main_hand": "kingdomwarsmiddleearth:mithril_sword",
+    "head": "kingdomwarsmiddleearth:mithril_helmet",
+    "chest": "kingdomwarsmiddleearth:mithril_chestplate",
+    "legs": "kingdomwarsmiddleearth:mithril_leggings",
+    "feet": "kingdomwarsmiddleearth:mithril_boots"
+  },
   "default_formation": "line"
 }

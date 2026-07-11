@@ -18,7 +18,7 @@ public final class KingdomSavedDataTest {
     private static void savedDataUsesVersionedOverworldStorage() throws IOException {
         String source = read("src/main/java/middleearth/lotr/warmod/kingdom/KingdomSavedData.java");
         assertContains(source, "CURRENT_SCHEMA_VERSION", "schema version");
-        assertContains(source, "CURRENT_SCHEMA_VERSION = 2", "Hall lifecycle schema version");
+        assertContains(source, "CURRENT_SCHEMA_VERSION = 4", "army and workforce schema version");
         assertContains(source, "inactive_hall_owners", "inactive Hall persistence");
         assertContains(source, "SavedDataType<KingdomSavedData>", "saved data type");
         assertContains(source, "level.getServer().overworld().getDataStorage().computeIfAbsent(TYPE)", "overworld storage");
@@ -35,6 +35,9 @@ public final class KingdomSavedDataTest {
         assertContains(source, "cancelActiveCampaigns", "transactional campaign cancellation");
         assertContains(source, "promoteCommander", "commander promotion");
         assertContains(source, "completeBuildProject", "building completion rewards");
+        assertContains(source, "reserveWorksite", "capacity reservation");
+        assertContains(source, "claimWorkOrder", "atomic work order claim");
+        assertContains(source, "progressWorkOrder", "guarded work order progress");
         assertContains(source, "hasCommanderSlot", "commander unlock guard");
         assertContains(source, "expectedRevision", "stale revision guard");
         assertContains(source, "beginCampaign", "campaign reservation");

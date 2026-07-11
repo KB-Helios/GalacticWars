@@ -3,6 +3,7 @@ package middleearth.lotr.warmod.settlement;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import middleearth.lotr.warmod.data.GameplayDataManager;
 import middleearth.lotr.warmod.kingdom.KingdomRecord;
 import middleearth.lotr.warmod.kingdom.KingdomSavedData;
 import middleearth.lotr.warmod.registry.ModBlockEntityTypes;
@@ -31,7 +32,7 @@ import org.jspecify.annotations.Nullable;
 
 public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
     public static final int CONTAINER_SIZE = 54;
-    private static final List<String> FACTIONS = List.of(
+    private static final List<String> FALLBACK_FACTIONS = List.of(
             "kingdomwarsmiddleearth:gondor",
             "kingdomwarsmiddleearth:rohan",
             "kingdomwarsmiddleearth:mordor",
@@ -40,7 +41,7 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
 
     private NonNullList<ItemStack> items = NonNullList.withSize(CONTAINER_SIZE, ItemStack.EMPTY);
     private @Nullable UUID ownerId;
-    private String factionId = FACTIONS.getFirst();
+    private String factionId = FALLBACK_FACTIONS.getFirst();
     private long lastUpkeepGameTime;
     private boolean upkeepClockInitialized;
     private boolean upkeepPaid = true;
@@ -76,12 +77,13 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
     }
 
     public String cycleFaction() {
-        int next = (FACTIONS.indexOf(factionId) + 1) % FACTIONS.size();
-        return this.setFaction(FACTIONS.get(next));
+        List<String> factions = supportedFactions();
+        int next = (Math.max(0, factions.indexOf(factionId)) + 1) % factions.size();
+        return this.setFaction(factions.get(next));
     }
 
     public String setFaction(String factionId) {
-        if (!FACTIONS.contains(factionId)) {
+        if (!supportedFactions().contains(factionId)) {
             throw new IllegalArgumentException("unsupported faction " + factionId);
         }
         this.factionId = factionId;
@@ -236,9 +238,10 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
         this.items = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
         ContainerHelper.loadAllItems(input, this.items);
         this.ownerId = input.read("KingdomOwner", UUIDUtil.CODEC).orElse(null);
-        this.factionId = input.getStringOr("KingdomFaction", FACTIONS.getFirst());
-        if (!FACTIONS.contains(this.factionId)) {
-            this.factionId = FACTIONS.getFirst();
+        List<String> factions = supportedFactions();
+        this.factionId = input.getStringOr("KingdomFaction", factions.getFirst());
+        if (!factions.contains(this.factionId)) {
+            this.factionId = factions.getFirst();
         }
         this.lastUpkeepGameTime = Math.max(0L, input.getLongOr("LastUpkeepGameTime", 0L));
         this.upkeepClockInitialized = input.getBooleanOr(
@@ -274,5 +277,12 @@ public final class KingdomHallBlockEntity extends BaseContainerBlockEntity {
             BlockState state = this.getBlockState();
             this.level.sendBlockUpdated(this.worldPosition, state, state, 3);
         }
+    }
+
+    private static List<String> supportedFactions() {
+        List<String> loaded = GameplayDataManager.snapshot().selectableFactions().stream()
+                .map(definition -> definition.id().toString())
+                .toList();
+        return loaded.isEmpty() ? FALLBACK_FACTIONS : loaded;
     }
 }

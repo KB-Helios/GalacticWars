@@ -2,6 +2,7 @@ package middleearth.lotr.warmod.entity;
 
 import java.util.List;
 import java.util.UUID;
+import middleearth.lotr.warmod.army.ArmyLocation;
 import middleearth.lotr.warmod.kingdom.KingdomSavedData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -15,12 +16,14 @@ public final class RecruitLifecycleService {
             ServerLevel level,
             UUID ownerId,
             UUID recruitId,
-            boolean commander
+            boolean commander,
+            ArmyLocation lastLocation
     ) {
         KingdomSavedData data = KingdomSavedData.get(level);
         if (commander) {
             data.cancelActiveCampaigns(ownerId, "commander_lost");
         }
+        data.releaseArmyMember(ownerId, recruitId, commander, lastLocation);
         boolean removed = data.unregisterRecruit(ownerId, recruitId);
         if (commander && !removed) {
             data.clearCommander(ownerId, recruitId);

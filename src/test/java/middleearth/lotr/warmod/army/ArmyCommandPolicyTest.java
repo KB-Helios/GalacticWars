@@ -12,7 +12,7 @@ public final class ArmyCommandPolicyTest {
     public static void main(String[] args) {
         acceptsOwnerCommandWithValidContext();
         rejectsInvalidOwnershipAndGroupContext();
-        rejectsLowAlignment();
+        alignmentDoesNotRevokeExistingControl();
         rejectsMalformedCommandPayloads();
         rejectsMissingContextWithStableReasons();
 
@@ -54,13 +54,14 @@ public final class ArmyCommandPolicyTest {
                 10), "empty group command");
     }
 
-    private static void rejectsLowAlignment() {
-        assertRejected("alignment_too_low", ArmyCommandPolicy.canIssue(
+    private static void alignmentDoesNotRevokeExistingControl() {
+        ArmyCommandValidation validation = ArmyCommandPolicy.canIssue(
                 ArmyCommand.protectOwner(ownerId(), groupId()),
                 populatedGroup(),
                 alignment(9),
                 FactionId.of("gondor"),
-                10), "low alignment command");
+                10);
+        assertTrue(validation.accepted(), "low alignment does not revoke a hired army");
     }
 
     private static void rejectsMalformedCommandPayloads() {
@@ -101,33 +102,26 @@ public final class ArmyCommandPolicyTest {
                 FactionId.of("gondor"),
                 10), "missing group");
 
-        assertRejected("unknown_player", ArmyCommandPolicy.canIssue(
+        assertTrue(ArmyCommandPolicy.canIssue(
                 ArmyCommand.followOwner(ownerId(), groupId()),
                 populatedGroup(),
                 null,
                 FactionId.of("gondor"),
-                10), "missing alignment");
+                10).accepted(), "alignment is outside command policy");
 
-        assertRejected("unknown_player", ArmyCommandPolicy.canIssue(
+        assertTrue(ArmyCommandPolicy.canIssue(
                 ArmyCommand.followOwner(ownerId(), groupId()),
                 populatedGroup(),
                 alignment(otherPlayerId(), 12),
                 FactionId.of("gondor"),
-                10), "mismatched alignment player");
+                10).accepted(), "alignment owner is outside command policy");
 
-        assertRejected("unknown_player", ArmyCommandPolicy.canIssue(
-                ArmyCommand.followOwner(ownerId(), groupId()),
-                populatedGroup(),
-                alignment(otherPlayerId(), 12),
-                FactionId.of("gondor"),
-                10), "mismatched alignment player");
-
-        assertRejected("unknown_faction", ArmyCommandPolicy.canIssue(
+        assertTrue(ArmyCommandPolicy.canIssue(
                 ArmyCommand.followOwner(ownerId(), groupId()),
                 populatedGroup(),
                 alignment(12),
                 null,
-                10), "missing faction");
+                10).accepted(), "faction diplomacy is outside command policy");
     }
 
     private static ArmyGroupState populatedGroup() {

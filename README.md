@@ -52,16 +52,17 @@ Animated entity work uses GeckoLib 5.5.3 for NeoForge 26.2. The dependency is
 declared in Gradle and in the generated NeoForge mod metadata so clients and
 servers load it before animated Middle-earth recruit entities.
 
-## Next milestones
+## Current release
 
-- Persist army groups and orders across chunk unloads, then connect the existing
-  formation, targeting, tactical, and command-policy planners to live recruits.
-- Load faction/unit costs, attributes, alliances, and alignment from the current
-  data resources instead of using shared runtime constants.
-- Enforce worksite capacity and persisted work orders, and load building
-  blueprints from their JSON resources.
-- Complete survival acquisition for the Kingdom Hall, Mallorn wood, Mithril,
-  and faction equipment before adding more decorative items.
-- Enable the remaining professions only after the current worker loop has full
-  runtime coverage; world generation, cavalry, ranged units, trading, quests,
-  and conquest remain later expansion work.
+- Faction relations, alignment effects, unit costs, attributes, equipment, and
+  kingdom blueprints load from validated datapack resources.
+- Army groups persist their membership, formations, commands, tactical vitals,
+  and movement-only virtual state across chunk unloads and server restarts.
+- Worksites enforce capacity through persisted assignments and work orders;
+  completed blueprints apply housing, storage, worksite, and commander rewards.
+- The Kingdom Hall, Mallorn, Mithril, faction materials, tokens, and five armor
+  and tool families have survival recipes and dedicated models and textures.
+
+Fisherman, animal farmer, cook, and merchant remain disabled pending their
+runtime worker loops. Region-specific spawning, Middle-earth world generation,
+cavalry, ranged units, trading, quests, and conquest remain later expansion work.

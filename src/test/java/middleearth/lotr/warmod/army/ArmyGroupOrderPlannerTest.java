@@ -17,6 +17,7 @@ public final class ArmyGroupOrderPlannerTest {
     public static void main(String[] args) {
         assignsMoveOrdersToLineFormationPositions();
         assignsHoldOrdersToColumnFormationPositions();
+        assignsFollowAndProtectOrdersToOwnerRelativeFormationPositions();
         propagatesDirectGroupOrders();
         returnsImmutableEmptyAssignmentsForEmptyGroups();
 
@@ -57,11 +58,34 @@ public final class ArmyGroupOrderPlannerTest {
     }
 
     private static void propagatesDirectGroupOrders() {
-        assertDirectOrder(ArmyCommand.followOwner(OWNER_ID, GROUP_ID), ArmyCommandType.FOLLOW_OWNER, null, "follow_group_order");
-        assertDirectOrder(ArmyCommand.protectOwner(OWNER_ID, GROUP_ID), ArmyCommandType.PROTECT_OWNER, null, "protect_group_order");
         assertDirectOrder(ArmyCommand.attackTarget(OWNER_ID, GROUP_ID, TARGET_ID), ArmyCommandType.ATTACK_TARGET, TARGET_ID,
                 "attack_group_order");
         assertDirectOrder(ArmyCommand.clearTarget(OWNER_ID, GROUP_ID), ArmyCommandType.CLEAR_TARGET, null, "clear_group_order");
+    }
+
+    private static void assignsFollowAndProtectOrdersToOwnerRelativeFormationPositions() {
+        ArmyPosition ownerAnchor = new ArmyPosition(30, 65, -10);
+        assertOwnerRelativeOrder(
+                ArmyCommand.followOwner(OWNER_ID, GROUP_ID), ArmyCommandType.FOLLOW_OWNER, ownerAnchor);
+        assertOwnerRelativeOrder(
+                ArmyCommand.protectOwner(OWNER_ID, GROUP_ID), ArmyCommandType.PROTECT_OWNER, ownerAnchor);
+    }
+
+    private static void assertOwnerRelativeOrder(
+            ArmyCommand groupCommand,
+            ArmyCommandType expectedType,
+            ArmyPosition ownerAnchor
+    ) {
+        ArmyGroupState group = populatedGroup().applyCommand(groupCommand);
+        List<ArmyGroupOrderAssignment> assignments = ArmyGroupOrderPlanner.plan(
+                group, ArmyFormation.LINE, 2, ownerAnchor);
+
+        assertAssignment(assignments.get(0), FIRST_RECRUIT_ID, expectedType,
+                new ArmyPosition(28, 65, -10), new FormationSlot(0, -2, 0), expectedType + " first");
+        assertAssignment(assignments.get(1), SECOND_RECRUIT_ID, expectedType,
+                new ArmyPosition(30, 65, -10), new FormationSlot(1, 0, 0), expectedType + " second");
+        assertAssignment(assignments.get(2), THIRD_RECRUIT_ID, expectedType,
+                new ArmyPosition(32, 65, -10), new FormationSlot(2, 2, 0), expectedType + " third");
     }
 
     private static void returnsImmutableEmptyAssignmentsForEmptyGroups() {
@@ -108,7 +132,9 @@ public final class ArmyGroupOrderPlannerTest {
     ) {
         assertEquals(expectedRecruitId, assignment.recruitId(), label + " recruit");
         assertEquals(expectedType, assignment.command().type(), label + " command type");
-        assertEquals(expectedPosition, assignment.command().targetPosition(), label + " command target");
+        if (expectedType == ArmyCommandType.MOVE_TO_POSITION || expectedType == ArmyCommandType.HOLD_POSITION) {
+            assertEquals(expectedPosition, assignment.command().targetPosition(), label + " command target");
+        }
         assertEquals(expectedPosition, assignment.assignedPosition(), label + " assigned position");
         assertEquals(expectedSlot, assignment.formationSlot(), label + " formation slot");
     }

@@ -1,8 +1,1 @@
-{
-  "replace": false,
-  "values": [
-    "kingdomwarsmiddleearth:middle_earth_stone",
-    "kingdomwarsmiddleearth:mithril_ore",
-    "kingdomwarsmiddleearth:kingdom_hall"
-  ]
-}
+{"replace":false,"values":["kingdomwarsmiddleearth:mithril_ore","kingdomwarsmiddleearth:middle_earth_stone"]}
