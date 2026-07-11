@@ -7,10 +7,12 @@ import java.util.Objects;
 import java.util.UUID;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.kingdom.KingdomRecord;
+import galacticwars.clonewars.kingdom.KingdomActionId;
+import galacticwars.clonewars.kingdom.KingdomGameplayAction;
+import galacticwars.clonewars.kingdom.KingdomGameplayRuntimeService;
 import galacticwars.clonewars.kingdom.KingdomPermission;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.registry.ModBlockEntityTypes;
-import galacticwars.clonewars.progression.ProgressionEvent;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import net.minecraft.core.BlockPos;
@@ -85,9 +87,13 @@ public final class CommandCenterBlockEntity extends BaseContainerBlockEntity {
             this.lastUpkeepGameTime = this.level == null ? 0L : this.level.getGameTime();
             this.upkeepClockInitialized = true;
             if (this.level instanceof ServerLevel serverLevel) {
-                ProgressionSavedData.get(serverLevel).apply(new ProgressionEvent(
-                        UUID.randomUUID(), player.getUUID(), ProgressionEventType.BUILDING_COMPLETED,
-                        "command_center", 1));
+                KingdomGameplayRuntimeService.applyProgression(
+                        ProgressionSavedData.get(serverLevel),
+                        new KingdomGameplayAction(
+                                KingdomActionId.of("command_center_claim", player.getUUID(),
+                                        serverLevel.dimension().identifier(), this.worldPosition.asLong()),
+                                player.getUUID(), ProgressionEventType.BUILDING_COMPLETED,
+                                "command_center", 1));
             }
             this.setChangedAndSync();
         }

@@ -5,8 +5,10 @@ import galacticwars.clonewars.army.ArmyTravelService;
 import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomPermission;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
-import galacticwars.clonewars.progression.ProgressionDecision;
-import galacticwars.clonewars.progression.ProgressionEvent;
+import galacticwars.clonewars.kingdom.KingdomActionId;
+import galacticwars.clonewars.kingdom.KingdomGameplayAction;
+import galacticwars.clonewars.kingdom.KingdomGameplayResult;
+import galacticwars.clonewars.kingdom.KingdomGameplayRuntimeService;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.progression.ProgressionState;
@@ -85,8 +87,10 @@ public final class PlanetTravelService {
 
         ProgressionState afterTravel = progression.state(player.getUUID());
         if (!afterTravel.hasSubject(ProgressionEventType.PLANET_VISITED, planetId)) {
-            ProgressionDecision visit = progression.apply(new ProgressionEvent(
-                    UUID.randomUUID(), player.getUUID(), ProgressionEventType.PLANET_VISITED, planetId, 1));
+            KingdomGameplayResult visit = KingdomGameplayRuntimeService.applyProgression(
+                    progression, new KingdomGameplayAction(
+                            KingdomActionId.of("planet_visited", player.getUUID(), planetId),
+                            player.getUUID(), ProgressionEventType.PLANET_VISITED, planetId, 1));
             if (!visit.accepted()) {
                 GalacticWars.LOGGER.error("Planet visit progression rejected after successful travel for {}: {}",
                         player.getGameProfile().name(), visit.reason());

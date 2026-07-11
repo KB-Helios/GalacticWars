@@ -3,8 +3,10 @@ package galacticwars.clonewars.faction;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
-import galacticwars.clonewars.progression.ProgressionDecision;
-import galacticwars.clonewars.progression.ProgressionEvent;
+import galacticwars.clonewars.kingdom.KingdomActionId;
+import galacticwars.clonewars.kingdom.KingdomGameplayAction;
+import galacticwars.clonewars.kingdom.KingdomGameplayResult;
+import galacticwars.clonewars.kingdom.KingdomGameplayRuntimeService;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import net.minecraft.network.chat.Component;
@@ -61,9 +63,11 @@ public final class IdentityChipItem extends Item {
             return InteractionResult.FAIL;
         }
 
-        ProgressionDecision progression = ProgressionSavedData.get(level).apply(new ProgressionEvent(
-                UUID.randomUUID(), player.getUUID(), ProgressionEventType.FACTION_PLEDGED,
-                faction.id().toString(), 1));
+        KingdomGameplayResult progression = KingdomGameplayRuntimeService.applyProgression(
+                ProgressionSavedData.get(level), new KingdomGameplayAction(
+                        KingdomActionId.of("faction_pledge", player.getUUID(), faction.id()),
+                        player.getUUID(), ProgressionEventType.FACTION_PLEDGED,
+                        faction.id().toString(), 1));
         if (!progression.accepted()) {
             player.sendSystemMessage(Component.literal("Faction pledge rejected: " + progression.reason()));
             return InteractionResult.FAIL;

@@ -17,7 +17,7 @@ public record ProgressionState(
         Map<ProgressionEventType, Set<String>> eventSubjects,
         Set<String> unlocks
 ) {
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
 
     public ProgressionState {
         if (schemaVersion != CURRENT_SCHEMA_VERSION) {

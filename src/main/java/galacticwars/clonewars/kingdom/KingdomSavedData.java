@@ -29,7 +29,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 public final class KingdomSavedData extends SavedData {
-    public static final int CURRENT_SCHEMA_VERSION = 5;
+    public static final int CURRENT_SCHEMA_VERSION = 6;
     public static final Codec<KingdomSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("schema_version", CURRENT_SCHEMA_VERSION).forGetter(KingdomSavedData::schemaVersion),
             KingdomCodecs.KINGDOM_RECORD.listOf().optionalFieldOf("kingdoms", List.of()).forGetter(KingdomSavedData::kingdoms),
@@ -72,7 +72,10 @@ public final class KingdomSavedData extends SavedData {
             List<KingdomDiplomacy> diplomacy,
             List<KingdomSiege> sieges
     ) {
-        this.schemaVersion = Math.max(CURRENT_SCHEMA_VERSION, schemaVersion);
+        if (schemaVersion > CURRENT_SCHEMA_VERSION) {
+            throw new IllegalArgumentException("Unsupported kingdom schema " + schemaVersion);
+        }
+        this.schemaVersion = CURRENT_SCHEMA_VERSION;
         for (KingdomRecord kingdom : kingdoms) {
             if (!this.kingdomsByOwner.containsKey(kingdom.ownerId())
                     && !this.kingdomsById.containsKey(kingdom.id())

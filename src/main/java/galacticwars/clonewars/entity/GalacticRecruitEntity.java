@@ -34,6 +34,9 @@ import galacticwars.clonewars.faction.FactionAlignmentSavedData;
 import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
+import galacticwars.clonewars.kingdom.KingdomActionId;
+import galacticwars.clonewars.kingdom.KingdomGameplayAction;
+import galacticwars.clonewars.kingdom.KingdomGameplayRuntimeService;
 import galacticwars.clonewars.kingdom.BuildProject;
 import galacticwars.clonewars.kingdom.CommanderPolicy;
 import galacticwars.clonewars.kingdom.RecruitmentCampaign;
@@ -49,7 +52,6 @@ import galacticwars.clonewars.menu.RecruitCommandMenu;
 import galacticwars.clonewars.menu.RecruitCommandAction;
 import galacticwars.clonewars.menu.RecruitCommandMenuProvider;
 import galacticwars.clonewars.recruitment.RecruitmentAction;
-import galacticwars.clonewars.progression.ProgressionEvent;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.recruitment.RecruitDuty;
@@ -1650,6 +1652,14 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             return false;
         }
         if (progressed.state() == WorkOrderState.COMPLETED) {
+            if (progressed.type() == WorkOrderType.COURIER) {
+                KingdomGameplayRuntimeService.applyProgression(
+                        ProgressionSavedData.get(serverLevel),
+                        new KingdomGameplayAction(
+                                KingdomActionId.of("delivery_complete", progressed.id()),
+                                ownerId, ProgressionEventType.DELIVERY_COMPLETED,
+                                "courier/" + progressed.id(), 1));
+            }
             this.workOrderId = null;
         }
         return true;
@@ -2013,9 +2023,13 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             this.blockWorker("kingdom_link_missing");
             return;
         }
-        ProgressionSavedData.get(serverLevel).apply(new ProgressionEvent(
-                UUID.randomUUID(), this.getOwnerReference().getUUID(), ProgressionEventType.BUILDING_COMPLETED,
-                KingdomBaseBlueprint.path(blueprint.id()), 1));
+        UUID ownerId = this.getOwnerReference().getUUID();
+        KingdomGameplayRuntimeService.applyProgression(
+                ProgressionSavedData.get(serverLevel),
+                new KingdomGameplayAction(
+                        KingdomActionId.of("build_project_complete", project.id()),
+                        ownerId, ProgressionEventType.BUILDING_COMPLETED,
+                        KingdomBaseBlueprint.path(blueprint.id()), 1));
         KingdomSavedData.get(serverLevel).reserveWorksite(
                 this.getOwnerReference().getUUID(), this.getUUID(), WorkerProfession.BUILDER);
         this.workerCooldownTicks = 100;
@@ -2441,9 +2455,12 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         this.setTarget(null);
         this.navigation.stop();
         this.level().broadcastEntityEvent(this, (byte) 7);
-        ProgressionSavedData.get(serverLevel).apply(new ProgressionEvent(
-                UUID.randomUUID(), player.getUUID(), ProgressionEventType.RECRUIT_HIRED,
-                this.recruitUnitId().substring(this.recruitUnitId().indexOf(':') + 1), 1));
+        KingdomGameplayRuntimeService.applyProgression(
+                ProgressionSavedData.get(serverLevel),
+                new KingdomGameplayAction(
+                        KingdomActionId.of("recruit_hired", this.getUUID()),
+                        player.getUUID(), ProgressionEventType.RECRUIT_HIRED,
+                        this.recruitUnitId().substring(this.recruitUnitId().indexOf(':') + 1), 1));
         sendFeedback(player, Component.translatable("message.galacticwars.recruit.hired"));
         return true;
     }
@@ -2511,9 +2528,12 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         this.setWorkerProfession(profession);
         this.reconcileWorkerAuthority(serverLevel);
         this.resumeWorkAfterProfessionAssignment();
-        ProgressionSavedData.get(serverLevel).apply(new ProgressionEvent(
-                UUID.randomUUID(), player.getUUID(), ProgressionEventType.PROFESSION_ASSIGNED,
-                profession.id(), 1));
+        KingdomGameplayRuntimeService.applyProgression(
+                ProgressionSavedData.get(serverLevel),
+                new KingdomGameplayAction(
+                        KingdomActionId.of("profession_assigned", this.getUUID(), profession.id()),
+                        player.getUUID(), ProgressionEventType.PROFESSION_ASSIGNED,
+                        profession.id(), 1));
         sendFeedback(player, Component.translatable(
                 "message.galacticwars.recruit.profession.contract",
                 Component.translatable(profession.translationKey()),

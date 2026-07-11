@@ -6,8 +6,10 @@ import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
-import galacticwars.clonewars.progression.ProgressionDecision;
-import galacticwars.clonewars.progression.ProgressionEvent;
+import galacticwars.clonewars.kingdom.KingdomActionId;
+import galacticwars.clonewars.kingdom.KingdomGameplayAction;
+import galacticwars.clonewars.kingdom.KingdomGameplayResult;
+import galacticwars.clonewars.kingdom.KingdomGameplayRuntimeService;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.LaunchContentCatalog;
 import galacticwars.clonewars.progression.ProgressionSavedData;
@@ -112,9 +114,10 @@ public final class FactionSelectionMenu extends AbstractContainerMenu {
         }
 
         if (progressionFaction.isEmpty()) {
-            ProgressionDecision pledge = progression.apply(new ProgressionEvent(
-                    UUID.randomUUID(), serverPlayer.getUUID(), ProgressionEventType.FACTION_PLEDGED,
-                    factionId, 1));
+            KingdomGameplayResult pledge = KingdomGameplayRuntimeService.applyProgression(
+                    progression, new KingdomGameplayAction(
+                            KingdomActionId.of("faction_pledge", serverPlayer.getUUID(), factionId),
+                            serverPlayer.getUUID(), ProgressionEventType.FACTION_PLEDGED, factionId, 1));
             if (!pledge.accepted()) {
                 serverPlayer.sendSystemMessage(Component.literal(
                         "Faction selection rejected: " + pledge.reason()));
