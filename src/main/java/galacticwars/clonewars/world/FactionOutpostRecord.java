@@ -48,6 +48,8 @@ public record FactionOutpostRecord(
     }
 
     public FactionOutpostRecord withNpc(UUID npcId, NpcServiceBranch branch, long gameTime) {
+        Objects.requireNonNull(npcId, "npcId");
+        Objects.requireNonNull(branch, "branch");
         LinkedHashSet<UUID> military = new LinkedHashSet<>(militaryNpcIds);
         LinkedHashSet<UUID> civilians = new LinkedHashSet<>(civilianNpcIds);
         military.remove(npcId);

@@ -95,14 +95,6 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     }
 
     public static boolean isSupportedButton(int buttonId) {
-        if (buttonId >= BUTTON_HIRE && buttonId <= BUTTON_CANCEL_BUILD) {
-            return true;
-        }
-        if (buttonId == BUTTON_CYCLE_FORMATION || buttonId == BUTTON_ROTATE_BLUEPRINT) {
-            return true;
-        }
-        return WorkerProfessionCatalog.definitionForButton(buttonId)
-                .filter(definition -> WorkerProfessionCatalog.isEnabled(definition.profession()))
-                .isPresent();
+        return RecruitCommandAction.fromButtonId(buttonId).isPresent();
     }
 }

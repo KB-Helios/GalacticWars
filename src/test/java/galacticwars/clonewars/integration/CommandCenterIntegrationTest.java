@@ -26,6 +26,8 @@ public final class CommandCenterIntegrationTest {
         assertContains(menu, "ProgressionEventType.FACTION_PLEDGED", "server-authoritative pledge");
         assertContains(menu, "activateHall", "selected faction kingdom activation");
         assertContains(menu, "FactionAlignmentSavedData", "selected faction alignment");
+        String provider = read("src/main/java/galacticwars/clonewars/menu/FactionSelectionMenuProvider.java");
+        assertContains(provider, "buffer.writeUtf(id, 128)", "bounded faction id encoding");
         assertContains(menus, "FACTION_SELECTION", "faction menu registration");
         assertContains(client, "FactionSelectionScreen", "faction screen registration");
     }

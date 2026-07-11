@@ -9,7 +9,7 @@ public final class RecruitCompanionAiIntegrationTest {
     }
 
     public static void main(String[] args) throws IOException {
-        recruitUsesSinglePlannerRuntimeController();
+        recruitSeparatesGroupedAndLocalRuntimeControl();
         controllerIntegratesExistingPlannerPipeline();
         controllerUsesDataDrivenRangedCombat();
         groupCommandsPersistBeforeRuntimeMutation();
@@ -22,13 +22,21 @@ public final class RecruitCompanionAiIntegrationTest {
         System.out.println("RecruitCompanionAiIntegrationTest passed");
     }
 
-    private static void recruitUsesSinglePlannerRuntimeController() throws IOException {
+    private static void recruitSeparatesGroupedAndLocalRuntimeControl() throws IOException {
         String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
 
         assertContains(entity, "ArmyRecruitRuntimeController", "army runtime controller");
         assertContains(entity, "this.armyRuntimeController.tick(this, serverLevel)", "army runtime invocation");
-        assertNotContains(entity, "new RecruitCompanionGoal", "competing companion goal");
-        assertNotContains(entity, "new RecruitMoveToCommandGoal", "competing move goal");
+        assertContains(entity, "this.goalSelector.addGoal(5, new RecruitMoveToCommandGoal(this, 1.05));",
+                "local move goal registration");
+        assertContains(entity, "this.goalSelector.addGoal(6, new RecruitCompanionGoal(this, 1.0));",
+                "local companion goal registration");
+        assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/RecruitCompanionGoal.java"),
+                "shouldUseCompanionAi", "companion ownership guard");
+        assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/RecruitMoveToCommandGoal.java"),
+                "shouldMoveToCommandTarget", "move command guard");
+        assertTrue(count(entity, "&& !this.hasAuthoritativeArmyGroup()") >= 2,
+                "local movement goals yield to authoritative group control");
         assertNotContains(entity, "FollowOwnerGoal", "vanilla dog-like follow goal");
         assertTrue(count(entity, "!GalacticRecruitEntity.this.hasAuthoritativeArmyGroup()") >= 4,
                 "grouped melee and random-stroll goals are disabled");
@@ -70,10 +78,7 @@ public final class RecruitCompanionAiIntegrationTest {
 
         assertBefore(orderMethod, "issueArmyOrder", "reconcileArmyGroupOrder", "order persistence before reconciliation");
         assertBefore(attackMethod, "issueArmyOrder", "reconcileArmyGroupOrder", "attack persistence before reconciliation");
-        String attackButton = section(
-                entity,
-                "case RecruitCommandMenu.BUTTON_ATTACK ->",
-                "case RecruitCommandMenu.BUTTON_CLEAR ->");
+        String attackButton = section(entity, "case ATTACK ->", "case CLEAR ->");
         assertContains(attackButton, "applyMenuArmyAttack", "attack button authoritative path");
         assertNotContains(attackButton, "this.setTarget", "attack button pre-persistence target mutation");
         assertNotContains(attackButton, "this.setRecruitCommand", "attack button pre-persistence command mutation");

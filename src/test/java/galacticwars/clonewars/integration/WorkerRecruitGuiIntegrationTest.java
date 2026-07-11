@@ -57,9 +57,13 @@ public final class WorkerRecruitGuiIntegrationTest {
 
     private static void recruitPersistsAndAppliesWorkerProfession() throws IOException {
         String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
+        String actions = read("src/main/java/galacticwars/clonewars/menu/RecruitCommandAction.java");
 
         assertContains(entity, "DATA_WORKER_PROFESSION", "synched worker profession");
-        assertContains(entity, "WorkerProfessionCatalog.professionForButton(buttonId)", "button to profession mapping");
+        assertContains(actions, "WorkerProfessionCatalog.professionForButton(buttonId)",
+                "typed button to profession mapping");
+        assertContains(entity, "RecruitCommandAction.workerProfession(buttonId)",
+                "entity profession action boundary");
         assertContains(entity, "tryAssignWorkerProfession(player, profession.get())", "paid profession assignment");
         assertContains(entity, "WorkerProfessionDefinition definition", "profession definition cost lookup");
         assertContains(entity, "definition.hireCostCredits()", "profession credit contract cost");

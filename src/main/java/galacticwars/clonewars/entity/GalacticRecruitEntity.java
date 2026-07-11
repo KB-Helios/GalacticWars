@@ -24,6 +24,8 @@ import galacticwars.clonewars.army.RecruitVitals;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.entity.ai.RecruitWorkerGoal;
 import galacticwars.clonewars.entity.ai.RecruitRangedCombatGoal;
+import galacticwars.clonewars.entity.ai.RecruitCompanionGoal;
+import galacticwars.clonewars.entity.ai.RecruitMoveToCommandGoal;
 import galacticwars.clonewars.entity.ai.CivilianShelterGoal;
 import galacticwars.clonewars.entity.ai.NaturalCivilianWorkGoal;
 import galacticwars.clonewars.combat.FactionRangedWeaponService;
@@ -44,6 +46,7 @@ import galacticwars.clonewars.kingdom.WorkOrderState;
 import galacticwars.clonewars.kingdom.WorkOrderType;
 import galacticwars.clonewars.kingdom.WorksiteRecord;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
+import galacticwars.clonewars.menu.RecruitCommandAction;
 import galacticwars.clonewars.menu.RecruitCommandMenuProvider;
 import galacticwars.clonewars.recruitment.RecruitmentAction;
 import galacticwars.clonewars.progression.ProgressionEvent;
@@ -258,6 +261,8 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         this.goalSelector.addGoal(2, new CivilianShelterGoal(this));
         this.goalSelector.addGoal(3, new NaturalCivilianWorkGoal(this));
         this.goalSelector.addGoal(4, new RecruitWorkerGoal(this));
+        this.goalSelector.addGoal(5, new RecruitMoveToCommandGoal(this, 1.05));
+        this.goalSelector.addGoal(6, new RecruitCompanionGoal(this, 1.0));
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(
                 this, GalacticRecruitEntity.class, 10, true, false,
                 (target, level) -> this.canNaturallyEngage(target)));
@@ -686,7 +691,13 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         }
         BlockPos storage = this.getHomePosition().offset(1, 0, 0);
         if (!(serverLevel.getBlockEntity(storage) instanceof Container container)
-                || !HopperBlockEntity.addItem(null, container, output, null).isEmpty()) {
+        ) {
+            this.nextNaturalProductionGameTime = serverLevel.getGameTime() + 200L;
+            return false;
+        }
+        int originalCount = output.getCount();
+        ItemStack remainder = HopperBlockEntity.addItem(null, container, output, null);
+        if (remainder.getCount() == originalCount) {
             this.nextNaturalProductionGameTime = serverLevel.getGameTime() + 200L;
             return false;
         }
@@ -855,56 +866,62 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         return List.copyOf(lines);
     }
 
+    public RecruitStatusSnapshot recruitStatusSnapshot() {
+        return new RecruitStatusSnapshot(this.recruitStatusLines());
+    }
+
     public boolean handleMenuButton(ServerPlayer player, int buttonId) {
+        Optional<RecruitCommandAction> requestedAction = RecruitCommandAction.fromButtonId(buttonId);
         if (player.level() != this.level()
                 || !this.isAlive()
                 || player.distanceToSqr(this) > 64.0
-                || !RecruitCommandMenu.isSupportedButton(buttonId)) {
+                || requestedAction.isEmpty()) {
             return false;
         }
-        if (buttonId == RecruitCommandMenu.BUTTON_HIRE) {
+        RecruitCommandAction action = requestedAction.orElseThrow();
+        if (action == RecruitCommandAction.HIRE) {
             return this.tryHire(player);
         }
         if (!this.isOwnedBy(player)) {
             sendFeedback(player, Component.translatable("message.galacticwars.recruit.not_owner"));
             return false;
         }
-        Optional<WorkerProfession> profession = WorkerProfessionCatalog.professionForButton(buttonId);
+        Optional<WorkerProfession> profession = RecruitCommandAction.workerProfession(buttonId);
         if (profession.isPresent()) {
             return this.tryAssignWorkerProfession(player, profession.get());
         }
 
-        return switch (buttonId) {
-            case RecruitCommandMenu.BUTTON_PROMOTE_COMMANDER -> this.tryPromoteCommander(player);
-            case RecruitCommandMenu.BUTTON_TOGGLE_AUTO_RECRUITMENT -> this.tryToggleAutomaticRecruitment(player);
-            case RecruitCommandMenu.BUTTON_START_RECRUITMENT -> this.tryStartCommanderCampaign(player);
-            case RecruitCommandMenu.BUTTON_CYCLE_FORMATION -> this.cycleArmyFormation(player);
-            case RecruitCommandMenu.BUTTON_ROTATE_BLUEPRINT -> this.rotateSelectedBlueprint(player);
-            case RecruitCommandMenu.BUTTON_NEXT_BLUEPRINT -> this.cycleSelectedBlueprint(player);
-            case RecruitCommandMenu.BUTTON_RETURN_TO_SOLDIER -> this.tryReturnToSoldier(player);
-            case RecruitCommandMenu.BUTTON_CANCEL_BUILD -> this.tryCancelBuilding(player);
-            case RecruitCommandMenu.BUTTON_FOLLOW -> {
+        return switch (action) {
+            case PROMOTE_COMMANDER -> this.tryPromoteCommander(player);
+            case TOGGLE_AUTO_RECRUITMENT -> this.tryToggleAutomaticRecruitment(player);
+            case START_RECRUITMENT -> this.tryStartCommanderCampaign(player);
+            case CYCLE_FORMATION -> this.cycleArmyFormation(player);
+            case ROTATE_BLUEPRINT -> this.rotateSelectedBlueprint(player);
+            case NEXT_BLUEPRINT -> this.cycleSelectedBlueprint(player);
+            case RETURN_TO_SOLDIER -> this.tryReturnToSoldier(player);
+            case CANCEL_BUILD -> this.tryCancelBuilding(player);
+            case FOLLOW -> {
                 if (!this.applyMenuArmyOrder(RecruitmentAction.FOLLOW_OWNER, null)) {
                     yield false;
                 }
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.follow"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_HOLD -> {
+            case HOLD -> {
                 if (!this.applyMenuArmyOrder(RecruitmentAction.HOLD_POSITION, null)) {
                     yield false;
                 }
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.hold"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_MOVE -> {
+            case MOVE -> {
                 if (!this.applyMenuArmyOrder(RecruitmentAction.MOVE_TO_POSITION, player.blockPosition())) {
                     yield false;
                 }
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.move"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_SET_WORKSITE -> {
+            case SET_WORKSITE -> {
                 if (this.getWorkerProfession().isEmpty()) {
                     player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.worksite.missing_profession"));
                     yield false;
@@ -938,7 +955,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                                 + decision.taskType().name().toLowerCase())));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_RETURN_WORKSITE -> {
+            case RETURN_WORKSITE -> {
                 if (this.workTarget == null) {
                     player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.worksite.missing"));
                     yield false;
@@ -948,7 +965,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.worksite.return"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_CLEAR_WORKSITE -> {
+            case CLEAR_WORKSITE -> {
                 this.releaseCurrentWorkOrder(false);
                 this.setWorkTarget(null);
                 this.pauseWorkerNavigation();
@@ -959,21 +976,21 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.worksite.clear"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_WORK_RADIUS_DECREASE -> {
+            case WORK_RADIUS_DECREASE -> {
                 this.adjustAuthoritativeWorkRadius(-WORK_RADIUS_STEP);
                 player.sendSystemMessage(Component.translatable(
                         "message.galacticwars.recruit.worksite.radius",
                         this.workRadius));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_WORK_RADIUS_INCREASE -> {
+            case WORK_RADIUS_INCREASE -> {
                 this.adjustAuthoritativeWorkRadius(WORK_RADIUS_STEP);
                 player.sendSystemMessage(Component.translatable(
                         "message.galacticwars.recruit.worksite.radius",
                         this.workRadius));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_SET_STORAGE -> {
+            case SET_STORAGE -> {
                 Optional<BlockPos> targetedStorage = targetedBlock(player);
                 if (targetedStorage.isEmpty() || this.findContainer(targetedStorage.get()).isEmpty()) {
                     player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.storage.invalid"));
@@ -989,7 +1006,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.storage.set"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_BUILD_STARTER_KEEP -> {
+            case BUILD_STARTER_KEEP -> {
                 Optional<BlockPos> targetedBase = targetedBlock(player);
                 if (targetedBase.isEmpty()) {
                     player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.worksite.invalid_target"));
@@ -1047,14 +1064,14 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                                 + resourceDecision.action().name().toLowerCase())));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_PROTECT -> {
+            case PROTECT -> {
                 if (!this.applyMenuArmyOrder(RecruitmentAction.PROTECT_OWNER, null)) {
                     yield false;
                 }
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.protect"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_ATTACK -> {
+            case ATTACK -> {
                 Optional<LivingEntity> explicitTarget = targetedLivingEntity(player);
                 if (explicitTarget.isEmpty()) {
                     player.sendSystemMessage(Component.translatable(
@@ -1069,19 +1086,20 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.attack"));
                 yield true;
             }
-            case RecruitCommandMenu.BUTTON_CLEAR -> {
+            case CLEAR -> {
                 if (!this.applyMenuArmyOrder(RecruitmentAction.CLEAR_TARGET, null)) {
                     yield false;
                 }
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.clear"));
                 yield true;
             }
-            default -> false;
+            case HIRE, ASSIGN_WORKER_PROFESSION -> false;
         };
     }
 
     public boolean shouldMoveToCommandTarget() {
         return this.isTame()
+                && !this.hasAuthoritativeArmyGroup()
                 && this.getRecruitCommand() == RecruitmentAction.MOVE_TO_POSITION
                 && this.moveTarget != null
                 && this.distanceToMoveTargetSqr() > 4.0;
@@ -1100,6 +1118,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
     public boolean shouldUseCompanionAi() {
         RecruitmentAction command = this.getRecruitCommand();
         return this.isTame()
+                && !this.hasAuthoritativeArmyGroup()
                 && !this.isOrderedToSit()
                 && (command == RecruitmentAction.FOLLOW_OWNER || command == RecruitmentAction.PROTECT_OWNER)
                 && this.getRecruitOwner().isPresent();

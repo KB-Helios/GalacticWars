@@ -10,8 +10,16 @@ public final class FactionOutpostRecordTest {
 
     public static void main(String[] args) {
         rosterSeparatesMilitaryAndCivilianNpcs();
+        rosterRejectsNullIdentityAndBranch();
         profilesMapEntityTypesToFactionBranches();
         System.out.println("FactionOutpostRecordTest passed");
+    }
+
+    private static void rosterRejectsNullIdentityAndBranch() {
+        FactionOutpostRecord outpost = FactionOutpostRecord.create(
+                "galacticwars:republic", "minecraft:overworld", 0, 64, 0, 96, 10L);
+        assertThrows(() -> outpost.withNpc(null, NpcServiceBranch.MILITARY, 20L), "null npc");
+        assertThrows(() -> outpost.withNpc(UUID.randomUUID(), null, 20L), "null branch");
     }
 
     private static void rosterSeparatesMilitaryAndCivilianNpcs() {
@@ -41,5 +49,14 @@ public final class FactionOutpostRecordTest {
 
     private static void assertTrue(boolean value, String label) {
         if (!value) throw new AssertionError(label);
+    }
+
+    private static void assertThrows(Runnable action, String label) {
+        try {
+            action.run();
+            throw new AssertionError(label + " did not throw");
+        } catch (NullPointerException expected) {
+            // Expected validation failure.
+        }
     }
 }

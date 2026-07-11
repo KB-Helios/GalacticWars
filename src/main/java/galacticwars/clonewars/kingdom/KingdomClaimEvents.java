@@ -60,8 +60,15 @@ public final class KingdomClaimEvents {
             return true;
         }
         String dimensionId = level.dimension().identifier().toString();
-        return KingdomSavedData.get(level).claimAt(dimensionId, new ChunkPos(blockX >> 4, blockZ >> 4))
-                .flatMap(claim -> KingdomSavedData.get(level).kingdom(claim.kingdomId()))
+        KingdomSavedData data = KingdomSavedData.get(level);
+        var claim = data.claimAt(dimensionId, new ChunkPos(blockX >> 4, blockZ >> 4));
+        if (claim.isEmpty()) {
+            return true;
+        }
+        if (player == null) {
+            return false;
+        }
+        return data.kingdom(claim.orElseThrow().kingdomId())
                 .map(kingdom -> kingdom.allows(player.getUUID(), permission))
                 .orElse(true);
     }

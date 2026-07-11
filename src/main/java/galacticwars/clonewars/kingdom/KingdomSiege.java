@@ -30,6 +30,8 @@ public record KingdomSiege(
             throw new IllegalArgumentException("invalid siege progress");
         }
         lastProgressGameTime = Math.max(0L, lastProgressGameTime);
+        Objects.requireNonNull(attackingParticipants, "attackingParticipants");
+        Objects.requireNonNull(defendingParticipants, "defendingParticipants");
         attackingParticipants = List.copyOf(new LinkedHashSet<>(attackingParticipants));
         defendingParticipants = List.copyOf(new LinkedHashSet<>(defendingParticipants));
     }

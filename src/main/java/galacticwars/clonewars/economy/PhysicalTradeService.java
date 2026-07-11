@@ -22,6 +22,9 @@ public final class PhysicalTradeService {
     public static TradeResult purchase(ServerPlayer player, UUID eventId, String tradeId) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(eventId, "eventId");
+        if (tradeId == null) {
+            return TradeResult.rejected("unknown_trade");
+        }
         LaunchContentCatalog.TradeDefinition trade = LaunchContentCatalog.TRADES.get(tradeId);
         if (trade == null) {
             return TradeResult.rejected("unknown_trade");

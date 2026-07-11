@@ -1243,7 +1243,9 @@ public final class KingdomSavedData extends SavedData {
     ) {
         KingdomRecord ownKingdom = kingdomForPlayer(actorId).orElse(null);
         if (ownKingdom == null || !ownKingdom.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)
-                || !kingdomsById.containsKey(otherKingdomId) || durationTicks <= 0L) {
+                || !kingdomsById.containsKey(otherKingdomId)
+                || ownKingdom.id().equals(otherKingdomId)
+                || durationTicks <= 0L) {
             return false;
         }
         KingdomDiplomacy current = relation(ownKingdom.id(), otherKingdomId);

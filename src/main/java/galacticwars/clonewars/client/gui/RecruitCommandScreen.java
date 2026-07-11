@@ -173,7 +173,7 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
         int controlsWidth = BUTTON_WIDTH * COLUMN_COUNT + COLUMN_GAP * (COLUMN_COUNT - 1);
         int controlsLeft = (this.width - controlsWidth) / 2;
         int controlsRight = controlsLeft + controlsWidth;
-        List<Component> statusLines = recruit.recruitStatusLines();
+        List<Component> statusLines = recruit.recruitStatusSnapshot().lines();
         if (this.width - controlsRight < STATUS_PANEL_MIN_WIDTH) {
             this.drawCompactStatusTooltip(graphics, statusLines, controlsRight, mouseX, mouseY);
             return;

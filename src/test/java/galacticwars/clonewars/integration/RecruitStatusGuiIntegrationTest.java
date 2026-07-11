@@ -22,7 +22,7 @@ public final class RecruitStatusGuiIntegrationTest {
         assertContains(screen, "GuiGraphicsExtractor", "gui graphics extraction parameter");
         assertContains(screen, "extractRenderState", "status extraction method");
         assertContains(screen, "drawRecruitStatusPanel", "status panel method");
-        assertContains(screen, "recruit.recruitStatusLines()", "entity status lines");
+        assertContains(screen, "recruit.recruitStatusSnapshot().lines()", "immutable entity status snapshot");
         assertContains(screen, "screen.galacticwars.recruit.status.title", "status title label");
         assertContains(screen, "drawCompactStatusTooltip", "narrow-screen status layout");
         assertContains(screen, "setComponentTooltipForNextFrame", "narrow-screen status tooltip");
@@ -32,6 +32,7 @@ public final class RecruitStatusGuiIntegrationTest {
         String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
 
         assertContains(entity, "recruitStatusLines", "status lines method");
+        assertContains(entity, "recruitStatusSnapshot", "immutable status snapshot method");
         assertContains(entity, "screen.galacticwars.recruit.status.command", "command status key");
         assertContains(entity, "screen.galacticwars.recruit.status.profession", "profession status key");
         assertContains(entity, "screen.galacticwars.recruit.status.resource_action", "resource action status key");

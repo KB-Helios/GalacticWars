@@ -14,6 +14,7 @@ public final class KingdomGovernanceTest {
         claimsRequireContiguousExpansionAndTransferExplicitly();
         diplomacyIsSymmetricAndCooldownAware();
         siegesRequireMilitaryAdvantageToProgress();
+        siegesRejectNullParticipantLists();
         npcRosterMigratesWorkersAndSoldiers();
         System.out.println("KingdomGovernanceTest passed");
     }
@@ -81,6 +82,24 @@ public final class KingdomGovernanceTest {
         KingdomSiege captured = contested.progress(12, 2, 140L, List.of(), List.of());
         assertEquals(SiegeState.CAPTURED, captured.state(), "capture state");
         assertEquals(10, captured.captureProgress(), "bounded capture progress");
+    }
+
+    private static void siegesRejectNullParticipantLists() {
+        assertThrows(() -> new KingdomSiege(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                SiegeState.ACTIVE, 0, 10, 0L, null, List.of()), "null attackers");
+        assertThrows(() -> new KingdomSiege(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                SiegeState.ACTIVE, 0, 10, 0L, List.of(), null), "null defenders");
+    }
+
+    private static void assertThrows(Runnable action, String label) {
+        try {
+            action.run();
+            throw new AssertionError(label + " did not throw");
+        } catch (NullPointerException expected) {
+            // Expected validation failure.
+        }
     }
 
     private static void assertEquals(Object expected, Object actual, String label) {

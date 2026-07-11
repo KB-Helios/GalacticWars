@@ -688,6 +688,10 @@ public final class ModGameTests {
         KingdomRecord kingdom = data.foundKingdom(
                 owner.getUUID(), "galacticwars:republic",
                 helper.getLevel().dimension().identifier().toString(), capitalPos);
+        if (data.establishTreaty(owner.getUUID(), kingdom.id(),
+                helper.getLevel().getGameTime(), 200L, 0L)) {
+            helper.fail("Kingdom established a treaty with itself");
+        }
         if (!data.addMember(owner.getUUID(), builder.getUUID(), KingdomMemberRole.BUILDER,
                 "galacticwars:republic")
                 || !data.allows(builder.getUUID(), KingdomPermission.BUILD)
@@ -932,10 +936,13 @@ public final class ModGameTests {
         UUID eventId = UUID.randomUUID();
         PhysicalTradeService.TradeResult purchase = PhysicalTradeService.purchase(
                 player, eventId, "republic_quartermaster");
+        PhysicalTradeService.TradeResult missingTrade = PhysicalTradeService.purchase(
+                player, UUID.randomUUID(), null);
         int energyCells = player.getInventory().getNonEquipmentItems().stream()
                 .filter(stack -> stack.is(ModItems.ENERGY_CELL.get()))
                 .mapToInt(ItemStack::getCount).sum();
         if (!purchase.accepted() || !purchase.changed() || purchase.creditsCharged() != 12
+                || missingTrade.accepted() || !missingTrade.reason().equals("unknown_trade")
                 || CreditTransactionService.playerBalance(player) != 0 || energyCells != 8) {
             helper.fail("Physical trade did not atomically exchange Credit Chips for goods");
         }

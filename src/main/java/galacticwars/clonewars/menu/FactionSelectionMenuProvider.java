@@ -32,6 +32,6 @@ public final class FactionSelectionMenuProvider implements MenuProvider {
         var factionIds = GameplayDataManager.snapshot().selectableFactions().stream()
                 .map(definition -> definition.id().toString()).toList();
         buffer.writeVarInt(factionIds.size());
-        factionIds.forEach(buffer::writeUtf);
+        factionIds.forEach(id -> buffer.writeUtf(id, 128));
     }
 }
