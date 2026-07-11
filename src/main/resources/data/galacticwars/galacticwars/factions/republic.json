@@ -11,6 +11,15 @@
   "enemies": [
     "galacticwars:separatist"
   ],
+  "strategy": {
+    "archetype": "disciplined_logistics",
+    "recruitment_capacity_bonus": 2,
+    "upkeep_percent": 120,
+    "production_percent": 110,
+    "morale_bonus": 15,
+    "strength": "officer_coordination",
+    "weakness": "supply_dependence"
+  },
   "pledge": {
     "token_item": "galacticwars:republic_identity_chip",
     "direct_delta": 10,

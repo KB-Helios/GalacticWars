@@ -17,7 +17,8 @@ public record FactionDefinition(
         String pledgeTokenItemId,
         int pledgeDirectDelta,
         int pledgeAllyDelta,
-        int pledgeEnemyDelta
+        int pledgeEnemyDelta,
+        FactionStrategyDefinition strategy
 ) {
     public FactionDefinition(
             FactionId id,
@@ -29,7 +30,26 @@ public record FactionDefinition(
             Set<FactionId> enemies
     ) {
         this(id, displayName, hireCost, minimumHiringAlignment, maxOwnedRecruits, allies, enemies,
-                0, "", 10, 2, -5);
+                0, "", 10, 2, -5, FactionStrategyDefinition.shared());
+    }
+
+    public FactionDefinition(
+            FactionId id,
+            String displayName,
+            int hireCost,
+            int minimumHiringAlignment,
+            int maxOwnedRecruits,
+            Set<FactionId> allies,
+            Set<FactionId> enemies,
+            int selectionOrder,
+            String pledgeTokenItemId,
+            int pledgeDirectDelta,
+            int pledgeAllyDelta,
+            int pledgeEnemyDelta
+    ) {
+        this(id, displayName, hireCost, minimumHiringAlignment, maxOwnedRecruits, allies, enemies,
+                selectionOrder, pledgeTokenItemId, pledgeDirectDelta, pledgeAllyDelta, pledgeEnemyDelta,
+                FactionStrategyDefinition.shared());
     }
 
     public FactionDefinition {
@@ -45,6 +65,7 @@ public record FactionDefinition(
         enemies = immutableCopy(enemies, "enemies");
         validateRelationSets(id.toString(), id, allies, enemies);
         pledgeTokenItemId = pledgeTokenItemId == null ? "" : pledgeTokenItemId.trim().toLowerCase();
+        Objects.requireNonNull(strategy, "strategy");
     }
 
     public static void validateRelationSets(

@@ -26,9 +26,13 @@ import galacticwars.clonewars.army.ArmyUnitRole;
 import galacticwars.clonewars.faction.FactionCatalog;
 import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.faction.FactionId;
+import galacticwars.clonewars.faction.FactionStrategyDefinition;
+import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.settlement.BaseBlockPlacement;
 import galacticwars.clonewars.settlement.BlueprintAnchor;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
+import galacticwars.clonewars.world.OverworldFactionSpawnProfile;
+import galacticwars.clonewars.world.CivilianArchetypeDefinition;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.FileToIdConverter;
@@ -73,6 +77,10 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
             Map<FactionId, FactionDefinition> factions = loadFactions(manager);
             List<ArmyUnitDefinition> units = loadUnits(manager, factions);
             Map<String, KingdomBaseBlueprint> blueprints = loadBlueprints(manager);
+            Map<String, CivilianArchetypeDefinition> civilianArchetypes = loadCivilianArchetypes(
+                    manager, factions);
+            Map<String, OverworldFactionSpawnProfile> overworldSpawnProfiles = loadOverworldSpawnProfiles(
+                    manager, factions, units, civilianArchetypes);
             LaunchContentValidator.validate(manager);
             validateRelations(factions);
             LinkedHashMap<String, ArmyUnitId> byEntityType = new LinkedHashMap<>();
@@ -106,7 +114,9 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                     new ArmyUnitCatalog(units),
                     byEntityType,
                     Map.of("galacticwars:mandalorian_rider", ArmyUnitId.of("galacticwars:mandalorian_warrior")),
-                    blueprints);
+                    blueprints,
+                    overworldSpawnProfiles,
+                    civilianArchetypes);
             return LoadResult.success(loaded);
         } catch (RuntimeException | IOException exception) {
             return LoadResult.failure(exception);
@@ -119,10 +129,12 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
             snapshot = result.snapshot().orElseThrow();
             generation++;
             GalacticWars.LOGGER.info(
-                    "Loaded {} factions, {} units, {} base blueprints, and the validated launch progression catalogs",
+                    "Loaded {} factions, {} units, {} civilian archetypes, {} base blueprints, {} Overworld spawn profiles, and the validated launch progression catalogs",
                     snapshot.factions().definitions().size(),
                     snapshot.units().definitions().size(),
-                    snapshot.blueprints().size());
+                    snapshot.civilianArchetypesByEntityType().size(),
+                    snapshot.blueprints().size(),
+                    snapshot.overworldSpawnProfiles().size());
         } else {
             GalacticWars.LOGGER.error(
                     "Rejected gameplay data reload; retaining the previous valid snapshot",
@@ -139,6 +151,7 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
             Set<FactionId> enemies = factionIds(json, "enemies");
             FactionDefinition.validateRelationSets(resource.id().toString(), id, allies, enemies);
             JsonObject pledge = object(json, "pledge", new JsonObject());
+            JsonObject strategy = object(json, "strategy", new JsonObject());
             FactionDefinition definition = new FactionDefinition(
                     id,
                     requiredString(json, "display_name", resource.id()),
@@ -151,7 +164,15 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                     string(pledge, "token_item", "galacticwars:" + id.path() + "_identity_chip"),
                     integer(pledge, "direct_delta", 10),
                     integer(pledge, "ally_delta", 2),
-                    integer(pledge, "enemy_delta", -5));
+                    integer(pledge, "enemy_delta", -5),
+                    new FactionStrategyDefinition(
+                            string(strategy, "archetype", "shared"),
+                            integer(strategy, "recruitment_capacity_bonus", 0),
+                            integer(strategy, "upkeep_percent", 100),
+                            integer(strategy, "production_percent", 100),
+                            integer(strategy, "morale_bonus", 0),
+                            string(strategy, "strength", "combined_arms"),
+                            string(strategy, "weakness", "none")));
             if (definitions.putIfAbsent(id, definition) != null) {
                 throw new IllegalArgumentException("Duplicate faction id " + id + " in " + resource.id());
             }
@@ -221,6 +242,98 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
             throw new IllegalArgumentException("Missing required forward_base blueprint");
         }
         return blueprints;
+    }
+
+    private static Map<String, OverworldFactionSpawnProfile> loadOverworldSpawnProfiles(
+            ResourceManager manager,
+            Map<FactionId, FactionDefinition> factions,
+            List<ArmyUnitDefinition> units,
+            Map<String, CivilianArchetypeDefinition> civilianArchetypes
+    ) throws IOException {
+        Map<String, ArmyUnitDefinition> unitsByEntity = units.stream().collect(java.util.stream.Collectors.toMap(
+                ArmyUnitDefinition::entityTypeId, unit -> unit));
+        LinkedHashMap<String, OverworldFactionSpawnProfile> profiles = new LinkedHashMap<>();
+        for (ResourceJson resource : resources(manager, "galacticwars/overworld_faction_spawns")) {
+            JsonArray definitions = requiredArray(resource.json(), "profiles", resource.id());
+            for (JsonElement element : definitions) {
+                JsonObject json = element.getAsJsonObject();
+                String factionId = requiredString(json, "faction", resource.id());
+                FactionId faction = FactionId.of(factionId);
+                if (!factions.containsKey(faction)) {
+                    throw new IllegalArgumentException("Overworld spawn profile references unknown faction " + faction);
+                }
+                LinkedHashMap<String, NpcServiceBranch> branches = new LinkedHashMap<>();
+                JsonArray entities = requiredArray(json, "entities", resource.id());
+                for (JsonElement entityElement : entities) {
+                    JsonObject entity = entityElement.getAsJsonObject();
+                    String entityTypeId = requiredString(entity, "entity_type", resource.id());
+                    ArmyUnitDefinition unit = unitsByEntity.get(entityTypeId);
+                    CivilianArchetypeDefinition civilian = civilianArchetypes.get(entityTypeId);
+                    boolean matchingUnit = unit != null && unit.factionId().equals(faction);
+                    boolean matchingCivilian = civilian != null && civilian.factionId().equals(faction.toString());
+                    if (!matchingUnit && !matchingCivilian) {
+                        throw new IllegalArgumentException("Overworld spawn entity " + entityTypeId
+                                + " does not belong to " + faction);
+                    }
+                    NpcServiceBranch branch = NpcServiceBranch.byId(
+                            requiredString(entity, "service_branch", resource.id()));
+                    if (branches.putIfAbsent(entityTypeId, branch) != null) {
+                        throw new IllegalArgumentException("Duplicate Overworld spawn entity " + entityTypeId);
+                    }
+                }
+                OverworldFactionSpawnProfile profile = new OverworldFactionSpawnProfile(
+                        faction.toString(), branches,
+                        integer(json, "outpost_radius", 96),
+                        integer(json, "minimum_outpost_spacing", 256),
+                        integer(json, "military_capacity", 12),
+                        integer(json, "civilian_capacity", 4));
+                if (profiles.putIfAbsent(profile.factionId(), profile) != null) {
+                    throw new IllegalArgumentException("Duplicate Overworld spawn profile for " + faction);
+                }
+            }
+        }
+        if (profiles.size() != factions.size()) {
+            throw new IllegalArgumentException("Every faction requires one Overworld spawn profile");
+        }
+        return Map.copyOf(profiles);
+    }
+
+    private static Map<String, CivilianArchetypeDefinition> loadCivilianArchetypes(
+            ResourceManager manager,
+            Map<FactionId, FactionDefinition> factions
+    ) throws IOException {
+        LinkedHashMap<String, CivilianArchetypeDefinition> definitions = new LinkedHashMap<>();
+        LinkedHashSet<FactionId> representedFactions = new LinkedHashSet<>();
+        for (ResourceJson resource : resources(manager, "galacticwars/civilian_archetypes")) {
+            JsonObject json = resource.json();
+            FactionId faction = FactionId.of(requiredString(json, "faction", resource.id()));
+            if (!factions.containsKey(faction)) {
+                throw new IllegalArgumentException("Civilian archetype references unknown faction " + faction);
+            }
+            JsonArray professionsJson = requiredArray(json, "professions", resource.id());
+            ArrayList<String> professions = new ArrayList<>();
+            professionsJson.forEach(element -> professions.add(element.getAsString()));
+            CivilianArchetypeDefinition definition = new CivilianArchetypeDefinition(
+                    requiredString(json, "id", resource.id()),
+                    requiredString(json, "display_name", resource.id()),
+                    faction.toString(),
+                    requiredString(json, "entity_type", resource.id()),
+                    professions,
+                    integer(json, "max_health", 20),
+                    decimal(json, "movement_speed", 0.26D),
+                    integer(json, "base_morale", 60),
+                    string(json, "home_type", "housing"));
+            requireRegistered(BuiltInRegistries.ENTITY_TYPE, definition.entityTypeId(),
+                    "civilian entity type for " + definition.id());
+            if (definitions.putIfAbsent(definition.entityTypeId(), definition) != null
+                    || !representedFactions.add(faction)) {
+                throw new IllegalArgumentException("Duplicate civilian archetype for " + faction);
+            }
+        }
+        if (representedFactions.size() != factions.size()) {
+            throw new IllegalArgumentException("Every faction requires one civilian archetype");
+        }
+        return Map.copyOf(definitions);
     }
 
     static KingdomBaseBlueprint parseBlueprint(Identifier resourceId, JsonObject json) {
@@ -387,7 +500,9 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 new ArmyUnitCatalog(List.of()),
                 Map.of(),
                 Map.of("galacticwars:mandalorian_rider", ArmyUnitId.of("galacticwars:mandalorian_warrior")),
-                indexed);
+                indexed,
+                Map.of(),
+                Map.of());
     }
 
     record LoadResult(Optional<GameplayDataSnapshot> snapshot, Optional<Throwable> failure) {

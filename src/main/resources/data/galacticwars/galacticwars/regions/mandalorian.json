@@ -6,8 +6,8 @@
   "downfall": 0.3,
   "spawn_weight": 8,
   "features": [
-    "horse_lords_plains",
-    "thatched_villages",
-    "watch_mounds"
+    "beskar_badlands",
+    "clan_enclaves",
+    "watchtowers"
   ]
 }

@@ -1,0 +1,13 @@
+{
+  "display_name": "Nightsisters",
+  "controlling_faction": "galacticwars:nightsister",
+  "climate": "shadow",
+  "base_temperature": 0.8,
+  "downfall": 0.2,
+  "spawn_weight": 5,
+  "features": [
+    "ritual_enclaves",
+    "weave_groves",
+    "mist_valleys"
+  ]
+}

@@ -16,13 +16,17 @@ import galacticwars.clonewars.faction.FactionCatalog;
 import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
+import galacticwars.clonewars.world.OverworldFactionSpawnProfile;
+import galacticwars.clonewars.world.CivilianArchetypeDefinition;
 
 public record GameplayDataSnapshot(
         FactionCatalog factions,
         ArmyUnitCatalog units,
         Map<String, ArmyUnitId> unitIdsByEntityType,
         Map<String, ArmyUnitId> unitAliases,
-        Map<String, KingdomBaseBlueprint> blueprints
+        Map<String, KingdomBaseBlueprint> blueprints,
+        Map<String, OverworldFactionSpawnProfile> overworldSpawnProfiles,
+        Map<String, CivilianArchetypeDefinition> civilianArchetypesByEntityType
 ) {
     public GameplayDataSnapshot {
         Objects.requireNonNull(factions, "factions");
@@ -43,6 +47,30 @@ public record GameplayDataSnapshot(
             }
         }
         blueprints = Collections.unmodifiableMap(normalizedBlueprints);
+        overworldSpawnProfiles = immutableMap(overworldSpawnProfiles, "overworldSpawnProfiles");
+        civilianArchetypesByEntityType = immutableMap(
+                civilianArchetypesByEntityType, "civilianArchetypesByEntityType");
+    }
+
+    public GameplayDataSnapshot(
+            FactionCatalog factions,
+            ArmyUnitCatalog units,
+            Map<String, ArmyUnitId> unitIdsByEntityType,
+            Map<String, ArmyUnitId> unitAliases,
+            Map<String, KingdomBaseBlueprint> blueprints
+    ) {
+        this(factions, units, unitIdsByEntityType, unitAliases, blueprints, Map.of(), Map.of());
+    }
+
+    public GameplayDataSnapshot(
+            FactionCatalog factions,
+            ArmyUnitCatalog units,
+            Map<String, ArmyUnitId> unitIdsByEntityType,
+            Map<String, ArmyUnitId> unitAliases,
+            Map<String, KingdomBaseBlueprint> blueprints,
+            Map<String, OverworldFactionSpawnProfile> overworldSpawnProfiles
+    ) {
+        this(factions, units, unitIdsByEntityType, unitAliases, blueprints, overworldSpawnProfiles, Map.of());
     }
 
     public Optional<FactionDefinition> faction(String id) {
@@ -75,6 +103,14 @@ public record GameplayDataSnapshot(
         ordered.sort(Comparator.comparingInt(FactionDefinition::selectionOrder)
                 .thenComparing(definition -> definition.id().toString()));
         return List.copyOf(ordered);
+    }
+
+    public Optional<OverworldFactionSpawnProfile> overworldSpawnProfileForEntity(String entityTypeId) {
+        return overworldSpawnProfiles.values().stream().filter(profile -> profile.supports(entityTypeId)).findFirst();
+    }
+
+    public Optional<CivilianArchetypeDefinition> civilianArchetypeForEntity(String entityTypeId) {
+        return Optional.ofNullable(civilianArchetypesByEntityType.get(entityTypeId));
     }
 
     public static String normalizeBlueprintId(String id) {

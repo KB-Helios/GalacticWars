@@ -26,7 +26,8 @@ public record SettlementRecord(
         List<WorkOrder> workOrders,
         List<RecruitmentCampaign> recruitmentCampaigns,
         SettlementRewards rewards,
-        int revision
+        int revision,
+        List<UUID> additionalCommanderIds
 ) {
     public SettlementRecord {
         Objects.requireNonNull(id, "id");
@@ -40,6 +41,12 @@ public record SettlementRecord(
         Objects.requireNonNull(recruitIds, "recruitIds");
         recruitIds = List.copyOf(new LinkedHashSet<>(recruitIds));
         commanderId = commanderId == null ? Optional.empty() : commanderId;
+        Optional<UUID> primaryCommander = commanderId;
+        additionalCommanderIds = List.copyOf(new LinkedHashSet<>(
+                Objects.requireNonNull(additionalCommanderIds, "additionalCommanderIds"))).stream()
+                .filter(commander -> primaryCommander.filter(commander::equals).isEmpty())
+                .filter(recruitIds::contains)
+                .toList();
         Objects.requireNonNull(commanderPolicy, "commanderPolicy");
         worksites = List.copyOf(Objects.requireNonNull(worksites, "worksites"));
         if (worksites.stream().noneMatch(worksite -> worksite.type().equals("frontier"))) {
@@ -54,6 +61,29 @@ public record SettlementRecord(
         if (revision < 0) {
             throw new IllegalArgumentException("revision cannot be negative");
         }
+    }
+
+    public SettlementRecord(
+            UUID id,
+            String dimensionId,
+            int hallX,
+            int hallY,
+            int hallZ,
+            int claimRadius,
+            int housingCapacity,
+            List<UUID> recruitIds,
+            Optional<UUID> commanderId,
+            CommanderPolicy commanderPolicy,
+            List<WorksiteRecord> worksites,
+            List<BuildProject> buildProjects,
+            List<WorkOrder> workOrders,
+            List<RecruitmentCampaign> recruitmentCampaigns,
+            SettlementRewards rewards,
+            int revision
+    ) {
+        this(id, dimensionId, hallX, hallY, hallZ, claimRadius, housingCapacity, recruitIds, commanderId,
+                commanderPolicy, worksites, buildProjects, workOrders, recruitmentCampaigns, rewards, revision,
+                List.of());
     }
 
     public static SettlementRecord create(String dimensionId, int x, int y, int z) {
@@ -93,7 +123,14 @@ public record SettlementRecord(
     }
 
     public boolean hasCommanderSlot() {
-        return rewards.commanderSlots() > 0;
+        return commanderIds().size() < rewards.commanderSlots();
+    }
+
+    public List<UUID> commanderIds() {
+        java.util.ArrayList<UUID> commanders = new java.util.ArrayList<>();
+        commanderId.ifPresent(commanders::add);
+        commanders.addAll(additionalCommanderIds);
+        return List.copyOf(commanders);
     }
 
     public boolean containsCompletedProject(BuildProject project) {
@@ -122,8 +159,11 @@ public record SettlementRecord(
         LinkedHashSet<UUID> updated = new LinkedHashSet<>(recruitIds);
         updated.remove(recruitId);
         Optional<UUID> updatedCommander = commanderId.filter(id -> !id.equals(recruitId));
+        List<UUID> updatedAdditionalCommanders = additionalCommanderIds.stream()
+                .filter(id -> !id.equals(recruitId)).toList();
         SettlementRecord removed = copy(
-                List.copyOf(updated), updatedCommander, commanderPolicy, recruitmentCampaigns, revision + 1)
+                List.copyOf(updated), updatedCommander, commanderPolicy, recruitmentCampaigns, revision + 1,
+                updatedAdditionalCommanders)
                 .releaseWorksite(recruitId);
         for (WorkOrder workOrder : List.copyOf(removed.workOrders())) {
             if (workOrder.assignedRecruitId().filter(recruitId::equals).isPresent() && !workOrder.state().terminal()) {
@@ -141,21 +181,38 @@ public record SettlementRecord(
                 .toList();
         return new SettlementRecord(id, dimensionId, x, y, z, claimRadius, housingCapacity,
                 recruitIds, commanderId, commanderPolicy, relocatedWorksites, buildProjects, workOrders,
-                recruitmentCampaigns, rewards, revision + 1);
+                recruitmentCampaigns, rewards, revision + 1, additionalCommanderIds);
     }
 
     public SettlementRecord withCommander(UUID recruitId) {
         if (!containsRecruit(recruitId)) {
             throw new IllegalArgumentException("commander must be a settlement recruit");
         }
-        return copy(recruitIds, Optional.of(recruitId), commanderPolicy, recruitmentCampaigns, revision + 1);
+        if (commanderIds().contains(recruitId)) {
+            return this;
+        }
+        if (commanderId.isEmpty()) {
+            return copy(recruitIds, Optional.of(recruitId), commanderPolicy, recruitmentCampaigns, revision + 1,
+                    additionalCommanderIds);
+        }
+        java.util.ArrayList<UUID> commanders = new java.util.ArrayList<>(additionalCommanderIds);
+        commanders.add(recruitId);
+        return copy(recruitIds, commanderId, commanderPolicy, recruitmentCampaigns, revision + 1,
+                List.copyOf(commanders));
     }
 
     public SettlementRecord withoutCommander(UUID recruitId) {
-        if (commanderId.filter(recruitId::equals).isEmpty()) {
+        if (!commanderIds().contains(recruitId)) {
             return this;
         }
-        return copy(recruitIds, Optional.empty(), commanderPolicy, recruitmentCampaigns, revision + 1);
+        if (commanderId.filter(recruitId::equals).isPresent()) {
+            Optional<UUID> promotedPrimary = additionalCommanderIds.stream().findFirst();
+            List<UUID> remaining = promotedPrimary.isEmpty() ? List.of() : additionalCommanderIds.subList(
+                    1, additionalCommanderIds.size());
+            return copy(recruitIds, promotedPrimary, commanderPolicy, recruitmentCampaigns, revision + 1, remaining);
+        }
+        return copy(recruitIds, commanderId, commanderPolicy, recruitmentCampaigns, revision + 1,
+                additionalCommanderIds.stream().filter(id -> !id.equals(recruitId)).toList());
     }
 
     public SettlementRecord withCommanderPolicy(CommanderPolicy policy) {
@@ -421,7 +478,7 @@ public record SettlementRecord(
                 commanderPolicy, List.copyOf(updatedWorksites), List.copyOf(projects), workOrders,
                 recruitmentCampaigns,
                 rewards.add(blueprint.storageSlotReward(), blueprint.commanderSlotReward()),
-                revision + 1);
+                revision + 1, additionalCommanderIds);
     }
 
     private List<WorksiteRecord> reconcileBuilderWorksite(
@@ -455,8 +512,20 @@ public record SettlementRecord(
             List<RecruitmentCampaign> campaigns,
             int nextRevision
     ) {
+        return copy(recruits, commander, policy, campaigns, nextRevision, additionalCommanderIds);
+    }
+
+    private SettlementRecord copy(
+            List<UUID> recruits,
+            Optional<UUID> commander,
+            CommanderPolicy policy,
+            List<RecruitmentCampaign> campaigns,
+            int nextRevision,
+            List<UUID> additionalCommanders
+    ) {
         return new SettlementRecord(id, dimensionId, hallX, hallY, hallZ, claimRadius, housingCapacity,
-                recruits, commander, policy, worksites, buildProjects, workOrders, campaigns, rewards, nextRevision);
+                recruits, commander, policy, worksites, buildProjects, workOrders, campaigns, rewards, nextRevision,
+                additionalCommanders);
     }
 
     private SettlementRecord withOperationalState(
@@ -467,6 +536,6 @@ public record SettlementRecord(
     ) {
         return new SettlementRecord(id, dimensionId, hallX, hallY, hallZ, claimRadius, housingCapacity,
                 recruitIds, commanderId, commanderPolicy, updatedWorksites, updatedProjects, updatedOrders,
-                recruitmentCampaigns, rewards, nextRevision);
+                recruitmentCampaigns, rewards, nextRevision, additionalCommanderIds);
     }
 }

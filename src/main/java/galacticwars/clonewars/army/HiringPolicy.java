@@ -25,7 +25,9 @@ public final class HiringPolicy {
         if (availableCoins < faction.hireCost()) {
             return HiringDecision.rejected("coins_too_low");
         }
-        if (ownedRecruitCount >= faction.maxOwnedRecruits()) {
+        int effectiveLimit = Math.addExact(
+                faction.maxOwnedRecruits(), faction.strategy().recruitmentCapacityBonus());
+        if (ownedRecruitCount >= effectiveLimit) {
             return HiringDecision.rejected("recruit_limit_reached");
         }
         return HiringDecision.accepted(faction.hireCost());

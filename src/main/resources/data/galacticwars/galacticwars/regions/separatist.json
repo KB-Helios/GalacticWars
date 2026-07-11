@@ -6,8 +6,8 @@
   "downfall": 0.0,
   "spawn_weight": 6,
   "features": [
-    "ash_wastes",
-    "black_gate",
-    "orc_camps"
+    "foundry_wastes",
+    "droid_checkpoints",
+    "command_nodes"
   ]
 }

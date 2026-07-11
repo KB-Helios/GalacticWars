@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.UUID;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.kingdom.KingdomRecord;
+import galacticwars.clonewars.kingdom.KingdomPermission;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.registry.ModBlockEntityTypes;
 import galacticwars.clonewars.progression.ProgressionEvent;
@@ -62,6 +63,17 @@ public final class CommandCenterBlockEntity extends BaseContainerBlockEntity {
 
     public boolean isOwner(Player player) {
         return ownerId != null && ownerId.equals(player.getUUID());
+    }
+
+    public boolean canUse(Player player, KingdomPermission permission) {
+        if (this.isOwner(player)) {
+            return true;
+        }
+        return this.level instanceof ServerLevel serverLevel
+                && this.ownerId != null
+                && KingdomSavedData.get(serverLevel).kingdomForOwner(this.ownerId)
+                        .map(kingdom -> kingdom.allows(player.getUUID(), permission))
+                        .orElse(false);
     }
 
     public boolean claim(Player player) {
@@ -122,7 +134,10 @@ public final class CommandCenterBlockEntity extends BaseContainerBlockEntity {
         if (gameTime - this.lastUpkeepGameTime < 24000) {
             return this.upkeepPaid;
         }
-        int upkeep = Math.max(1, population);
+        int upkeepPercent = GameplayDataManager.snapshot().faction(this.factionId)
+                .map(definition -> definition.strategy().upkeepPercent()).orElse(100);
+        int upkeep = Math.max(1, Math.floorDiv(Math.addExact(
+                Math.multiplyExact(Math.max(0, population), upkeepPercent), 99), 100));
         this.upkeepPaid = this.reserveCredits(upkeep);
         this.lastUpkeepGameTime = gameTime;
         this.setChangedAndSync();
@@ -193,7 +208,7 @@ public final class CommandCenterBlockEntity extends BaseContainerBlockEntity {
 
     @Override
     public boolean canOpen(Player player) {
-        return super.canOpen(player) && this.isOwner(player);
+        return super.canOpen(player) && this.canUse(player, KingdomPermission.USE_STORAGE);
     }
 
     @Override

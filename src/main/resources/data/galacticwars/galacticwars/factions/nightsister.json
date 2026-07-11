@@ -1,6 +1,6 @@
 {
   "id": "galacticwars:nightsister",
-  "display_name": "Elven Realm",
+  "display_name": "Nightsisters",
   "selection_order": 4,
   "hire_cost": 28,
   "minimum_hiring_alignment": 10,
@@ -9,6 +9,15 @@
   "enemies": [
     "galacticwars:separatist"
   ],
+  "strategy": {
+    "archetype": "ritual_enclave",
+    "recruitment_capacity_bonus": 0,
+    "upkeep_percent": 110,
+    "production_percent": 85,
+    "morale_bonus": 25,
+    "strength": "force_area_control",
+    "weakness": "limited_industry"
+  },
   "pledge": {
     "token_item": "galacticwars:nightsister_identity_chip",
     "direct_delta": 10,

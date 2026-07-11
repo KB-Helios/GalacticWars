@@ -1,0 +1,11 @@
+{
+  "id": "galacticwars:mandalorian_clansperson",
+  "display_name": "Mandalorian Clansperson",
+  "faction": "galacticwars:mandalorian",
+  "entity_type": "galacticwars:mandalorian_clansperson",
+  "professions": ["miner", "builder", "merchant", "cook"],
+  "max_health": 22,
+  "movement_speed": 0.28,
+  "base_morale": 85,
+  "home_type": "clan_hall"
+}

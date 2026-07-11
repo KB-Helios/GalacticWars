@@ -11,6 +11,15 @@
   "enemies": [
     "galacticwars:separatist"
   ],
+  "strategy": {
+    "archetype": "elite_clans",
+    "recruitment_capacity_bonus": 0,
+    "upkeep_percent": 140,
+    "production_percent": 90,
+    "morale_bonus": 20,
+    "strength": "mobility_and_beskar",
+    "weakness": "limited_population"
+  },
   "pledge": {
     "token_item": "galacticwars:mandalorian_identity_chip",
     "direct_delta": 10,

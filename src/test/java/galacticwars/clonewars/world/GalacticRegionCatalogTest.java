@@ -40,7 +40,7 @@ public final class GalacticRegionCatalogTest {
         assertEquals(0.8F, republic.baseTemperature(), "region base temperature");
         assertEquals(0.4F, republic.downfall(), "region downfall");
         assertEquals(10, republic.spawnWeight(), "region spawn weight");
-        assertTrue(republic.features().contains("white_city_outskirts"), "region feature");
+        assertTrue(republic.features().contains("clone_garrisons"), "region feature");
     }
 
     private static void looksUpRegionsByIdFactionAndClimate() {
@@ -121,7 +121,7 @@ public final class GalacticRegionCatalogTest {
                         0.7F,
                         0.3F,
                         8,
-                        Set.of("horse_lords_plains", "thatched_villages")),
+                        Set.of("beskar_badlands", "clan_enclaves")),
                 new GalacticRegionDefinition(
                         GalacticRegionId.of("separatist"),
                         "Separatist",
@@ -130,7 +130,7 @@ public final class GalacticRegionCatalogTest {
                         1.0F,
                         0.0F,
                         6,
-                        Set.of("ash_wastes", "black_gate"))));
+                        Set.of("foundry_wastes", "command_nodes"))));
     }
 
     private static GalacticRegionDefinition republic() {
@@ -142,7 +142,7 @@ public final class GalacticRegionCatalogTest {
                 0.8F,
                 0.4F,
                 10,
-                Set.of("white_city_outskirts", "beacon_hills"));
+                Set.of("clone_garrisons", "supply_corridors"));
     }
 
     private static void assertEquals(Object expected, Object actual, String label) {

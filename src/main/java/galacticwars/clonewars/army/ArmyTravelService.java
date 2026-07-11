@@ -2,6 +2,7 @@ package galacticwars.clonewars.army;
 
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
+import galacticwars.clonewars.kingdom.KingdomPermission;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,7 +28,11 @@ public final class ArmyTravelService {
             ServerLevel destination,
             BlockPos arrival
     ) {
-        ArmyGroupRecord group = data.armyGroupForOwner(owner.getUUID()).orElse(null);
+        var kingdom = data.kingdomForPlayer(owner.getUUID()).orElse(null);
+        ArmyGroupRecord group = kingdom == null || !kingdom.allows(owner.getUUID(), KingdomPermission.COMMAND_ARMY)
+                ? null
+                : data.armyGroupsForKingdom(kingdom.id()).stream()
+                        .filter(candidate -> eligible(owner, candidate)).findFirst().orElse(null);
         if (group == null || !eligible(owner, group)) {
             return TravelPlan.noop(data);
         }

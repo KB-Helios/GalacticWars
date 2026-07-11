@@ -12,6 +12,15 @@
     "galacticwars:hutt_cartel",
     "galacticwars:nightsister"
   ],
+  "strategy": {
+    "archetype": "droid_industry",
+    "recruitment_capacity_bonus": 8,
+    "upkeep_percent": 70,
+    "production_percent": 125,
+    "morale_bonus": 0,
+    "strength": "mass_production",
+    "weakness": "command_node_dependence"
+  },
   "pledge": {
     "token_item": "galacticwars:separatist_identity_chip",
     "direct_delta": 10,

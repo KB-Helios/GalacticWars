@@ -1,0 +1,11 @@
+{
+  "id": "galacticwars:separatist_technician",
+  "display_name": "Separatist Technician Droid",
+  "faction": "galacticwars:separatist",
+  "entity_type": "galacticwars:separatist_technician",
+  "professions": ["miner", "builder", "courier"],
+  "max_health": 18,
+  "movement_speed": 0.25,
+  "base_morale": 100,
+  "home_type": "droid_service_bay"
+}

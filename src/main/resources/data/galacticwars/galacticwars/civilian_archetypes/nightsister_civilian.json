@@ -1,0 +1,11 @@
+{
+  "id": "galacticwars:nightsister_civilian",
+  "display_name": "Nightsister Gatherer",
+  "faction": "galacticwars:nightsister",
+  "entity_type": "galacticwars:nightsister_civilian",
+  "professions": ["farmer", "lumberjack", "cook", "merchant"],
+  "max_health": 20,
+  "movement_speed": 0.27,
+  "base_morale": 70,
+  "home_type": "ritual_dwelling"
+}

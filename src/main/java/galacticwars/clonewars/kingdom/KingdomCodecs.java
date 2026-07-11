@@ -2,6 +2,7 @@ package galacticwars.clonewars.kingdom;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.mojang.datafixers.util.Either;
 import java.util.List;
 import java.util.Optional;
 import galacticwars.clonewars.army.ArmyFormation;
@@ -14,10 +15,73 @@ import galacticwars.clonewars.army.ArmyMemberSnapshot;
 import galacticwars.clonewars.army.ArmySnapshotEquipment;
 import galacticwars.clonewars.army.ArmyCommandType;
 import galacticwars.clonewars.recruitment.RecruitDuty;
+import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.workforce.WorkerProfession;
+import galacticwars.clonewars.workforce.CourierTransferAction;
+import galacticwars.clonewars.workforce.CourierTransferType;
+import galacticwars.clonewars.workforce.CourierWaypoint;
+import galacticwars.clonewars.workforce.WorkAreaBounds;
+import galacticwars.clonewars.workforce.WorkAreaConfiguration;
 import net.minecraft.core.UUIDUtil;
 
 final class KingdomCodecs {
+    static final Codec<KingdomNpcRecord> KINGDOM_NPC = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("recruit_id").forGetter(KingdomNpcRecord::recruitId),
+            UUIDUtil.CODEC.fieldOf("settlement_id").forGetter(KingdomNpcRecord::settlementId),
+            Codec.STRING.xmap(NpcServiceBranch::byId, NpcServiceBranch::id)
+                    .fieldOf("service_branch").forGetter(KingdomNpcRecord::serviceBranch)
+    ).apply(instance, KingdomNpcRecord::new));
+
+    static final Codec<KingdomMember> KINGDOM_MEMBER = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("player_id").forGetter(KingdomMember::playerId),
+            Codec.STRING.xmap(KingdomMemberRole::byId, KingdomMemberRole::id)
+                    .fieldOf("role").forGetter(KingdomMember::role)
+    ).apply(instance, KingdomMember::new));
+
+    static final Codec<ClaimedChunk> CLAIMED_CHUNK = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.INT.fieldOf("x").forGetter(ClaimedChunk::x),
+            Codec.INT.fieldOf("z").forGetter(ClaimedChunk::z)
+    ).apply(instance, ClaimedChunk::new));
+
+    static final Codec<KingdomClaim> KINGDOM_CLAIM = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("id").forGetter(KingdomClaim::id),
+            UUIDUtil.CODEC.fieldOf("kingdom_id").forGetter(KingdomClaim::kingdomId),
+            Codec.STRING.fieldOf("dimension").forGetter(KingdomClaim::dimensionId),
+            CLAIMED_CHUNK.fieldOf("center").forGetter(KingdomClaim::center),
+            CLAIMED_CHUNK.listOf().fieldOf("chunks").forGetter(KingdomClaim::chunks),
+            Codec.BOOL.optionalFieldOf("capital", false).forGetter(KingdomClaim::capital)
+    ).apply(instance, KingdomClaim::new));
+
+    static final Codec<KingdomDiplomacy> KINGDOM_DIPLOMACY = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("first_kingdom_id").forGetter(KingdomDiplomacy::firstKingdomId),
+            UUIDUtil.CODEC.fieldOf("second_kingdom_id").forGetter(KingdomDiplomacy::secondKingdomId),
+            Codec.STRING.xmap(KingdomRelation::byId, KingdomRelation::id)
+                    .optionalFieldOf("relation", KingdomRelation.NEUTRAL).forGetter(KingdomDiplomacy::relation),
+            Codec.LONG.optionalFieldOf("treaty_expires_game_time", 0L)
+                    .forGetter(KingdomDiplomacy::treatyExpiresGameTime),
+            Codec.LONG.optionalFieldOf("cooldown_until_game_time", 0L)
+                    .forGetter(KingdomDiplomacy::cooldownUntilGameTime),
+            Codec.BOOL.optionalFieldOf("embargo", false).forGetter(KingdomDiplomacy::embargo)
+    ).apply(instance, KingdomDiplomacy::new));
+
+    static final Codec<KingdomSiege> KINGDOM_SIEGE = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("id").forGetter(KingdomSiege::id),
+            UUIDUtil.CODEC.fieldOf("claim_id").forGetter(KingdomSiege::claimId),
+            UUIDUtil.CODEC.fieldOf("attacker_kingdom_id").forGetter(KingdomSiege::attackerKingdomId),
+            UUIDUtil.CODEC.fieldOf("defender_kingdom_id").forGetter(KingdomSiege::defenderKingdomId),
+            Codec.STRING.xmap(SiegeState::byId, SiegeState::id)
+                    .optionalFieldOf("state", SiegeState.ACTIVE).forGetter(KingdomSiege::state),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("capture_progress", 0)
+                    .forGetter(KingdomSiege::captureProgress),
+            Codec.intRange(1, Integer.MAX_VALUE).fieldOf("capture_goal").forGetter(KingdomSiege::captureGoal),
+            Codec.LONG.optionalFieldOf("last_progress_game_time", 0L)
+                    .forGetter(KingdomSiege::lastProgressGameTime),
+            UUIDUtil.CODEC.listOf().optionalFieldOf("attackers", List.of())
+                    .forGetter(KingdomSiege::attackingParticipants),
+            UUIDUtil.CODEC.listOf().optionalFieldOf("defenders", List.of())
+                    .forGetter(KingdomSiege::defendingParticipants)
+    ).apply(instance, KingdomSiege::new));
+
     static final Codec<ArmyLocation> ARMY_LOCATION = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("dimension").forGetter(ArmyLocation::dimensionId),
             Codec.DOUBLE.fieldOf("x").forGetter(ArmyLocation::x),
@@ -77,7 +141,13 @@ final class KingdomCodecs {
             UUIDUtil.CODEC.listOf().optionalFieldOf("member_ids", List.of()).forGetter(ArmyGroupRecord::memberIds),
             ARMY_GROUP_ORDER.fieldOf("order").forGetter(ArmyGroupRecord::order),
             ARMY_GROUP_SIMULATION.fieldOf("simulation").forGetter(ArmyGroupRecord::simulation),
-            ARMY_MEMBER_SNAPSHOT.listOf().optionalFieldOf("snapshots", List.of()).forGetter(ArmyGroupRecord::snapshots)
+            ARMY_MEMBER_SNAPSHOT.listOf().optionalFieldOf("snapshots", List.of()).forGetter(ArmyGroupRecord::snapshots),
+            Codec.STRING.optionalFieldOf("name", "Squad").forGetter(ArmyGroupRecord::name),
+            ARMY_LOCATION.optionalFieldOf("rally_point").forGetter(ArmyGroupRecord::rallyPoint),
+            ARMY_LOCATION.listOf().optionalFieldOf("patrol_route", List.of()).forGetter(ArmyGroupRecord::patrolRoute),
+            UUIDUtil.CODEC.optionalFieldOf("defended_claim_id").forGetter(ArmyGroupRecord::defendedClaimId),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("supply_units", 0)
+                    .forGetter(ArmyGroupRecord::supplyUnits)
     ).apply(instance, ArmyGroupRecord::new));
 
     static final Codec<CommanderPolicy> COMMANDER_POLICY = RecordCodecBuilder.create(instance -> instance.group(
@@ -108,6 +178,39 @@ final class KingdomCodecs {
             Codec.intRange(1, Integer.MAX_VALUE).fieldOf("slots").forGetter(StorageEndpoint::slots)
     ).apply(instance, StorageEndpoint::new));
 
+    static final Codec<WorkAreaBounds> WORK_AREA_BOUNDS = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.intRange(1, 64).fieldOf("width").forGetter(WorkAreaBounds::width),
+            Codec.intRange(1, 64).fieldOf("height").forGetter(WorkAreaBounds::height),
+            Codec.intRange(1, 64).fieldOf("depth").forGetter(WorkAreaBounds::depth)
+    ).apply(instance, WorkAreaBounds::new));
+
+    static final Codec<CourierTransferAction> COURIER_TRANSFER_ACTION = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.STRING.xmap(CourierTransferType::byId, CourierTransferType::id)
+                    .fieldOf("type").forGetter(CourierTransferAction::type),
+            Codec.STRING.optionalFieldOf("item", "").forGetter(CourierTransferAction::itemId),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("quantity", 0)
+                    .forGetter(CourierTransferAction::quantity)
+    ).apply(instance, CourierTransferAction::new));
+
+    static final Codec<CourierWaypoint> COURIER_WAYPOINT = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.STRING.fieldOf("dimension").forGetter(CourierWaypoint::dimensionId),
+            Codec.INT.fieldOf("x").forGetter(CourierWaypoint::x),
+            Codec.INT.fieldOf("y").forGetter(CourierWaypoint::y),
+            Codec.INT.fieldOf("z").forGetter(CourierWaypoint::z),
+            COURIER_TRANSFER_ACTION.listOf().optionalFieldOf("actions", List.of())
+                    .forGetter(CourierWaypoint::actions)
+    ).apply(instance, CourierWaypoint::new));
+
+    static final Codec<WorkAreaConfiguration> WORK_AREA_CONFIGURATION = RecordCodecBuilder.create(instance -> instance.group(
+            WORK_AREA_BOUNDS.fieldOf("bounds").forGetter(WorkAreaConfiguration::bounds),
+            Codec.BOOL.optionalFieldOf("kingdom_access", true).forGetter(WorkAreaConfiguration::kingdomAccess),
+            Codec.intRange(0, 100).optionalFieldOf("priority", 50).forGetter(WorkAreaConfiguration::priority),
+            Codec.BOOL.optionalFieldOf("overlay_visible", false).forGetter(WorkAreaConfiguration::overlayVisible),
+            Codec.STRING.listOf().optionalFieldOf("item_filters", List.of()).forGetter(WorkAreaConfiguration::itemFilters),
+            COURIER_WAYPOINT.listOf().optionalFieldOf("courier_route", List.of())
+                    .forGetter(WorkAreaConfiguration::courierRoute)
+    ).apply(instance, WorkAreaConfiguration::new));
+
     static final Codec<WorksiteRecord> WORKSITE = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("id").forGetter(WorksiteRecord::id),
             Codec.STRING.fieldOf("type").forGetter(WorksiteRecord::type),
@@ -121,8 +224,10 @@ final class KingdomCodecs {
                     .listOf().optionalFieldOf("accepted_professions", List.of()).forGetter(WorksiteRecord::acceptedProfessions),
             UUIDUtil.CODEC.optionalFieldOf("source_project_id").forGetter(WorksiteRecord::sourceProjectId),
             UUIDUtil.CODEC.listOf().optionalFieldOf("assignment_ids", List.of()).forGetter(WorksiteRecord::assignmentIds),
-            STORAGE_ENDPOINT.listOf().optionalFieldOf("storage_endpoints", List.of()).forGetter(WorksiteRecord::storageEndpoints)
-    ).apply(instance, WorksiteRecord::new));
+            STORAGE_ENDPOINT.listOf().optionalFieldOf("storage_endpoints", List.of()).forGetter(WorksiteRecord::storageEndpoints),
+            WORK_AREA_CONFIGURATION.optionalFieldOf("configuration")
+                    .forGetter(worksite -> Optional.of(worksite.configuration()))
+    ).apply(instance, WorksiteRecord::fromPersistence));
 
     static final Codec<BuildProject> BUILD_PROJECT = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("id").forGetter(BuildProject::id),
@@ -176,7 +281,9 @@ final class KingdomCodecs {
             Codec.intRange(8, 256).optionalFieldOf("claim_radius", 48).forGetter(SettlementRecord::claimRadius),
             Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("housing_capacity", 4).forGetter(SettlementRecord::housingCapacity),
             UUIDUtil.CODEC.listOf().optionalFieldOf("recruit_ids", List.of()).forGetter(SettlementRecord::recruitIds),
-            UUIDUtil.CODEC.optionalFieldOf("commander_id").forGetter(SettlementRecord::commanderId),
+            Codec.either(UUIDUtil.CODEC, UUIDUtil.CODEC.listOf())
+                    .xmap(value -> value.map(List::of, List::copyOf), Either::right)
+                    .optionalFieldOf("commander_id", List.of()).forGetter(SettlementRecord::commanderIds),
             COMMANDER_POLICY.optionalFieldOf("commander_policy", CommanderPolicy.defaults()).forGetter(SettlementRecord::commanderPolicy),
             WORKSITE.listOf().optionalFieldOf("worksites", List.of()).forGetter(SettlementRecord::worksites),
             BUILD_PROJECT.listOf().optionalFieldOf("build_projects", List.of()).forGetter(SettlementRecord::buildProjects),
@@ -184,13 +291,23 @@ final class KingdomCodecs {
             RECRUITMENT_CAMPAIGN.listOf().optionalFieldOf("recruitment_campaigns", List.of()).forGetter(SettlementRecord::recruitmentCampaigns),
             SETTLEMENT_REWARDS.optionalFieldOf("rewards", SettlementRewards.none()).forGetter(SettlementRecord::rewards),
             Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("revision", 0).forGetter(SettlementRecord::revision)
-    ).apply(instance, SettlementRecord::new));
+    ).apply(instance, (id, dimension, hallX, hallY, hallZ, claimRadius, housingCapacity, recruitIds,
+            commanderIds, commanderPolicy, worksites, buildProjects, workOrders, recruitmentCampaigns,
+            rewards, revision) -> new SettlementRecord(
+                    id, dimension, hallX, hallY, hallZ, claimRadius, housingCapacity, recruitIds,
+                    commanderIds.stream().findFirst(), commanderPolicy, worksites, buildProjects, workOrders,
+                    recruitmentCampaigns, rewards, revision,
+                    commanderIds.size() < 2 ? List.of() : commanderIds.subList(1, commanderIds.size()))));
 
     static final Codec<KingdomRecord> KINGDOM_RECORD = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("id").forGetter(KingdomRecord::id),
             UUIDUtil.CODEC.fieldOf("owner_id").forGetter(KingdomRecord::ownerId),
             Codec.STRING.fieldOf("faction_id").forGetter(KingdomRecord::factionId),
-            SETTLEMENT.fieldOf("settlement").forGetter(KingdomRecord::settlement)
+            SETTLEMENT.fieldOf("settlement").forGetter(KingdomRecord::settlement),
+            KINGDOM_MEMBER.listOf().optionalFieldOf("members", List.of()).forGetter(KingdomRecord::members),
+            SETTLEMENT.listOf().optionalFieldOf("outposts", List.of()).forGetter(KingdomRecord::outposts),
+            KINGDOM_CLAIM.listOf().optionalFieldOf("claims", List.of()).forGetter(KingdomRecord::claims),
+            KINGDOM_NPC.listOf().optionalFieldOf("npc_roster", List.of()).forGetter(KingdomRecord::npcRoster)
     ).apply(instance, KingdomRecord::new));
 
     private KingdomCodecs() {

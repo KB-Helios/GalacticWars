@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.workforce.WorkerProfessionCatalog;
+import galacticwars.clonewars.workforce.WorkAreaConfiguration;
 
 public record WorksiteRecord(
         UUID id,
@@ -20,7 +21,8 @@ public record WorksiteRecord(
         List<WorkerProfession> acceptedProfessions,
         Optional<UUID> sourceProjectId,
         List<UUID> assignmentIds,
-        List<StorageEndpoint> storageEndpoints
+        List<StorageEndpoint> storageEndpoints,
+        WorkAreaConfiguration configuration
 ) {
     public WorksiteRecord {
         Objects.requireNonNull(id, "id");
@@ -46,6 +48,25 @@ public record WorksiteRecord(
             throw new IllegalArgumentException("worksite assignments exceed capacity");
         }
         storageEndpoints = List.copyOf(Objects.requireNonNull(storageEndpoints, "storageEndpoints"));
+        configuration = configuration == null ? WorkAreaConfiguration.defaults(radius) : configuration;
+    }
+
+    public WorksiteRecord(
+            UUID id,
+            String type,
+            String dimensionId,
+            int x,
+            int y,
+            int z,
+            int radius,
+            int capacity,
+            List<WorkerProfession> acceptedProfessions,
+            Optional<UUID> sourceProjectId,
+            List<UUID> assignmentIds,
+            List<StorageEndpoint> storageEndpoints
+    ) {
+        this(id, type, dimensionId, x, y, z, radius, capacity, acceptedProfessions, sourceProjectId,
+                assignmentIds, storageEndpoints, WorkAreaConfiguration.defaults(radius));
     }
 
     public WorksiteRecord(UUID id, String type, String dimensionId, int x, int y, int z, int radius, int capacity) {
@@ -80,7 +101,7 @@ public record WorksiteRecord(
 
     private WorksiteRecord copy(List<UUID> assignments, List<StorageEndpoint> endpoints) {
         return new WorksiteRecord(id, type, dimensionId, x, y, z, radius, capacity,
-                acceptedProfessions, sourceProjectId, assignments, endpoints);
+                acceptedProfessions, sourceProjectId, assignments, endpoints, configuration);
     }
 
     public WorksiteRecord withLocation(String dimensionId, int x, int y, int z) {
@@ -89,6 +110,34 @@ public record WorksiteRecord(
 
     public WorksiteRecord withLocationAndRadius(String dimensionId, int x, int y, int z, int radius) {
         return new WorksiteRecord(id, type, dimensionId, x, y, z, radius, capacity,
-                acceptedProfessions, sourceProjectId, assignmentIds, storageEndpoints);
+                acceptedProfessions, sourceProjectId, assignmentIds, storageEndpoints,
+                new WorkAreaConfiguration(configuration.bounds(), configuration.kingdomAccess(),
+                        configuration.priority(), configuration.overlayVisible(), configuration.itemFilters(),
+                        configuration.courierRoute()));
+    }
+
+    static WorksiteRecord fromPersistence(
+            UUID id,
+            String type,
+            String dimensionId,
+            int x,
+            int y,
+            int z,
+            int radius,
+            int capacity,
+            List<WorkerProfession> acceptedProfessions,
+            Optional<UUID> sourceProjectId,
+            List<UUID> assignmentIds,
+            List<StorageEndpoint> storageEndpoints,
+            Optional<WorkAreaConfiguration> configuration
+    ) {
+        return new WorksiteRecord(id, type, dimensionId, x, y, z, radius, capacity,
+                acceptedProfessions, sourceProjectId, assignmentIds, storageEndpoints,
+                configuration.orElseGet(() -> WorkAreaConfiguration.defaults(radius)));
+    }
+
+    public WorksiteRecord configured(WorkAreaConfiguration configuration) {
+        return new WorksiteRecord(id, type, dimensionId, x, y, z, radius, capacity,
+                acceptedProfessions, sourceProjectId, assignmentIds, storageEndpoints, configuration);
     }
 }
