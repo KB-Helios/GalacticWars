@@ -62,6 +62,12 @@ public final class ModItems {
             ITEMS.registerSimpleItem("green_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
     public static final DeferredItem<Item> RED_LIGHTSABER =
             ITEMS.registerSimpleItem("red_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
+    public static final DeferredItem<Item> PURPLE_LIGHTSABER =
+            ITEMS.registerSimpleItem("purple_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
+    public static final DeferredItem<Item> YELLOW_LIGHTSABER =
+            ITEMS.registerSimpleItem("yellow_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
+    public static final DeferredItem<Item> WHITE_LIGHTSABER =
+            ITEMS.registerSimpleItem("white_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
     public static final DeferredItem<Item> VIBROBLADE =
             ITEMS.registerSimpleItem("vibroblade", properties -> properties.sword(ModEquipmentMaterials.MANDALORIAN.tool(), 3.0F, -2.4F));
     public static final DeferredItem<Item> POWER_DRILL =

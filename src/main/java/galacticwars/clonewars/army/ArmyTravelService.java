@@ -134,7 +134,7 @@ public final class ArmyTravelService {
         private final ArmyGroupRecord original;
         private final ArmyGroupRecord transferred;
         private final List<GalacticRecruitEntity> liveMembers;
-        private boolean reserved;
+        private final AtomicTravelReservation reservation = new AtomicTravelReservation();
 
         private TravelPlan(
                 KingdomSavedData data,
@@ -188,32 +188,31 @@ public final class ArmyTravelService {
             if (transferred == null) {
                 return true;
             }
-            reserved = data.replaceArmyGroup(transferred, original.simulation().revision());
-            return reserved;
+            return reservation.reserve(
+                    () -> data.replaceArmyGroup(transferred, original.simulation().revision()));
         }
 
         public void commit() {
-            if (!reserved || transferred == null) {
+            if (transferred == null) {
                 return;
             }
-            liveMembers.forEach(GalacticRecruitEntity::discard);
-            reserved = false;
+            reservation.commit(() -> liveMembers.forEach(GalacticRecruitEntity::discard));
         }
 
         public boolean rollback(long gameTime) {
-            if (!reserved || transferred == null) {
+            if (transferred == null) {
                 return true;
+            }
+            if (!reservation.reserved()) {
+                return false;
             }
             ArmyGroupSimulation previous = original.simulation();
             ArmyGroupSimulation restoredSimulation = new ArmyGroupSimulation(
                     previous.lifecycleState(), previous.anchor(), Math.max(previous.lastSimulationGameTime(), gameTime),
                     transferred.simulation().revision() + 1L, previous.snapshotGeneration(), previous.blockedReason());
             ArmyGroupRecord restored = original.withSimulation(restoredSimulation, original.snapshots());
-            boolean restoredSuccessfully = data.replaceArmyGroup(restored, transferred.simulation().revision());
-            if (restoredSuccessfully) {
-                reserved = false;
-            }
-            return restoredSuccessfully;
+            return reservation.rollback(
+                    () -> data.replaceArmyGroup(restored, transferred.simulation().revision()));
         }
     }
 }

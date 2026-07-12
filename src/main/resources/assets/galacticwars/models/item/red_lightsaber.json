@@ -1,1 +1,1 @@
-{"parent":"minecraft:item/handheld","textures":{"layer0":"galacticwars:item/red_lightsaber"}}
+{"parent":"galacticwars:item/lightsaber_base","textures":{"hilt":"galacticwars:item/lightsaber/red_hilt","blade":"galacticwars:item/lightsaber/red_blade"}}

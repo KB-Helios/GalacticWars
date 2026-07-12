@@ -33,7 +33,8 @@ public final class AssetManifestCompletenessTest {
     private static final List<String> COMBAT = List.of(
             "vibroblade", "plasma_cutter", "power_drill", "sonic_excavator", "hydrospanner",
             "dc15_blaster", "e5_blaster", "westar_blaster", "scatter_blaster", "nightsister_bow",
-            "blue_lightsaber", "green_lightsaber", "red_lightsaber", "beskar_vibroblade",
+            "blue_lightsaber", "green_lightsaber", "red_lightsaber", "purple_lightsaber",
+            "yellow_lightsaber", "white_lightsaber", "beskar_vibroblade",
             "blaster_bolt", "force_light", "force_dark");
     private static final List<String> VEHICLES = List.of(
             "barc_speeder", "at_rt", "stap", "aat", "laat_gunship");
@@ -118,7 +119,12 @@ public final class AssetManifestCompletenessTest {
                     "textures/armor/" + family + ".png", "1024x1024");
         }
         for (String id : COMBAT) {
-            item(assets, "combat_and_tools", id);
+            if (id.endsWith("_lightsaber")) {
+                transparent(assets, "combat_and_tools", id,
+                        "textures/item/" + id + ".png", "16x16");
+            } else {
+                item(assets, "combat_and_tools", id);
+            }
         }
 
         transparent(assets, "planets", "tatooine", "textures/gui/planet/tatooine.png", "128x128");

@@ -76,6 +76,35 @@ def contact_sheet(entries: list[tuple[Path, Path, str]], columns: int, output: P
     sheet.save(output)
 
 
+def texture_sheet(entries: list[tuple[Path, str]], columns: int, output: Path) -> None:
+    """Render small game textures at nearest-neighbour scale for visual QA."""
+    cell_width = 164
+    cell_height = 142
+    previews = []
+    for path, label in entries:
+        texture = Image.open(path).convert("RGBA")
+        scale = min(112 / texture.width, 104 / texture.height)
+        rendered = texture.resize(
+            (max(1, round(texture.width * scale)), max(1, round(texture.height * scale))),
+            Image.Resampling.NEAREST,
+        )
+        preview = Image.new("RGBA", (cell_width, cell_height), (20, 23, 28, 255))
+        preview.alpha_composite(rendered, ((cell_width - rendered.width) // 2, 5))
+        draw = ImageDraw.Draw(preview)
+        text_box = draw.textbbox((0, 0), label, font=ImageFont.load_default())
+        text_width = text_box[2] - text_box[0]
+        draw.text(((cell_width - text_width) // 2, cell_height - 17), label,
+                  fill=(232, 235, 240, 255), font=ImageFont.load_default())
+        previews.append(preview)
+    rows = math.ceil(len(previews) / columns)
+    sheet = Image.new("RGBA", (columns * cell_width, rows * cell_height), (12, 14, 18, 255))
+    for index, preview in enumerate(previews):
+        sheet.alpha_composite(preview, ((index % columns) * cell_width,
+                                        (index // columns) * cell_height))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(output)
+
+
 def main() -> None:
     entity_models = ASSETS / "geckolib/models/entity"
     entity_textures = ASSETS / "textures/entity"
@@ -99,6 +128,21 @@ def main() -> None:
         (armor_models / f"{family}.geo.json", armor_textures / f"{family}.png", family)
         for family in armor
     ], 5, OUTPUT / "armor_models.png")
+    block_textures = ASSETS / "textures/block"
+    texture_sheet([
+        (path, path.stem) for path in sorted(block_textures.glob("*.png"))
+    ], 5, OUTPUT / "block_textures.png")
+    item_textures = ASSETS / "textures/item"
+    texture_sheet([
+        (item_textures / f"{color}_lightsaber.png", f"{color}_lightsaber")
+        for color in ("blue", "green", "red", "purple", "yellow", "white")
+    ], 3, OUTPUT / "lightsaber_items.png")
+    lightsaber_materials = item_textures / "lightsaber"
+    texture_sheet([
+        (lightsaber_materials / f"{color}_{part}.png", f"{color}_{part}")
+        for color in ("blue", "green", "red", "purple", "yellow", "white")
+        for part in ("hilt", "blade")
+    ], 6, OUTPUT / "lightsaber_materials.png")
     print(f"Rendered previews to {OUTPUT}")
 
 

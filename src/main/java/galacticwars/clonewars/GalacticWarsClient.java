@@ -5,7 +5,9 @@ import galacticwars.clonewars.client.gui.CommandCenterNavigationScreen;
 import galacticwars.clonewars.client.gui.FactionSelectionScreen;
 import galacticwars.clonewars.client.gui.BlasterHeatHud;
 import galacticwars.clonewars.client.render.GalacticRecruitRenderer;
+import galacticwars.clonewars.client.render.LightsaberClientExtensions;
 import galacticwars.clonewars.registry.ModEntityTypes;
+import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.registry.ModMenuTypes;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -20,6 +22,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = GalacticWars.MODID, dist = Dist.CLIENT)
@@ -43,6 +46,18 @@ public class GalacticWarsClient {
         ModEntityTypes.recruits().forEach(holder -> event.registerEntityRenderer(
                 holder.get(), context -> new GalacticRecruitRenderer<>(
                         context, holder.get())));
+    }
+
+    @SubscribeEvent
+    static void registerClientExtensions(RegisterClientExtensionsEvent event) {
+        event.registerItem(
+                LightsaberClientExtensions.INSTANCE,
+                ModItems.BLUE_LIGHTSABER.get(),
+                ModItems.GREEN_LIGHTSABER.get(),
+                ModItems.RED_LIGHTSABER.get(),
+                ModItems.PURPLE_LIGHTSABER.get(),
+                ModItems.YELLOW_LIGHTSABER.get(),
+                ModItems.WHITE_LIGHTSABER.get());
     }
 
     @SubscribeEvent

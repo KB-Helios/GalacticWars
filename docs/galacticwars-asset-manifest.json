@@ -60,8 +60,18 @@
       "kind": "item",
       "size": "16x16",
       "transparent": true,
-      "ids": ["vibroblade","plasma_cutter","power_drill","sonic_excavator","hydrospanner","dc15_blaster","e5_blaster","westar_blaster","scatter_blaster","nightsister_bow","blue_lightsaber","green_lightsaber","red_lightsaber","beskar_vibroblade","blaster_bolt","force_light","force_dark"],
+      "ids": ["vibroblade","plasma_cutter","power_drill","sonic_excavator","hydrospanner","dc15_blaster","e5_blaster","westar_blaster","scatter_blaster","nightsister_bow","blue_lightsaber","green_lightsaber","red_lightsaber","purple_lightsaber","yellow_lightsaber","white_lightsaber","beskar_vibroblade","blaster_bolt","force_light","force_dark"],
       "path_template": "textures/item/{id}.png"
+    },
+    {
+      "id": "lightsaber_models",
+      "kind": "animated_3d_item_materials",
+      "ids": ["blue","green","red","purple","yellow","white"],
+      "hilt_size": "16x16",
+      "hilt_path_template": "textures/item/lightsaber/{id}_hilt.png",
+      "blade_size": "16x64",
+      "blade_path_template": "textures/item/lightsaber/{id}_blade.png",
+      "animation_path_template": "textures/item/lightsaber/{id}_blade.png.mcmeta"
     },
     {
       "id": "planets",

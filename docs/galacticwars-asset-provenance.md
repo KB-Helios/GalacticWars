@@ -1,5 +1,38 @@
 # Galactic Wars Asset Provenance
 
+## 2026-07-12 planetary refinement and lightsaber expansion
+
+Four placeholder-grade planetary materials were replaced with separately generated, original source
+textures retained under `tools/source_art`. Each source was prompted as an orthographic seamless pixel-art
+material without logos, symbols, characters, text, or recognizable franchise motifs. The reproducible
+`tools/generate_polished_textures.py` pass fits each source to 16x16, reduces it to a controlled 24-color
+palette, and equalizes opposite edge texels after reduction so the final block tiles are seamless.
+
+| Final asset | Retained source | Built-in generation result | Material direction |
+| --- | --- | --- | --- |
+| `textures/block/coruscant_panel.png` | `generated_coruscant_panel_source.png` | `exec-7f40e704-5b4d-4895-9b7f-05b33363505e.png` | Dark modular infrastructure plating with cyan conduits and sparse amber indicators. |
+| `textures/block/kamino_panel.png` | `generated_kamino_panel_source.png` | `exec-63a419ba-8326-4190-be53-d2a8e5a75ba1.png` | Pearl ceramic-alloy research panel with cool seams and icy-blue lighting. |
+| `textures/block/geonosis_rock.png` | `generated_geonosis_rock_source.png` | `exec-3a2b65a9-fad3-4df5-9ae3-a92784d8d52a.png` | Iron-rich rust sediment with ochre strata and restrained basalt fragments. |
+| `textures/block/tatooine_sand.png` | `generated_tatooine_sand_source.png` | `exec-213d0bac-de93-47cd-be73-efe2afd201cb.png` | Pale wind-combed desert sand with warm mineral flecks. |
+
+Purple, yellow, and white lightsabers were generated as separate straight-beam energy-saber concepts on
+a flat green key. The accepted sources are retained beside chroma-cleaned cutouts; the first purple draft
+was rejected because its broad fantasy-sword silhouette did not meet the lightsaber brief. The installed
+16x16 inventory icons are fitted from the accepted cutouts. Six matching 3D-model material sets use
+project-authored hilt patterns and four-frame animated blade strips generated deterministically from the
+accepted palettes.
+
+| Final icon | Retained accepted source | Built-in generation result | Hilt direction |
+| --- | --- | --- | --- |
+| `textures/item/purple_lightsaber.png` | `generated_purple_lightsaber_source.png` | `exec-fe3667ee-8cae-465e-96f2-9bfb75bfe26e.png` | Blackened silver with a violet emitter ring. |
+| `textures/item/yellow_lightsaber.png` | `generated_yellow_lightsaber_source.png` | `exec-16c22aaf-699d-4819-b86c-f92258a025dd.png` | Weathered gunmetal, dark grip, and amber activation stud. |
+| `textures/item/white_lightsaber.png` | `generated_white_lightsaber_source.png` | `exec-a4a0ae86-20ba-4ed3-aaa9-665456ddce18.png` | Brushed silver, black grip bands, and pearl-blue activation light. |
+
+The installed image-generation helper removed each flat green background using border key sampling, a
+soft matte, thresholds 12/220, and despill. Final cutouts have transparent corners, non-empty visible
+coverage, and no green key background. No official art, film stills, logos, or third-party mod assets were
+used.
+
 ## Polished clone, droid, and lightsaber pass
 
 The detailed Clone Trooper, B1 Battle Droid, and lightsaber direction was generated with the built-in image generation workflow as project-owned concept material. Because general image generation does not preserve Minecraft cube UV coordinates, `tools/generate_polished_textures.py` translates that direction into deterministic UV-safe 64x64 GeckoLib skins and native 16x16 item sprites. The existing Gondorian-derived clone/droid geometry, bone names, pivots, animations, and UV origins remain unchanged; only the texture pixels are replaced.

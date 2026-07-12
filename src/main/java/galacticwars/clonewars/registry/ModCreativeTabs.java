@@ -45,6 +45,9 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.BLUE_LIGHTSABER.get());
                         output.accept(ModItems.GREEN_LIGHTSABER.get());
                         output.accept(ModItems.RED_LIGHTSABER.get());
+                        output.accept(ModItems.PURPLE_LIGHTSABER.get());
+                        output.accept(ModItems.YELLOW_LIGHTSABER.get());
+                        output.accept(ModItems.WHITE_LIGHTSABER.get());
                         output.accept(ModItems.VIBROBLADE.get());
                         output.accept(ModItems.POWER_DRILL.get());
                         output.accept(ModItems.PLASMA_CUTTER.get());
