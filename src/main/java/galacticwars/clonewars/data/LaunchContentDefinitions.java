@@ -1,5 +1,6 @@
 package galacticwars.clonewars.data;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,8 @@ public record LaunchContentDefinitions(
         Map<String, TradeDefinition> trades,
         Map<String, ConquestRegionDefinition> conquestRegions
 ) {
+    public static final int MAX_SERIALIZED_PLANET_ID_BYTES = 128;
+
     public LaunchContentDefinitions {
         planets = immutable(planets, "planets");
         vehicles = immutable(vehicles, "vehicles");
@@ -44,7 +47,12 @@ public record LaunchContentDefinitions(
     }
 
     public record PlanetDefinition(String id, String dimensionId, String arrival, String theme, String factionId) {
-        public PlanetDefinition { requireIds(id, dimensionId, arrival, theme, factionId); }
+        public PlanetDefinition {
+            requireIds(id, dimensionId, arrival, theme, factionId);
+            if (id.getBytes(StandardCharsets.UTF_8).length > MAX_SERIALIZED_PLANET_ID_BYTES) {
+                throw new IllegalArgumentException("Planet id exceeds navigation packet limit: " + id);
+            }
+        }
     }
 
     public record VehicleDefinition(String id, String movement, int seats, int maxHealth, int fuelCapacity, String requiredUnlock) {

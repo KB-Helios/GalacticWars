@@ -6,13 +6,12 @@ import java.util.regex.Pattern;
 
 public record AbilityId(String namespace, String path) {
     public static final String DEFAULT_NAMESPACE = "galacticwars";
-    private static final Pattern NAMESPACE = Pattern.compile("[a-z0-9_.-]+");
-    private static final Pattern PATH = Pattern.compile("[a-z0-9/._-]+");
+    private static final Pattern PATH = Pattern.compile("[a-z0-9]+(?:_[a-z0-9]+)*");
 
     public AbilityId {
         namespace = normalize(namespace, "namespace");
         path = normalize(path, "path");
-        if (!NAMESPACE.matcher(namespace).matches() || !PATH.matcher(path).matches()) {
+        if (!DEFAULT_NAMESPACE.equals(namespace) || !PATH.matcher(path).matches()) {
             throw new IllegalArgumentException("Invalid ability id " + namespace + ":" + path);
         }
     }

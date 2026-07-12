@@ -62,7 +62,7 @@ public final class BlasterBoltEntity extends AbstractArrow implements ItemSuppli
 
     public boolean deflectTowardOwner(LivingEntity defender) {
         Entity previousOwner = this.getOwner();
-        if (previousOwner == null || previousOwner == defender) {
+        if (!canDeflectTowardOwner(defender)) {
             return false;
         }
         Vec3 origin = defender.getEyePosition();
@@ -78,6 +78,15 @@ public final class BlasterBoltEntity extends AbstractArrow implements ItemSuppli
         this.setPos(origin.add(normalized.scale(0.75D)));
         this.shoot(normalized.x, normalized.y, normalized.z, 3.6F, 0.0F);
         return true;
+    }
+
+    public boolean canDeflectTowardOwner(LivingEntity defender) {
+        Entity previousOwner = this.getOwner();
+        if (previousOwner == null || previousOwner == defender) {
+            return false;
+        }
+        Vec3 direction = previousOwner.getEyePosition().subtract(defender.getEyePosition());
+        return direction.lengthSqr() >= 0.01D || this.getDeltaMovement().lengthSqr() >= 0.01D;
     }
 
     @Override

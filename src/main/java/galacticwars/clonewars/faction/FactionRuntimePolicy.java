@@ -19,18 +19,18 @@ public record FactionRuntimePolicy(
             normalizedTraits.add(normalize(trait, "trait"));
         }
         traits = Set.copyOf(normalizedTraits);
-            LinkedHashMap<String, Integer> normalizedModifiers = new LinkedHashMap<>();
-            for (Map.Entry<String, Integer> entry : Objects.requireNonNull(modifiers, "modifiers").entrySet()) {
-                String key = normalize(entry.getKey(), "modifier");
-                Integer value = Objects.requireNonNull(entry.getValue(), "modifier value");
-                if (value < 0 || value > 500) {
-                    throw new IllegalArgumentException("modifier " + key + " must be between 0 and 500");
-                }
-                if (normalizedModifiers.containsKey(key)) {
-                    throw new IllegalArgumentException("duplicate modifier key after normalization: " + key);
-                }
-                normalizedModifiers.put(key, value);
+        LinkedHashMap<String, Integer> normalizedModifiers = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : Objects.requireNonNull(modifiers, "modifiers").entrySet()) {
+            String key = normalize(entry.getKey(), "modifier");
+            Integer value = Objects.requireNonNull(entry.getValue(), "modifier value");
+            if (value < 0 || value > 500) {
+                throw new IllegalArgumentException("modifier " + key + " must be between 0 and 500");
             }
+            if (normalizedModifiers.containsKey(key)) {
+                throw new IllegalArgumentException("duplicate modifier key after normalization: " + key);
+            }
+            normalizedModifiers.put(key, value);
+        }
         modifiers = Map.copyOf(normalizedModifiers);
     }
 

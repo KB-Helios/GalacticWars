@@ -25,7 +25,20 @@ public final class LaunchContentCatalogTest {
         assertEquals(true, rejected, "Force runtime remains disabled");
         assertNullQuestCollectionRejected(null, Set.of(), "objectives for quest broken");
         assertNullQuestCollectionRejected(List.of("command_center"), null, "unlocks for quest broken");
+        assertThrows(() -> new LaunchContentDefinitions.PlanetDefinition(
+                "a".repeat(LaunchContentDefinitions.MAX_SERIALIZED_PLANET_ID_BYTES + 1),
+                "galacticwars:test", "arrival", "theme", "republic"),
+                "oversized planet id rejected");
         System.out.println("LaunchContentCatalogTest passed");
+    }
+
+    private static void assertThrows(Runnable action, String label) {
+        try {
+            action.run();
+        } catch (IllegalArgumentException expected) {
+            return;
+        }
+        throw new AssertionError(label);
     }
 
     private static void assertNullQuestCollectionRejected(

@@ -27,6 +27,9 @@ public final class LightsaberDeflectionService {
         if (defender instanceof ServerPlayer player && !player.isCrouching()) {
             return false;
         }
+        if (!bolt.canDeflectTowardOwner(defender)) {
+            return false;
+        }
         if (defender instanceof GalacticRecruitEntity recruit) {
             var unitClass = recruit.unitClassDefinition().orElse(null);
             if (unitClass == null || !unitClass.id().toString().equals("galacticwars:jedi_guardian")) {

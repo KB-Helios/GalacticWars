@@ -24,6 +24,9 @@ public final class AbilityDefinitionTest {
                 true);
         assertEquals("galacticwars:suppressive_fire", ability.id().toString(), "default namespace");
         assertTrue(ability.active(), "target ability is active");
+        assertThrows(() -> AbilityId.of("minecraft:suppressive_fire"), "foreign namespace rejected");
+        assertThrows(() -> AbilityId.of("galacticwars:suppressive-fire"), "non-snake-case path rejected");
+        assertThrows(() -> AbilityId.of("galacticwars:combat/suppressive_fire"), "nested path rejected");
     }
 
     private static void passiveAbilityContract() {

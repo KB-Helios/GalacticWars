@@ -1,10 +1,10 @@
 # Authorized source intake
 
 The project owner authorized derivative reuse and redistribution of code and assets from these
-local projects on 2026-07-12:
+private source archives on 2026-07-12:
 
-- `C:\Users\kevin\Desktop\Programmering\Projekt\workers`
-- `C:\Users\kevin\Desktop\Programmering\Projekt\recruits`
+- `workers` (authorization evidence retained privately by the project owner)
+- `recruits` (authorization evidence retained privately by the project owner)
 
 Both source projects declare `All Rights Reserved`. This ledger is therefore required for every
 import, even when the resulting file is substantially rewritten. Authorization covers use in

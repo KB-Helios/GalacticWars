@@ -23,6 +23,8 @@ public final class PlanetTravelIntegrationTest {
         assertContains(menu, "size > MAX_PLANET_IDS", "navigation payload read cap");
         assertContains(menuProvider, "planets.size() > CommandCenterNavigationMenu.MAX_PLANET_IDS",
                 "navigation payload write cap");
+        assertContains(menuProvider, "LaunchContentDefinitions.MAX_SERIALIZED_PLANET_ID_BYTES",
+                "navigation planet id wire limit");
         assertContains(service, "state.unlocks().contains(\"planet_travel\")", "Forward Base unlock validation");
         assertContains(service, "hall != null && hall.upkeepPaid()", "upkeep validation");
         assertContains(service, "player.teleportTo", "server dimension transfer");

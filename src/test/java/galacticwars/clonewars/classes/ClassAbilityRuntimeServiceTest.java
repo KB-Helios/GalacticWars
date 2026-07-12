@@ -55,9 +55,14 @@ public final class ClassAbilityRuntimeServiceTest {
         ClassProgressState state = ClassProgressState.unassigned().assign(UnitClassId.of("clone_trooper"));
         state = state.gainExperience(100L);
         assertEquals(2, state.rank(), "first promotion");
-        state = state.gainExperience(100_000L);
+        state = state.gainExperience(Long.MAX_VALUE);
         assertEquals(ClassProgressState.MAX_RANK, state.rank(), "rank cap");
         assertEquals(0L, state.experience(), "experience stops accumulating at cap");
+        ClassProgressState spent = ClassProgressState.unassigned()
+                .assign(UnitClassId.of("clone_trooper"))
+                .activate(AbilityId.of("suppressive_fire"), 15, 200L, 100L);
+        assertEquals(ClassProgressState.MAX_RESOURCE, spent.regenerate(Integer.MAX_VALUE).resource(),
+                "resource regeneration saturates without overflow");
     }
 
     private static AbilityDefinition ability() {

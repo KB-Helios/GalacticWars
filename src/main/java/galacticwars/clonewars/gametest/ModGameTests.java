@@ -19,6 +19,7 @@ import galacticwars.clonewars.combat.BlasterBoltEntity;
 import galacticwars.clonewars.combat.FactionRangedWeaponService;
 import galacticwars.clonewars.combat.BlasterHeatPolicy;
 import galacticwars.clonewars.combat.BlasterItem;
+import galacticwars.clonewars.combat.LightsaberDeflectionService;
 import galacticwars.clonewars.economy.CreditTransactionService;
 import galacticwars.clonewars.economy.PhysicalTradeService;
 import galacticwars.clonewars.data.GameplayDataManager;
@@ -1740,6 +1741,15 @@ public final class ModGameTests {
         shooter.initializeFromSpawnEgg();
         guardian.initializeFromSpawnEgg();
         guardian.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.BLUE_LIGHTSABER.get()));
+        int resourceBeforeRejectedDeflection = guardian.classProgressState().resource();
+        BlasterBoltEntity selfOwnedBolt = new BlasterBoltEntity(
+                helper.getLevel(), guardian, new ItemStack(ModItems.BLUE_LIGHTSABER.get()), 5.0D);
+        if (LightsaberDeflectionService.tryDeflect(
+                selfOwnedBolt, guardian, helper.getLevel().getGameTime())
+                || guardian.classProgressState().resource() != resourceBeforeRejectedDeflection) {
+            helper.fail("Rejected self-owned bolt deflection consumed saber guard resources");
+            return;
+        }
         BlasterBoltEntity bolt = new BlasterBoltEntity(
                 helper.getLevel(), shooter, new ItemStack(ModItems.E5_BLASTER.get()), 5.0D);
         bolt.setPos(guardian.getX() - 0.5D, guardian.getEyeY(), guardian.getZ());

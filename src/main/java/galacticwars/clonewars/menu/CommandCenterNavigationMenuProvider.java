@@ -1,5 +1,6 @@
 package galacticwars.clonewars.menu;
 
+import galacticwars.clonewars.data.LaunchContentDefinitions;
 import galacticwars.clonewars.progression.LaunchContentCatalog;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -28,6 +29,6 @@ public final class CommandCenterNavigationMenuProvider implements MenuProvider {
             throw new IllegalStateException("planet list exceeds navigation payload cap: " + planets.size());
         }
         buffer.writeVarInt(planets.size());
-        planets.forEach(id -> buffer.writeUtf(id, 128));
+        planets.forEach(id -> buffer.writeUtf(id, LaunchContentDefinitions.MAX_SERIALIZED_PLANET_ID_BYTES));
     }
 }

@@ -1,6 +1,7 @@
 package galacticwars.clonewars.menu;
 
 import galacticwars.clonewars.progression.LaunchContentCatalog;
+import galacticwars.clonewars.data.LaunchContentDefinitions;
 import galacticwars.clonewars.registry.ModMenuTypes;
 import galacticwars.clonewars.world.PlanetTravelService;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -77,7 +78,7 @@ public final class CommandCenterNavigationMenu extends AbstractContainerMenu {
         }
         ArrayList<String> ids = new ArrayList<>(size);
         for (int index = 0; index < size; index++) {
-            ids.add(buffer.readUtf(128));
+            ids.add(buffer.readUtf(LaunchContentDefinitions.MAX_SERIALIZED_PLANET_ID_BYTES));
         }
         return List.copyOf(ids);
     }

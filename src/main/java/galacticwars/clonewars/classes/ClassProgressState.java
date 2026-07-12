@@ -26,8 +26,6 @@ public record ClassProgressState(
         if (rank < 0 || rank > MAX_RANK || classId.isEmpty() != (rank == 0)) {
             throw new IllegalArgumentException("rank does not match class assignment");
         }
-            throw new IllegalArgumentException("rank does not match class assignment");
-        }
         if (experience < 0L) {
             throw new IllegalArgumentException("experience cannot be negative");
         }
@@ -62,7 +60,7 @@ public record ClassProgressState(
         if (amount <= 0L || classId.isEmpty() || rank >= MAX_RANK) {
             return this;
         }
-        long total = Math.addExact(experience, amount);
+        long total = experience > Long.MAX_VALUE - amount ? Long.MAX_VALUE : experience + amount;
         int nextRank = rank;
         long remaining = total;
         while (nextRank < MAX_RANK) {
@@ -85,7 +83,7 @@ public record ClassProgressState(
             return this;
         }
         return new ClassProgressState(schemaVersion, classId, rank, experience,
-                Math.min(MAX_RESOURCE, resource + amount), cooldownEnds);
+                (int) Math.min(MAX_RESOURCE, (long) resource + amount), cooldownEnds);
     }
 
     ClassProgressState activate(AbilityId abilityId, int resourceCost, long cooldownEnd, long gameTime) {

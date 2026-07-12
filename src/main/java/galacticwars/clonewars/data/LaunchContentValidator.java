@@ -8,6 +8,7 @@ import galacticwars.clonewars.GalacticWars;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +18,11 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 
 final class LaunchContentValidator {
+    private static final Set<String> RUNTIME_UNLOCKS = Set.of(
+            "faction_intro", "treasury", "recruitment", "workforce",
+            "commander", "planet_travel", "vehicle_crafting", "advanced_trading",
+            "vehicle_control", "veteran_trades");
+
     private LaunchContentValidator() {
     }
 
@@ -33,12 +39,34 @@ final class LaunchContentValidator {
         requireCount("quests", quests, 15);
         requireCount("trades", trades, 5);
         requireCount("conquest regions", regions, 4);
+        validateReferences(vehicles, forceAbilities, quests, trades);
+        return new LaunchContentDefinitions(planets, vehicles, forceAbilities, quests, trades, regions);
+    }
+
+    static void validateReferences(
+            Map<String, LaunchContentDefinitions.VehicleDefinition> vehicles,
+            Map<String, LaunchContentDefinitions.ForceAbilityDefinition> forceAbilities,
+            Map<String, LaunchContentDefinitions.QuestDefinition> quests,
+            Map<String, LaunchContentDefinitions.TradeDefinition> trades
+    ) {
+        LinkedHashSet<String> knownUnlocks = new LinkedHashSet<>(RUNTIME_UNLOCKS);
+        knownUnlocks.addAll(quests.keySet());
+        quests.values().forEach(quest -> knownUnlocks.addAll(quest.unlocks()));
         for (LaunchContentDefinitions.ForceAbilityDefinition ability : forceAbilities.values()) {
             if (!quests.containsKey(ability.requiredQuest())) {
                 throw new IllegalArgumentException("Force ability " + ability.id() + " references unknown quest");
             }
         }
-        return new LaunchContentDefinitions(planets, vehicles, forceAbilities, quests, trades, regions);
+        for (LaunchContentDefinitions.VehicleDefinition vehicle : vehicles.values()) {
+            if (!knownUnlocks.contains(vehicle.requiredUnlock())) {
+                throw new IllegalArgumentException("Vehicle " + vehicle.id() + " references unknown unlock");
+            }
+        }
+        for (LaunchContentDefinitions.TradeDefinition trade : trades.values()) {
+            if (!knownUnlocks.contains(trade.requiredUnlock())) {
+                throw new IllegalArgumentException("Trade " + trade.id() + " references unknown unlock");
+            }
+        }
     }
 
     private static Map<String, LaunchContentDefinitions.PlanetDefinition> loadPlanets(
