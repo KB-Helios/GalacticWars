@@ -14,6 +14,7 @@ public final class VirtualArmyMovementPlannerTest {
         movementOrdersAdvanceOnlyTowardSameDimensionTargets();
         unavailableAndNonMovementOrdersPauseExplicitly();
         advancingDoesNotMutateSnapshotsOrdersOrVitals();
+        virtualPatrolAdvancesToTheNextWaypoint();
         System.out.println("VirtualArmyMovementPlannerTest passed");
     }
 
@@ -105,6 +106,39 @@ public final class VirtualArmyMovementPlannerTest {
         assertEquals(virtual.snapshots(), advanced.snapshots(), "snapshot and vitals unchanged");
         assertEquals(ArmyGroupLifecycleState.VIRTUAL, advanced.simulation().lifecycleState(), "virtual state retained");
         assertDouble(2.8D, advanced.simulation().anchor().x(), "virtual anchor advance");
+    }
+
+    private static void virtualPatrolAdvancesToTheNextWaypoint() {
+        UUID owner = UUID.randomUUID();
+        UUID kingdom = UUID.randomUUID();
+        UUID commander = UUID.randomUUID();
+        ArmyLocation first = location("minecraft:overworld", 0.0D, 64.0D, 0.0D);
+        ArmyLocation second = location("minecraft:overworld", 12.0D, 64.0D, 0.0D);
+        ArmyGroupOrder patrol = new ArmyGroupOrder(
+                ArmyCommandType.PATROL_ROUTE,
+                Optional.of(first),
+                Optional.empty(),
+                ArmyFormation.LINE,
+                2);
+        ArmyGroupRecord group = ArmyGroupRecord.create(
+                        owner, kingdom, commander, List.of(), ArmyFormation.LINE, first, 100L)
+                .withPatrolRoute(List.of(first, second))
+                .withOrder(patrol)
+                .withSimulation(
+                        new ArmyGroupSimulation(
+                                ArmyGroupLifecycleState.VIRTUAL,
+                                first,
+                                100L,
+                                2L,
+                                0L,
+                                ""),
+                        List.of());
+
+        ArmyGroupRecord advanced = VirtualArmyMovementPlanner.advance(
+                group, Optional.empty(), 0.28D, 120L);
+
+        assertEquals(ArmyCommandType.PATROL_ROUTE, advanced.order().type(), "virtual patrol order");
+        assertEquals(second, advanced.order().targetPosition().orElseThrow(), "next virtual patrol waypoint");
     }
 
     private static ArmyLocation location(String dimension, double x, double y, double z) {

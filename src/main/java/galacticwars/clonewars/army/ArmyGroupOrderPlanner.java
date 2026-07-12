@@ -24,7 +24,7 @@ public final class ArmyGroupOrderPlanner {
 
         ArmyCommand groupCommand = group.currentCommand();
         return switch (groupCommand.type()) {
-            case MOVE_TO_POSITION -> planFormationCommand(group, formation, spacing, true);
+            case MOVE_TO_POSITION, PATROL_ROUTE -> planFormationCommand(group, formation, spacing, true);
             case HOLD_POSITION -> planFormationCommand(group, formation, spacing, false);
             case FOLLOW_OWNER -> ownerAnchor == null
                     ? planDirectCommand(group, "follow_group_order")
@@ -112,6 +112,8 @@ public final class ArmyGroupOrderPlanner {
             case CLEAR_TARGET -> ArmyCommand.clearTarget(group.ownerId(), group.groupId());
             case MOVE_TO_POSITION -> ArmyCommand.moveToPosition(group.ownerId(), group.groupId(), command.targetPosition());
             case HOLD_POSITION -> ArmyCommand.holdPosition(group.ownerId(), group.groupId(), command.targetPosition());
+            case PATROL_ROUTE -> ArmyCommand.patrolRoute(
+                    group.ownerId(), group.groupId(), command.targetPosition());
         };
     }
 }

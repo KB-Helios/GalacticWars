@@ -21,4 +21,15 @@ public final class BlasterFriendlyFirePolicy {
         return !allowFriendlyFire
                 && (sameOwner || relation == FactionRelation.SAME || relation == FactionRelation.ALLY);
     }
+
+    public static boolean blocksRecruitHitOnPlayer(
+            boolean sameOwner,
+            FactionRelation relation,
+            boolean allowPvp
+    ) {
+        Objects.requireNonNull(relation, "relation");
+        return !allowPvp
+                || sameOwner
+                || relation != FactionRelation.ENEMY;
+    }
 }

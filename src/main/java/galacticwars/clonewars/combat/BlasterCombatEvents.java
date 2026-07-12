@@ -1,12 +1,8 @@
 package galacticwars.clonewars.combat;
 
 import galacticwars.clonewars.Config;
-import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
-import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.FactionRelation;
-import galacticwars.clonewars.kingdom.KingdomSavedData;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -27,15 +23,29 @@ public final class BlasterCombatEvents {
             return;
         }
         Entity target = hit.getEntity();
-        boolean blocked = target instanceof Player
-                ? !(shooter instanceof ServerPlayer) || BlasterFriendlyFirePolicy.blocksHit(
-                        true, false, FactionRelation.NEUTRAL,
-                        Config.ALLOW_BLASTER_FRIENDLY_FIRE.getAsBoolean(), Config.ALLOW_BLASTER_PVP.getAsBoolean())
+        boolean blocked = target instanceof Player player
+                ? blocksPlayerHit(shooter, player)
                 : target instanceof GalacticRecruitEntity recruit && blocksRecruitHit(shooter, recruit);
         if (blocked) {
             event.setCanceled(true);
             arrow.discard();
         }
+    }
+
+    private static boolean blocksPlayerHit(LivingEntity shooter, Player player) {
+        if (shooter instanceof ServerPlayer) {
+            return BlasterFriendlyFirePolicy.blocksHit(
+                    true, false, FactionRelation.NEUTRAL,
+                    Config.ALLOW_BLASTER_FRIENDLY_FIRE.getAsBoolean(),
+                    Config.ALLOW_BLASTER_PVP.getAsBoolean());
+        }
+        if (!(shooter instanceof GalacticRecruitEntity recruit)) {
+            return true;
+        }
+        return BlasterFriendlyFirePolicy.blocksRecruitHitOnPlayer(
+                recruit.isOwnedBy(player),
+                recruit.factionRelationTo(player),
+                Config.ALLOW_BLASTER_PVP.getAsBoolean());
     }
 
     private static boolean blocksRecruitHit(LivingEntity shooter, GalacticRecruitEntity recruit) {
@@ -49,19 +59,11 @@ public final class BlasterCombatEvents {
 
     private static FactionRelation relation(LivingEntity shooter, GalacticRecruitEntity recruit) {
         if (shooter instanceof GalacticRecruitEntity other) {
-            return GameplayDataManager.snapshot().factions().relation(
-                    FactionId.of(other.getRecruitFactionId()), FactionId.of(recruit.getRecruitFactionId()));
+            return other.factionRelationTo(recruit);
         }
-        if (!(shooter instanceof ServerPlayer player)) {
-            return FactionRelation.NEUTRAL;
-        }
-        if (!(shooter.level() instanceof ServerLevel level)) {
-            return FactionRelation.NEUTRAL;
-        }
-        return KingdomSavedData.get(level).kingdomForOwner(player.getUUID())
-                .map(kingdom -> GameplayDataManager.snapshot().factions().relation(
-                        FactionId.of(kingdom.factionId()), FactionId.of(recruit.getRecruitFactionId())))
-                .orElse(FactionRelation.NEUTRAL);
+        return shooter instanceof ServerPlayer player
+                ? recruit.factionRelationTo(player)
+                : FactionRelation.NEUTRAL;
     }
 
     private static boolean sameOwner(GalacticRecruitEntity first, GalacticRecruitEntity second) {

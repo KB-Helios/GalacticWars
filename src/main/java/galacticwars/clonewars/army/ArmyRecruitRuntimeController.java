@@ -55,11 +55,13 @@ public final class ArmyRecruitRuntimeController {
             releaseRuntimeControl(recruit);
             return;
         }
-        ArmyGroupRecord group = KingdomSavedData.get(level).armyGroup(groupId).orElse(null);
+        KingdomSavedData data = KingdomSavedData.get(level);
+        ArmyGroupRecord group = data.armyGroup(groupId).orElse(null);
         if (group == null || group.simulation().lifecycleState() != ArmyGroupLifecycleState.LIVE) {
             releaseRuntimeControl(recruit);
             return;
         }
+        group = advancePatrolWaypoint(recruit, level, data, group);
         ownsRuntimeControl = true;
 
         LivingEntity owner = living(level.getEntity(group.ownerId()));
@@ -94,6 +96,60 @@ public final class ArmyRecruitRuntimeController {
         apply(recruit, level, group, tactical);
     }
 
+    private static ArmyGroupRecord advancePatrolWaypoint(
+            GalacticRecruitEntity recruit,
+            ServerLevel level,
+            KingdomSavedData data,
+            ArmyGroupRecord group
+    ) {
+        if (group.order().type() != ArmyCommandType.PATROL_ROUTE
+                || group.commanderId().filter(recruit.getUUID()::equals).isEmpty()
+                || group.patrolRoute().size() < 2
+                || group.patrolRoute().stream().anyMatch(
+                        waypoint -> !waypoint.dimensionId().equals(level.dimension().identifier().toString()))) {
+            return group;
+        }
+        ArmyLocation activeWaypoint = group.order().targetPosition().orElse(null);
+        int activeIndex = group.patrolRoute().indexOf(activeWaypoint);
+        if (activeIndex < 0) {
+            return replacePatrolTarget(data, group, group.patrolRoute().getFirst());
+        }
+        ArmyPatrolRoute route = new ArmyPatrolRoute(
+                group.patrolRoute().stream().map(ArmyLocation::blockPosition).toList(),
+                ArmyPatrolMode.LOOP,
+                2,
+                0);
+        ArmyPatrolDecision decision = ArmyPatrolPlanner.advance(
+                route,
+                new ArmyPatrolState(activeIndex, 1, 0),
+                position(recruit));
+        if (decision.nextState().waypointIndex() == activeIndex) {
+            return group;
+        }
+        return replacePatrolTarget(
+                data,
+                group,
+                group.patrolRoute().get(decision.nextState().waypointIndex()));
+    }
+
+    private static ArmyGroupRecord replacePatrolTarget(
+            KingdomSavedData data,
+            ArmyGroupRecord group,
+            ArmyLocation waypoint
+    ) {
+        ArmyGroupOrder nextOrder = new ArmyGroupOrder(
+                ArmyCommandType.PATROL_ROUTE,
+                Optional.of(waypoint),
+                Optional.empty(),
+                group.order().formation(),
+                group.order().spacing());
+        ArmyGroupRecord updated = group.withOrder(nextOrder);
+        if (data.replaceArmyGroup(updated, group.simulation().revision())) {
+            return updated;
+        }
+        return data.armyGroup(group.id()).orElse(group);
+    }
+
     private UUID selectTarget(
             GalacticRecruitEntity recruit,
             ServerLevel level,
@@ -108,6 +164,15 @@ public final class ArmyRecruitRuntimeController {
                 .orElse(null);
         if (validTarget(recruit, group, explicit)) {
             return explicit.getUUID();
+        }
+
+        if (command == ArmyCommandType.PROTECT_OWNER) {
+            LivingEntity owner = living(level.getEntity(group.ownerId()));
+            LivingEntity ownerAttacker = owner == null ? null : owner.getLastHurtByMob();
+            if (validTarget(recruit, group, ownerAttacker, true)
+                    && recruit.distanceToSqr(ownerAttacker) <= (double) maxRange * maxRange) {
+                return ownerAttacker.getUUID();
+            }
         }
 
         FactionId ownFaction = FactionId.of(recruit.getRecruitFactionId());
@@ -145,7 +210,9 @@ public final class ArmyRecruitRuntimeController {
         if (candidate instanceof GalacticRecruitEntity other) {
             if (other.getRecruitDuty() == RecruitDuty.WORKER
                     || group.contains(other.getUUID())
-                    || sameOwner(recruit, other)) {
+                    || sameOwner(recruit, other)
+                    || recruit.factionRelationTo(other)
+                            != galacticwars.clonewars.faction.FactionRelation.ENEMY) {
                 return null;
             }
             int threat = (int) Math.round(Math.min(100.0D,
@@ -157,7 +224,8 @@ public final class ArmyRecruitRuntimeController {
                     position(other),
                     target != null && target.getUUID().equals(group.ownerId()),
                     target != null && group.contains(target.getUUID()),
-                    Math.max(0, threat));
+                    Math.max(0, threat),
+                    Optional.of(recruit.factionRelationTo(other)));
         }
         return null;
     }
@@ -282,26 +350,36 @@ public final class ArmyRecruitRuntimeController {
             ArmyGroupRecord group,
             LivingEntity target
     ) {
+        return validTarget(recruit, group, target, false);
+    }
+
+    private static boolean validTarget(
+            GalacticRecruitEntity recruit,
+            ArmyGroupRecord group,
+            LivingEntity target,
+            boolean defendingOwner
+    ) {
         if (target == null || !target.isAlive() || target == recruit || group.contains(target.getUUID())) {
             return false;
         }
         LivingEntity owner = recruit.getOwner();
-        if (target instanceof Player || (owner != null && owner.getUUID().equals(target.getUUID()))) {
+        if (owner != null && owner.getUUID().equals(target.getUUID())) {
             return false;
+        }
+        if (target instanceof Player player) {
+            return recruit.canAttackFactionPlayer(player);
         }
         if (target instanceof GalacticRecruitEntity other) {
             if (other.getRecruitDuty() == RecruitDuty.WORKER || sameOwner(recruit, other)) {
                 return false;
             }
-            FactionId own = FactionId.of(recruit.getRecruitFactionId());
-            FactionId candidate = FactionId.of(other.getRecruitFactionId());
-            return GameplayDataManager.snapshot().factions().relation(own, candidate)
+            return recruit.factionRelationTo(other)
                     == galacticwars.clonewars.faction.FactionRelation.ENEMY;
         }
         if (target instanceof Monster) {
             boolean explicitOrderTarget = group.order().type() == ArmyCommandType.ATTACK_TARGET
                     && group.order().targetEntityId().filter(target.getUUID()::equals).isPresent();
-            return ArmyAttackTargetPolicy.canAttackMonster(
+            return defendingOwner || ArmyAttackTargetPolicy.canAttackMonster(
                     explicitOrderTarget,
                     target == recruit.getLastHurtByMob());
         }

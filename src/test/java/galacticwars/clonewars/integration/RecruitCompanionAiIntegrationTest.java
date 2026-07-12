@@ -88,16 +88,17 @@ public final class RecruitCompanionAiIntegrationTest {
     private static void explicitAttackTargetsAreGuarded() throws IOException {
         String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
         String validation = section(entity, "private boolean canAttackTarget", "private boolean cycleArmyFormation");
-        String policy = read("src/main/java/galacticwars/clonewars/army/ArmyAttackTargetPolicy.java");
 
-        assertContains(validation, "ArmyAttackTargetPolicy.canAttackRecruit", "faction target policy");
-        assertContains(policy, "targetDuty != RecruitDuty.WORKER", "worker target rejection");
-        assertContains(policy, "!sameOwner", "same-owner target rejection");
-        assertContains(policy, "FactionRelation.ENEMY", "allied and neutral target rejection");
+        assertContains(validation, "recruit.getRecruitDuty() != RecruitDuty.WORKER", "worker target rejection");
+        assertContains(validation, "!sameOwner", "same-owner target rejection");
+        assertContains(validation, "this.factionRelationTo(recruit) == FactionRelation.ENEMY",
+                "kingdom-aware faction target policy");
+        assertContains(validation, "this.canAttackFactionPlayer(player)", "hostile player target policy");
+        assertContains(entity, "KingdomFactionRelations.resolve", "dynamic kingdom diplomacy resolver");
         assertContains(validation, "target instanceof Monster", "non-faction hostile target rule");
 
         String controller = read("src/main/java/galacticwars/clonewars/army/ArmyRecruitRuntimeController.java");
-        assertContains(controller, "target instanceof Player", "retaliatory player rejection");
+        assertContains(controller, "recruit.canAttackFactionPlayer(player)", "retaliatory player diplomacy guard");
     }
 
     private static void missingGroupsReleaseStaleRuntimeOwnership() throws IOException {

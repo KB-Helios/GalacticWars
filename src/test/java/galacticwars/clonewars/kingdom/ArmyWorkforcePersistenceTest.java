@@ -4,9 +4,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import galacticwars.clonewars.army.ArmyFormation;
+import galacticwars.clonewars.army.ArmyCommand;
+import galacticwars.clonewars.army.ArmyCommandPolicy;
 import galacticwars.clonewars.army.ArmyGroupLifecycleState;
 import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyLocation;
+import galacticwars.clonewars.army.ArmyMemberSnapshot;
+import galacticwars.clonewars.army.ArmySnapshotEquipment;
+import galacticwars.clonewars.recruitment.RecruitDuty;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.workforce.CourierTransferAction;
 import galacticwars.clonewars.workforce.CourierTransferType;
@@ -20,6 +25,8 @@ public final class ArmyWorkforcePersistenceTest {
 
     public static void main(String[] args) {
         armyMembershipOrderAndOrphaningPersistInDomainRecords();
+        commanderOnlySquadsAcceptCommands();
+        membershipChangesPruneStaleVirtualSnapshots();
         namedSquadLogisticsAndPatrolMetadataPersist();
         settlementsSupportRewardBoundedMultipleCommanders();
         worksiteCapacityAndAssignmentsAreAuthoritative();
@@ -44,6 +51,63 @@ public final class ArmyWorkforcePersistenceTest {
         assertEquals(ArmyGroupLifecycleState.ORPHANED, orphaned.simulation().lifecycleState(), "orphan state");
         assertEquals(group.memberIds(), orphaned.memberIds(), "orphan membership retention");
         assertEquals(ArmyFormation.WEDGE, orphaned.order().formation(), "formation retention");
+    }
+
+    private static void commanderOnlySquadsAcceptCommands() {
+        UUID owner = UUID.randomUUID();
+        UUID commander = UUID.randomUUID();
+        ArmyLocation anchor = new ArmyLocation("minecraft:overworld", 4, 64, 8);
+        ArmyGroupRecord group = ArmyGroupRecord.create(
+                owner, UUID.randomUUID(), commander, List.of(), ArmyFormation.LINE, anchor, 100L);
+
+        assertTrue(ArmyCommandPolicy.canIssue(
+                ArmyCommand.holdPosition(owner, group.id(), anchor.blockPosition()),
+                group.commandValidationState()).accepted(),
+                "commander-only squad command validation");
+        assertTrue(group.plannerState().recruitIds().isEmpty(),
+                "commander remains outside member formation slots");
+    }
+
+    private static void membershipChangesPruneStaleVirtualSnapshots() {
+        UUID owner = UUID.randomUUID();
+        UUID kingdom = UUID.randomUUID();
+        UUID commander = UUID.randomUUID();
+        UUID retained = UUID.randomUUID();
+        UUID removed = UUID.randomUUID();
+        ArmyLocation anchor = new ArmyLocation("minecraft:overworld", 4, 64, 8);
+        ArmyGroupRecord group = ArmyGroupRecord.create(
+                        owner, kingdom, commander, List.of(retained, removed),
+                        ArmyFormation.LINE, anchor, 100L)
+                .withSnapshot(snapshot(commander, owner, kingdom, RecruitDuty.COMMANDER))
+                .withSnapshot(snapshot(retained, owner, kingdom, RecruitDuty.SOLDIER))
+                .withSnapshot(snapshot(removed, owner, kingdom, RecruitDuty.SOLDIER));
+
+        ArmyGroupRecord updated = group.withMembers(List.of(retained));
+        assertEquals(List.of(commander, retained),
+                updated.snapshots().stream().map(ArmyMemberSnapshot::recruitId).toList(),
+                "membership snapshot pruning");
+    }
+
+    private static ArmyMemberSnapshot snapshot(
+            UUID recruitId,
+            UUID ownerId,
+            UUID kingdomId,
+            RecruitDuty duty
+    ) {
+        return new ArmyMemberSnapshot(
+                recruitId,
+                "galacticwars:clone_trooper",
+                "galacticwars:clone_trooper",
+                ownerId,
+                kingdomId,
+                duty,
+                20.0F,
+                100,
+                100,
+                0,
+                1L,
+                new ArmySnapshotEquipment("", "", "", "", ""),
+                "");
     }
 
     private static void worksiteCapacityAndAssignmentsAreAuthoritative() {

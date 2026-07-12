@@ -28,5 +28,7 @@ public class RecruitCommandMenuProvider implements MenuProvider {
     @Override
     public void writeClientSideData(AbstractContainerMenu menu, RegistryFriendlyByteBuf buffer) {
         buffer.writeVarInt(this.recruit.getId());
+        buffer.writeBoolean(menu instanceof RecruitCommandMenu recruitMenu
+                && recruitMenu.armyCommandAccess());
     }
 }

@@ -20,6 +20,7 @@ public record ForceRuntimeState(int energy, Map<String, Long> cooldownEnds) {
         if (amount < 0) {
             throw new IllegalArgumentException("regeneration amount cannot be negative");
         }
-        return new ForceRuntimeState(Math.min(MAX_ENERGY, Math.addExact(energy, amount)), cooldownEnds);
+        int regeneratedEnergy = (int) Math.min(MAX_ENERGY, (long) energy + amount);
+        return new ForceRuntimeState(regeneratedEnergy, cooldownEnds);
     }
 }

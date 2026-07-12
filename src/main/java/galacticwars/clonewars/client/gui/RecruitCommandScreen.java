@@ -42,19 +42,41 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 && this.minecraft.player != null
                 && recruit.isOwnedBy(this.minecraft.player);
         boolean tame = entity instanceof GalacticRecruitEntity recruit && recruit.isTame();
+        boolean armyCommandAccess = this.menu.armyCommandAccess();
 
         int x = (this.width - BUTTON_WIDTH) / 2;
-        int y = Math.max(8, (this.height - ((ownedByPlayer ? CONTROL_ROW_COUNT : 1) * (BUTTON_HEIGHT + GAP))) / 2);
+        int visibleRows = ownedByPlayer ? CONTROL_ROW_COUNT : armyCommandAccess ? 8 : 1;
+        int y = Math.max(8, (this.height - (visibleRows * (BUTTON_HEIGHT + GAP))) / 2);
         if (!tame) {
             this.addButton(x, y, "screen.galacticwars.recruit.hire", RecruitCommandMenu.BUTTON_HIRE);
             return;
         }
-        if (!ownedByPlayer) {
+        if (!ownedByPlayer && !armyCommandAccess) {
             this.addRenderableWidget(Button.builder(
                             Component.translatable("screen.galacticwars.recruit.locked"),
                             button -> this.onClose())
                     .bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT)
                     .build());
+            return;
+        }
+        if (!ownedByPlayer) {
+            this.addButton(x, y, "screen.galacticwars.recruit.follow", RecruitCommandMenu.BUTTON_FOLLOW);
+            this.addButton(x, y + (BUTTON_HEIGHT + GAP),
+                    "screen.galacticwars.recruit.hold", RecruitCommandMenu.BUTTON_HOLD);
+            this.addButton(x, y + 2 * (BUTTON_HEIGHT + GAP),
+                    "screen.galacticwars.recruit.move", RecruitCommandMenu.BUTTON_MOVE);
+            this.addButton(x, y + 3 * (BUTTON_HEIGHT + GAP),
+                    "screen.galacticwars.recruit.protect", RecruitCommandMenu.BUTTON_PROTECT);
+            this.addButton(x, y + 4 * (BUTTON_HEIGHT + GAP),
+                    "screen.galacticwars.recruit.attack", RecruitCommandMenu.BUTTON_ATTACK);
+            this.addButton(x, y + 5 * (BUTTON_HEIGHT + GAP),
+                    "screen.galacticwars.recruit.clear", RecruitCommandMenu.BUTTON_CLEAR);
+            this.addButton(x, y + 6 * (BUTTON_HEIGHT + GAP),
+                    "screen.galacticwars.recruit.commander.patrol",
+                    RecruitCommandMenu.BUTTON_PATROL);
+            this.addButton(x, y + 7 * (BUTTON_HEIGHT + GAP),
+                    "screen.galacticwars.recruit.commander.formation",
+                    RecruitCommandMenu.BUTTON_CYCLE_FORMATION);
             return;
         }
 
@@ -122,6 +144,11 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 y + 5 * (BUTTON_HEIGHT + GAP),
                 "screen.galacticwars.recruit.worksite.radius.increase",
                 RecruitCommandMenu.BUTTON_WORK_RADIUS_INCREASE);
+        this.addButton(
+                kingdomX,
+                y + 6 * (BUTTON_HEIGHT + GAP),
+                "screen.galacticwars.recruit.commander.patrol",
+                RecruitCommandMenu.BUTTON_PATROL);
     }
 
     @Override

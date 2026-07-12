@@ -6,5 +6,6 @@ public enum ArmyCommandType {
     MOVE_TO_POSITION,
     PROTECT_OWNER,
     ATTACK_TARGET,
-    CLEAR_TARGET
+    CLEAR_TARGET,
+    PATROL_ROUTE
 }

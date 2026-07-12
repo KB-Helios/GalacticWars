@@ -44,18 +44,30 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     public static final int BUTTON_ASSIGN_COURIER = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 8;
     public static final int BUTTON_CYCLE_FORMATION = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 9;
     public static final int BUTTON_ROTATE_BLUEPRINT = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 10;
+    public static final int BUTTON_PATROL = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 11;
 
     private final int recruitEntityId;
     private final Level level;
+    private final boolean armyCommandAccess;
 
     public RecruitCommandMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf extraData) {
-        this(containerId, inventory, extraData.readVarInt());
+        this(containerId, inventory, extraData.readVarInt(), extraData.readBoolean());
     }
 
     public RecruitCommandMenu(int containerId, Inventory inventory, int recruitEntityId) {
+        this(containerId, inventory, recruitEntityId, resolveArmyCommandAccess(inventory, recruitEntityId));
+    }
+
+    private RecruitCommandMenu(
+            int containerId,
+            Inventory inventory,
+            int recruitEntityId,
+            boolean armyCommandAccess
+    ) {
         super(ModMenuTypes.RECRUIT_COMMAND.get(), containerId);
         this.recruitEntityId = recruitEntityId;
         this.level = inventory.player.level();
+        this.armyCommandAccess = armyCommandAccess;
     }
 
     @Override
@@ -88,6 +100,10 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
         return recruitEntityId;
     }
 
+    public boolean armyCommandAccess() {
+        return armyCommandAccess;
+    }
+
     public static int[] workerProfessionButtonIds() {
         return WorkerProfessionCatalog.enabledProfessions().stream()
                 .mapToInt(definition -> definition.commandButtonId())
@@ -96,5 +112,11 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
 
     public static boolean isSupportedButton(int buttonId) {
         return RecruitCommandAction.fromButtonId(buttonId).isPresent();
+    }
+
+    private static boolean resolveArmyCommandAccess(Inventory inventory, int recruitEntityId) {
+        Entity entity = inventory.player.level().getEntity(recruitEntityId);
+        return entity instanceof GalacticRecruitEntity recruit
+                && recruit.canPlayerCommandArmy(inventory.player);
     }
 }

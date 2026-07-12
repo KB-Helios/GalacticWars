@@ -43,7 +43,7 @@ public final class ArmyCommandPolicy {
         return switch (command.type()) {
             case FOLLOW_OWNER, PROTECT_OWNER, CLEAR_TARGET ->
                     command.targetPosition() == null && command.targetEntityId() == null;
-            case HOLD_POSITION, MOVE_TO_POSITION ->
+            case HOLD_POSITION, MOVE_TO_POSITION, PATROL_ROUTE ->
                     command.targetPosition() != null && command.targetEntityId() == null;
             case ATTACK_TARGET ->
                     command.targetPosition() == null && command.targetEntityId() != null;

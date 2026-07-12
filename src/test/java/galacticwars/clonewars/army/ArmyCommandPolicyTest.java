@@ -29,6 +29,9 @@ public final class ArmyCommandPolicyTest {
 
         assertTrue(validation.accepted(), "valid command accepted");
         assertEquals("accepted", validation.reasonCode(), "valid command reason");
+        assertTrue(ArmyCommandPolicy.canIssue(
+                ArmyCommand.patrolRoute(ownerId(), groupId(), new ArmyPosition(4, 64, 4)),
+                populatedGroup()).accepted(), "patrol command accepted");
     }
 
     private static void rejectsInvalidOwnershipAndGroupContext() {
@@ -85,6 +88,10 @@ public final class ArmyCommandPolicyTest {
                 alignment(12),
                 FactionId.of("republic"),
                 10), "clear command with position");
+
+        assertRejected("invalid_payload", ArmyCommandPolicy.canIssue(
+                new ArmyCommand(ArmyCommandType.PATROL_ROUTE, ownerId(), groupId(), null, null),
+                populatedGroup()), "patrol command without waypoint");
     }
 
     private static void rejectsMissingContextWithStableReasons() {

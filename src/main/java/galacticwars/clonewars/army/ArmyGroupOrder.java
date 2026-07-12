@@ -19,7 +19,9 @@ public record ArmyGroupOrder(
         if (spacing < 1 || spacing > 8) {
             throw new IllegalArgumentException("spacing must be between 1 and 8");
         }
-        boolean positionRequired = type == ArmyCommandType.MOVE_TO_POSITION || type == ArmyCommandType.HOLD_POSITION;
+        boolean positionRequired = type == ArmyCommandType.MOVE_TO_POSITION
+                || type == ArmyCommandType.HOLD_POSITION
+                || type == ArmyCommandType.PATROL_ROUTE;
         boolean entityRequired = type == ArmyCommandType.ATTACK_TARGET;
         boolean positionForbidden = !positionRequired && type != ArmyCommandType.ATTACK_TARGET;
         if ((positionRequired && targetPosition.isEmpty())
@@ -41,6 +43,8 @@ public record ArmyGroupOrder(
             case PROTECT_OWNER -> ArmyCommand.protectOwner(ownerId, groupId);
             case ATTACK_TARGET -> ArmyCommand.attackTarget(ownerId, groupId, targetEntityId.orElseThrow());
             case CLEAR_TARGET -> ArmyCommand.clearTarget(ownerId, groupId);
+            case PATROL_ROUTE -> ArmyCommand.patrolRoute(
+                    ownerId, groupId, targetPosition.orElseThrow().blockPosition());
         };
     }
 

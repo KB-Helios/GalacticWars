@@ -19,6 +19,7 @@ public final class ArmyBehaviorPlanner {
             case PROTECT_OWNER -> planProtectOwner(context);
             case ATTACK_TARGET -> planAttack(command.targetEntityId(), context);
             case CLEAR_TARGET -> ArmyBehaviorDecision.idle("target_cleared");
+            case PATROL_ROUTE -> ArmyBehaviorDecision.move(command.targetPosition(), "patrol_route");
         };
     }
 

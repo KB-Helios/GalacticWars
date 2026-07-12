@@ -3,6 +3,7 @@ package galacticwars.clonewars.kingdom;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -16,6 +17,7 @@ import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.data.SavedDataSchemaPolicy;
 import galacticwars.clonewars.army.ArmyFormation;
+import galacticwars.clonewars.army.ArmyGroupLifecycleState;
 import galacticwars.clonewars.army.ArmyGroupOrder;
 import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyLocation;
@@ -232,6 +234,13 @@ public final class KingdomSavedData extends SavedData {
         if (existing != null) {
             return existing;
         }
+        if (!canActivateHall(ownerId, dimensionId, hallPos)) {
+            throw new IllegalStateException("command center claim overlaps an existing kingdom claim");
+        }
+        return createKingdom(ownerId, factionId, dimensionId, hallPos);
+    }
+
+    private KingdomRecord createKingdom(UUID ownerId, String factionId, String dimensionId, BlockPos hallPos) {
         KingdomRecord kingdom = new KingdomRecord(
                 UUID.randomUUID(),
                 ownerId,
@@ -242,6 +251,30 @@ public final class KingdomSavedData extends SavedData {
         return kingdom;
     }
 
+    public boolean canActivateHall(UUID ownerId, String dimensionId, BlockPos hallPos) {
+        Objects.requireNonNull(ownerId, "ownerId");
+        Objects.requireNonNull(hallPos, "hallPos");
+        String normalizedDimension = KingdomNormalizers.normalize(dimensionId, "dimensionId");
+        KingdomRecord existing = kingdomsByOwner.get(ownerId);
+        if (existing == null) {
+            return capitalClaimAvailable(normalizedDimension, hallPos, null);
+        }
+        SettlementRecord settlement = existing.settlement();
+        boolean sameHall = settlement.dimensionId().equals(normalizedDimension)
+                && settlement.hallX() == hallPos.getX()
+                && settlement.hallY() == hallPos.getY()
+                && settlement.hallZ() == hallPos.getZ();
+        if (!inactiveHallOwners.contains(ownerId)) {
+            return sameHall;
+        }
+        UUID replacedCapitalClaimId = existing.claims().stream()
+                .filter(KingdomClaim::capital)
+                .map(KingdomClaim::id)
+                .findFirst()
+                .orElse(null);
+        return capitalClaimAvailable(normalizedDimension, hallPos, replacedCapitalClaimId);
+    }
+
     public Optional<KingdomRecord> activateHall(
             UUID ownerId,
             String factionId,
@@ -250,9 +283,13 @@ public final class KingdomSavedData extends SavedData {
     ) {
         Objects.requireNonNull(ownerId, "ownerId");
         Objects.requireNonNull(hallPos, "hallPos");
+        dimensionId = KingdomNormalizers.normalize(dimensionId, "dimensionId");
+        if (!canActivateHall(ownerId, dimensionId, hallPos)) {
+            return Optional.empty();
+        }
         KingdomRecord existing = kingdomsByOwner.get(ownerId);
         if (existing == null) {
-            return Optional.of(foundKingdom(ownerId, factionId, dimensionId, hallPos));
+            return Optional.of(createKingdom(ownerId, factionId, dimensionId, hallPos));
         }
         SettlementRecord settlement = existing.settlement();
         boolean sameHall = settlement.dimensionId().equals(dimensionId)
@@ -262,8 +299,10 @@ public final class KingdomSavedData extends SavedData {
         if (!inactiveHallOwners.contains(ownerId)) {
             return sameHall ? Optional.of(existing) : Optional.empty();
         }
-        KingdomRecord relocated = existing.withSettlement(
-                settlement.withHallLocation(dimensionId, hallPos.getX(), hallPos.getY(), hallPos.getZ()));
+        SettlementRecord relocatedSettlement = settlement.withHallLocation(
+                dimensionId, hallPos.getX(), hallPos.getY(), hallPos.getZ());
+        KingdomRecord relocated = existing.withSettlement(relocatedSettlement)
+                .replaceClaim(KingdomClaim.capital(existing.id(), relocatedSettlement));
         storeKingdom(relocated);
         inactiveHallOwners.remove(ownerId);
         this.setDirty();
@@ -469,13 +508,25 @@ public final class KingdomSavedData extends SavedData {
     }
 
     public boolean addRecruitToArmy(UUID ownerId, UUID recruitId) {
-        Optional<ArmyGroupRecord> groupOptional = armyGroupForOwner(ownerId);
-        if (groupOptional.isEmpty()) {
+        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
+        if (kingdom == null
+                || !kingdomIdsByRecruit.getOrDefault(recruitId, new UUID(0L, 0L)).equals(kingdom.id())
+                || kingdom.npc(recruitId).map(KingdomNpcRecord::serviceBranch)
+                        .filter(NpcServiceBranch.MILITARY::equals).isEmpty()) {
             return false;
         }
-        ArmyGroupRecord group = groupOptional.orElseThrow();
-        if (group.memberIds().contains(recruitId) || group.commanderId().filter(recruitId::equals).isPresent()) {
-            return true;
+        Optional<ArmyGroupRecord> existing = armyGroupForRecruit(recruitId);
+        if (existing.isPresent()) {
+            return existing.orElseThrow().ownerId().equals(ownerId);
+        }
+        ArmyGroupRecord group = armyGroupsById.values().stream()
+                .filter(candidate -> candidate.ownerId().equals(ownerId))
+                .filter(candidate -> candidate.simulation().lifecycleState() == ArmyGroupLifecycleState.LIVE)
+                .min(Comparator.comparingInt((ArmyGroupRecord candidate) -> candidate.memberIds().size())
+                        .thenComparing(candidate -> candidate.id().toString()))
+                .orElse(null);
+        if (group == null) {
+            return false;
         }
         ArrayList<UUID> members = new ArrayList<>(group.memberIds());
         members.add(recruitId);
@@ -1024,6 +1075,7 @@ public final class KingdomSavedData extends SavedData {
         KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
         if (group == null || kingdom == null || !group.kingdomId().equals(kingdom.id())
                 || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || group.simulation().lifecycleState() != ArmyGroupLifecycleState.LIVE
                 || !kingdomIdsByRecruit.getOrDefault(recruitId, new UUID(0L, 0L)).equals(kingdom.id())
                 || kingdom.npc(recruitId).map(KingdomNpcRecord::serviceBranch)
                         .filter(NpcServiceBranch.MILITARY::equals).isEmpty()
@@ -1063,6 +1115,39 @@ public final class KingdomSavedData extends SavedData {
         return true;
     }
 
+    public boolean startArmyPatrol(
+            UUID actorId,
+            UUID groupId,
+            ArmyLocation rallyPoint,
+            List<ArmyLocation> patrolRoute
+    ) {
+        Objects.requireNonNull(rallyPoint, "rallyPoint");
+        patrolRoute = List.copyOf(Objects.requireNonNull(patrolRoute, "patrolRoute"));
+        ArmyGroupRecord group = armyGroupsById.get(groupId);
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (group == null || kingdom == null
+                || !group.kingdomId().equals(kingdom.id())
+                || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || group.simulation().lifecycleState() != ArmyGroupLifecycleState.LIVE
+                || patrolRoute.size() < 2 || patrolRoute.size() > 32
+                || patrolRoute.stream().anyMatch(
+                        waypoint -> !waypoint.dimensionId().equals(rallyPoint.dimensionId()))) {
+            return false;
+        }
+        ArmyGroupOrder patrolOrder = new ArmyGroupOrder(
+                galacticwars.clonewars.army.ArmyCommandType.PATROL_ROUTE,
+                Optional.of(patrolRoute.getFirst()),
+                Optional.empty(),
+                group.order().formation(),
+                group.order().spacing());
+        ArmyGroupRecord updated = group.withRallyPoint(rallyPoint)
+                .withPatrolRoute(patrolRoute)
+                .withOrder(patrolOrder);
+        armyGroupsById.put(groupId, updated);
+        this.setDirty();
+        return true;
+    }
+
     public Optional<ArmyGroupRecord> splitArmyGroup(
             UUID actorId,
             UUID sourceGroupId,
@@ -1076,6 +1161,7 @@ public final class KingdomSavedData extends SavedData {
         KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
         if (source == null || kingdom == null || !source.kingdomId().equals(kingdom.id())
                 || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)
+                || source.simulation().lifecycleState() != ArmyGroupLifecycleState.LIVE
                 || !source.memberIds().contains(newCommanderId)
                 || kingdom.npc(newCommanderId).map(KingdomNpcRecord::serviceBranch)
                         .filter(NpcServiceBranch.MILITARY::equals).isEmpty()
@@ -1115,6 +1201,8 @@ public final class KingdomSavedData extends SavedData {
         KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
         if (target == null || source == null || kingdom == null
                 || !target.kingdomId().equals(kingdom.id()) || !source.kingdomId().equals(kingdom.id())
+                || target.simulation().lifecycleState() != ArmyGroupLifecycleState.LIVE
+                || source.simulation().lifecycleState() != ArmyGroupLifecycleState.LIVE
                 || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)) {
             return false;
         }
@@ -1202,9 +1290,21 @@ public final class KingdomSavedData extends SavedData {
         if (firstKingdomId.equals(secondKingdomId)) {
             throw new IllegalArgumentException("kingdom cannot have diplomacy with itself");
         }
-        return diplomacyByPair.getOrDefault(
-                DiplomacyKey.of(firstKingdomId, secondKingdomId),
-                KingdomDiplomacy.neutral(firstKingdomId, secondKingdomId));
+        return diplomacyBetween(firstKingdomId, secondKingdomId)
+                .orElseGet(() -> KingdomDiplomacy.neutral(firstKingdomId, secondKingdomId));
+    }
+
+    public Optional<KingdomDiplomacy> diplomacyBetween(UUID firstKingdomId, UUID secondKingdomId) {
+        Objects.requireNonNull(firstKingdomId, "firstKingdomId");
+        Objects.requireNonNull(secondKingdomId, "secondKingdomId");
+        if (firstKingdomId.equals(secondKingdomId)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(diplomacyByPair.get(DiplomacyKey.of(firstKingdomId, secondKingdomId)));
+    }
+
+    public KingdomRelation effectiveRelation(UUID firstKingdomId, UUID secondKingdomId, long gameTime) {
+        return relation(firstKingdomId, secondKingdomId).effectiveRelation(gameTime);
     }
 
     public boolean setRelation(
@@ -1282,7 +1382,7 @@ public final class KingdomSavedData extends SavedData {
         KingdomRecord defender = claim == null ? null : kingdomsById.get(claim.kingdomId());
         if (attacker == null || defender == null || attacker.id().equals(defender.id())
                 || !attacker.allows(actorId, KingdomPermission.COMMAND_ARMY)
-                || relation(attacker.id(), defender.id()).relation() != KingdomRelation.ENEMY
+                || effectiveRelation(attacker.id(), defender.id(), gameTime) != KingdomRelation.ENEMY
                 || !defenderOnline || !withinSiegeWindow || captureGoal <= 0
                 || siegesById.values().stream().anyMatch(siege -> siege.claimId().equals(claimId)
                         && siege.state() == SiegeState.ACTIVE)
@@ -1356,6 +1456,20 @@ public final class KingdomSavedData extends SavedData {
                     claimsByChunk.remove(new ClaimKey(claim.dimensionId(), chunk.x(), chunk.z()), claim)));
         }
         indexKingdom(kingdom);
+    }
+
+    private boolean capitalClaimAvailable(String dimensionId, BlockPos hallPos, UUID replacedClaimId) {
+        int centerX = hallPos.getX() >> 4;
+        int centerZ = hallPos.getZ() >> 4;
+        for (int x = centerX - 1; x <= centerX + 1; x++) {
+            for (int z = centerZ - 1; z <= centerZ + 1; z++) {
+                KingdomClaim occupied = claimsByChunk.get(new ClaimKey(dimensionId, x, z));
+                if (occupied != null && (replacedClaimId == null || !occupied.id().equals(replacedClaimId))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private record ClaimKey(String dimensionId, int x, int z) {

@@ -40,6 +40,15 @@ public record KingdomDiplomacy(
         return treatyExpiresGameTime > gameTime;
     }
 
+    public KingdomRelation effectiveRelation(long gameTime) {
+        if (relation == KingdomRelation.ALLY
+                && treatyExpiresGameTime > 0L
+                && !treatyActive(gameTime)) {
+            return KingdomRelation.NEUTRAL;
+        }
+        return relation;
+    }
+
     public KingdomDiplomacy withRelation(KingdomRelation relation, long cooldownUntil) {
         return new KingdomDiplomacy(firstKingdomId, secondKingdomId, relation,
                 relation == KingdomRelation.ALLY ? treatyExpiresGameTime : 0L,

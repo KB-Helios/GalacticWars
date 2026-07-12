@@ -39,6 +39,12 @@ public record ArmyGroupRecord(
         if (patrolRoute.size() == 1 || patrolRoute.size() > 32) {
             throw new IllegalArgumentException("patrolRoute must be empty or contain 2-32 waypoints");
         }
+        if (!patrolRoute.isEmpty()) {
+            String patrolDimension = patrolRoute.getFirst().dimensionId();
+            if (patrolRoute.stream().anyMatch(waypoint -> !waypoint.dimensionId().equals(patrolDimension))) {
+                throw new IllegalArgumentException("patrolRoute waypoints must share one dimension");
+            }
+        }
         defendedClaimId = defendedClaimId == null ? Optional.empty() : defendedClaimId;
         if (supplyUnits < 0) {
             throw new IllegalArgumentException("supplyUnits cannot be negative");
@@ -81,6 +87,17 @@ public record ArmyGroupRecord(
         return new ArmyGroupState(id, ownerId, new LinkedHashSet<>(memberIds), order.toCommand(ownerId, id));
     }
 
+    /**
+     * Includes the commander when validating whether a persisted order can be
+     * issued. The formation planner intentionally excludes the commander, but
+     * a newly promoted commander is still a commandable one-unit squad.
+     */
+    public ArmyGroupState commandValidationState() {
+        LinkedHashSet<UUID> participants = new LinkedHashSet<>(memberIds);
+        commanderId.ifPresent(participants::add);
+        return new ArmyGroupState(id, ownerId, participants, order.toCommand(ownerId, id));
+    }
+
     public boolean contains(UUID recruitId) {
         return commanderId.filter(recruitId::equals).isPresent() || memberIds.contains(recruitId);
     }
@@ -121,10 +138,16 @@ public record ArmyGroupRecord(
     }
 
     public ArmyGroupRecord withMembers(List<UUID> members) {
+        LinkedHashSet<UUID> retainedIds = new LinkedHashSet<>(members);
+        commanderId.ifPresent(retainedIds::add);
+        List<ArmyMemberSnapshot> retainedSnapshots = snapshots.stream()
+                .filter(snapshot -> retainedIds.contains(snapshot.recruitId()))
+                .toList();
         return copy(commanderId, members, order,
                 new ArmyGroupSimulation(
                         simulation.lifecycleState(), simulation.anchor(), simulation.lastSimulationGameTime(),
-                        simulation.revision() + 1, simulation.snapshotGeneration(), simulation.blockedReason()), snapshots);
+                        simulation.revision() + 1, simulation.snapshotGeneration(), simulation.blockedReason()),
+                retainedSnapshots);
     }
 
     public ArmyGroupRecord withSimulation(ArmyGroupSimulation simulation, List<ArmyMemberSnapshot> snapshots) {

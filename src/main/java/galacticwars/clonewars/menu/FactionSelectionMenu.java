@@ -113,6 +113,13 @@ public final class FactionSelectionMenu extends AbstractContainerMenu {
             }
         }
 
+        if (!kingdoms.canActivateHall(
+                serverPlayer.getUUID(), level.dimension().identifier().toString(), commandCenterPos)) {
+            serverPlayer.sendSystemMessage(Component.translatable(
+                    "message.galacticwars.command_center.claim_conflict"));
+            return false;
+        }
+
         if (progressionFaction.isEmpty()) {
             KingdomGameplayResult pledge = KingdomGameplayRuntimeService.applyProgression(
                     progression, new KingdomGameplayAction(
