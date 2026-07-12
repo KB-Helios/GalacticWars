@@ -13,6 +13,12 @@ import java.util.stream.Stream;
 public final class LaunchDataIntegrityTest {
     private static final Path ROOT = Path.of("src/main/resources/data/galacticwars");
     private static final Path GAMEPLAY = ROOT.resolve("galacticwars");
+    private static final Set<String> EXPECTED_QUEST_IDS = Set.of(
+            "republic_chapter_1", "republic_chapter_2", "republic_chapter_3",
+            "separatist_chapter_1", "separatist_chapter_2", "separatist_chapter_3",
+            "mandalorian_chapter_1", "mandalorian_chapter_2", "mandalorian_chapter_3",
+            "hutt_cartel_chapter_1", "hutt_cartel_chapter_2", "hutt_cartel_chapter_3",
+            "nightsister_chapter_1", "nightsister_chapter_2", "nightsister_chapter_3");
 
     public static void main(String[] args) throws Exception {
         assertJsonCount(GAMEPLAY.resolve("factions"), 5, "factions");
@@ -29,12 +35,9 @@ public final class LaunchDataIntegrityTest {
         assertTrue(Files.isRegularFile(ROOT.resolve("dimension_type/planet.json")), "planet dimension type");
         String quests = Files.readString(GAMEPLAY.resolve("quests/launch.json"));
         Set<String> questIds = ids(quests);
-        assertTrue(questIds.size() == 15, "quest count");
+        assertTrue(questIds.equals(EXPECTED_QUEST_IDS), "launch quest ids");
         assertTrue(!quests.contains("\"objectives\":[\"force_ability_unlocked\""),
                 "launch campaign cannot require disabled Force runtime");
-        for (String quest : questIds) {
-            assertTrue(quests.contains("\"id\":\"" + quest + "\""), quest);
-        }
         Map<String, Set<String>> declaredUnlocks = new HashMap<>();
         Matcher questMatcher = Pattern.compile(
                 "\\{\"id\":\"([^\"]+)\".*?\"unlocks\":\\[([^]]*)]}").matcher(quests);
@@ -47,6 +50,7 @@ public final class LaunchDataIntegrityTest {
             declaredUnlocks.put(questMatcher.group(1), Set.copyOf(unlocks));
         }
         assertTrue(declaredUnlocks.size() == 15, "quest unlock declarations");
+        assertTrue(declaredUnlocks.keySet().equals(EXPECTED_QUEST_IDS), "quest unlock owners");
         System.out.println("LaunchDataIntegrityTest passed");
     }
 

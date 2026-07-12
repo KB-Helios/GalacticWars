@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class CommandCenterNavigationMenu extends AbstractContainerMenu {
+    public static final int MAX_PLANET_IDS = 32;
     private final List<String> planetIds;
 
     public CommandCenterNavigationMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf extraData) {
@@ -71,7 +72,7 @@ public final class CommandCenterNavigationMenu extends AbstractContainerMenu {
 
     private static List<String> readPlanetIds(RegistryFriendlyByteBuf buffer) {
         int size = buffer.readVarInt();
-        if (size < 0 || size > 32) {
+        if (size < 0 || size > MAX_PLANET_IDS) {
             throw new IllegalArgumentException("invalid navigation payload size " + size);
         }
         ArrayList<String> ids = new ArrayList<>(size);

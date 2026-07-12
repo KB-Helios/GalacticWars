@@ -23,7 +23,22 @@ public final class LaunchContentCatalogTest {
             rejected = true;
         }
         assertEquals(true, rejected, "Force runtime remains disabled");
+        assertNullQuestCollectionRejected(null, Set.of(), "objectives for quest broken");
+        assertNullQuestCollectionRejected(List.of("command_center"), null, "unlocks for quest broken");
         System.out.println("LaunchContentCatalogTest passed");
+    }
+
+    private static void assertNullQuestCollectionRejected(
+            List<String> objectives,
+            Set<String> unlocks,
+            String expectedMessage
+    ) {
+        try {
+            new LaunchContentDefinitions.QuestDefinition("broken", objectives, 0, unlocks);
+            throw new AssertionError("Null quest collection was accepted");
+        } catch (NullPointerException expected) {
+            assertEquals(expectedMessage, expected.getMessage(), "null quest collection diagnostic");
+        }
     }
 
     private static void assertEquals(Object expected, Object actual, String label) {

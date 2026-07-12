@@ -2223,9 +2223,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             }
             return;
         }
-        Animal target = livestock.stream()
-                .filter(animal -> !animal.isBaby() && animal.isFood(new ItemStack(feed)))
-                .findFirst().orElseThrow();
+        Animal target = this.breedingPair(livestock, feed).getFirst();
         this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "feed_animals", target.blockPosition());
     }
 
@@ -2258,12 +2256,8 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             this.blockWorker("breeding_pair_required");
             return;
         }
-        List<Animal> pair = livestock.stream()
-                .filter(animal -> !animal.isBaby() && animal.canFallInLove())
-                .filter(animal -> animal.isFood(new ItemStack(feed)))
-                .limit(2)
-                .toList();
-        if (pair.size() < 2) {
+        List<Animal> pair = this.breedingPair(livestock, feed);
+        if (pair.isEmpty()) {
             this.blockWorker("breeding_pair_required");
             return;
         }
@@ -2285,18 +2279,22 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             return;
         }
         List<ItemStack> products = new ArrayList<>();
-        String livestockType = BuiltInRegistries.ENTITY_TYPE.getKey(animal.getType()).toString();
-        if (livestockType.equals("minecraft:sheep")) {
+        EntityType<?> livestockType = animal.getType();
+        if (livestockType == net.minecraft.world.entity.EntityTypes.SHEEP) {
             products.add(new ItemStack(Items.MUTTON, 2));
             products.add(new ItemStack(Items.STRING, 2));
-        } else if (livestockType.equals("minecraft:pig")) {
+        } else if (livestockType == net.minecraft.world.entity.EntityTypes.PIG) {
             products.add(new ItemStack(Items.PORKCHOP, 2));
-        } else if (livestockType.equals("minecraft:chicken")) {
+        } else if (livestockType == net.minecraft.world.entity.EntityTypes.CHICKEN) {
             products.add(new ItemStack(Items.CHICKEN));
             products.add(new ItemStack(Items.FEATHER, 2));
-        } else {
+        } else if (livestockType == net.minecraft.world.entity.EntityTypes.COW
+                || livestockType == net.minecraft.world.entity.EntityTypes.MOOSHROOM) {
             products.add(new ItemStack(Items.BEEF, 2));
             products.add(new ItemStack(Items.LEATHER));
+        } else {
+            this.blockWorker("unsupported_livestock_type");
+            return;
         }
         NonNullList<ItemStack> nextInventory = this.copyWorkerInventory();
         if (!mergeAll(nextInventory, products)) {
@@ -2485,16 +2483,31 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
 
     private net.minecraft.world.item.Item requiredAnimalFeed(List<Animal> livestock) {
         for (net.minecraft.world.item.Item feed : List.of(Items.WHEAT, Items.CARROT, Items.WHEAT_SEEDS)) {
-            long eligible = livestock.stream()
-                    .filter(animal -> !animal.isBaby() && animal.canFallInLove())
-                    .filter(animal -> animal.isFood(new ItemStack(feed)))
-                    .limit(2)
-                    .count();
-            if (eligible == 2) {
+            if (!this.breedingPair(livestock, feed).isEmpty()) {
                 return feed;
             }
         }
         return null;
+    }
+
+    private List<Animal> breedingPair(List<Animal> livestock, net.minecraft.world.item.Item feed) {
+        ItemStack feedStack = new ItemStack(feed);
+        for (int firstIndex = 0; firstIndex < livestock.size(); firstIndex++) {
+            Animal first = livestock.get(firstIndex);
+            if (first.isBaby() || !first.canFallInLove() || !first.isFood(feedStack)) {
+                continue;
+            }
+            for (int secondIndex = firstIndex + 1; secondIndex < livestock.size(); secondIndex++) {
+                Animal second = livestock.get(secondIndex);
+                if (second.getType() == first.getType()
+                        && !second.isBaby()
+                        && second.canFallInLove()
+                        && second.isFood(feedStack)) {
+                    return List.of(first, second);
+                }
+            }
+        }
+        return List.of();
     }
 
     private net.minecraft.world.item.Item availableStoredRawCookingInput() {

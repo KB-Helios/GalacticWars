@@ -2,7 +2,9 @@ package galacticwars.clonewars.integration;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,10 +33,15 @@ public final class ClassAbilityDataIntegrityTest {
         assertEquals(15, classIds.size(), "class count");
         assertEquals(15, classUnits.size(), "one class per unit");
         assertEquals(15, count(classData, "\"player_assignable\":true"), "assignable class count");
-        for (String abilityReference : arrayValues(classData, "abilities")) {
-            assertTrue(abilityIds.contains(abilityReference), "known class ability " + abilityReference);
+        List<List<String>> classAbilities = arrayValueGroups(classData, "abilities");
+        assertEquals(15, classAbilities.size(), "class ability declarations");
+        for (List<String> abilities : classAbilities) {
+            assertEquals(2, abilities.size(), "two abilities per class");
+            for (String abilityReference : abilities) {
+                assertTrue(abilityIds.contains(abilityReference), "known class ability " + abilityReference);
+            }
         }
-        assertEquals(30, arrayValues(classData, "abilities").size(), "two abilities per class");
+        assertEquals(30, classAbilities.stream().mapToInt(List::size).sum(), "total class ability references");
     }
 
     private static void everyFactionHasRuntimePolicy() throws Exception {
@@ -68,17 +75,19 @@ public final class ClassAbilityDataIntegrityTest {
         return Set.copyOf(values);
     }
 
-    private static Set<String> arrayValues(String json, String key) {
-        HashSet<String> values = new HashSet<>();
+    private static List<List<String>> arrayValueGroups(String json, String key) {
+        ArrayList<List<String>> groups = new ArrayList<>();
         Matcher arrays = Pattern.compile("\\\"" + Pattern.quote(key)
                 + "\\\"\\s*:\\s*\\[(.*?)]", Pattern.DOTALL).matcher(json);
         while (arrays.find()) {
+            ArrayList<String> values = new ArrayList<>();
             Matcher entries = Pattern.compile("\\\"([^\\\"]+)\\\"").matcher(arrays.group(1));
             while (entries.find()) {
                 values.add(entries.group(1));
             }
+            groups.add(List.copyOf(values));
         }
-        return Set.copyOf(values);
+        return List.copyOf(groups);
     }
 
     private static int count(String value, String needle) {

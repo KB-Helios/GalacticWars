@@ -24,6 +24,9 @@ public final class CommandCenterNavigationMenuProvider implements MenuProvider {
         var planets = menu instanceof CommandCenterNavigationMenu navigation
                 ? navigation.planetIds()
                 : LaunchContentCatalog.planets();
+        if (planets.size() > CommandCenterNavigationMenu.MAX_PLANET_IDS) {
+            throw new IllegalStateException("planet list exceeds navigation payload cap: " + planets.size());
+        }
         buffer.writeVarInt(planets.size());
         planets.forEach(id -> buffer.writeUtf(id, 128));
     }

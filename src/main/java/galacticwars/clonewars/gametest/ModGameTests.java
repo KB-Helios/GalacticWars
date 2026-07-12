@@ -92,6 +92,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -172,6 +173,7 @@ public final class ModGameTests {
         tests.put(id("worker_resource_conservation"), ModGameTests::workerResourceConservation);
         tests.put(id("enabled_worker_loops"), ModGameTests::enabledWorkerLoops);
         tests.put(id("specialist_worker_loops"), ModGameTests::specialistWorkerLoops);
+        tests.put(id("animal_farmer_species_pairing"), ModGameTests::animalFarmerSpeciesPairing);
         tests.put(id("workforce_saved_data_authority"), ModGameTests::workforceSavedDataAuthority);
         tests.put(id("recruit_spawn_eggs"), ModGameTests::recruitSpawnEggs);
         tests.put(id("blaster_friendly_fire"), ModGameTests::blasterFriendlyFire);
@@ -1814,6 +1816,54 @@ public final class ModGameTests {
                 helper, hallPos, hall, owner, recruit, data, first, second));
     }
 
+    private static void animalFarmerSpeciesPairing(GameTestHelper helper) {
+        GalacticRecruitEntity recruit = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
+        Animal cow = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        Animal sheep = EntityTypes.SHEEP.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        Animal secondCow = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        if (cow == null || sheep == null || secondCow == null) {
+            helper.fail("Could not create cross-species livestock pair");
+            return;
+        }
+        cow.setPos(recruit.getX() + 1.0D, recruit.getY(), recruit.getZ());
+        sheep.setPos(recruit.getX() - 1.0D, recruit.getY(), recruit.getZ());
+        secondCow.setPos(recruit.getX() + 2.0D, recruit.getY(), recruit.getZ());
+        secondCow.setAge(-24_000);
+        helper.getLevel().addFreshEntity(cow);
+        helper.getLevel().addFreshEntity(sheep);
+        helper.getLevel().addFreshEntity(secondCow);
+        helper.runAfterDelay(2, () -> {
+            setWorkerInventory(recruit, new ItemStack(Items.WHEAT, 2));
+            invokeFeedAnimalPair(recruit, helper.getLevel());
+            if (!recruit.getWorkerStatus().reasonCode().equals("breeding_pair_required")
+                    || cow.isInLove()
+                    || sheep.isInLove()
+                    || workerInventoryCount(recruit) != 2) {
+                helper.fail("Animal farmer accepted an incompatible cow/sheep breeding pair");
+                return;
+            }
+
+            secondCow.setAge(0);
+            helper.runAfterDelay(2, () -> {
+                invokeFeedAnimalPair(recruit, helper.getLevel());
+                if (!cow.isInLove()
+                        || !secondCow.isInLove()
+                        || sheep.isInLove()
+                        || workerInventoryCount(recruit) != 0) {
+                    helper.fail("Animal farmer did not select and feed the compatible cow pair; reason="
+                            + recruit.getWorkerStatus().reasonCode()
+                            + ", carried=" + workerInventoryCount(recruit)
+                            + ", firstCow=" + cow.isAlive() + "/" + cow.canFallInLove() + "/" + cow.isInLove()
+                            + ", secondCow=" + secondCow.isAlive() + "/" + secondCow.canFallInLove() + "/" + secondCow.isInLove()
+                            + ", sheep=" + sheep.isAlive() + "/" + sheep.canFallInLove() + "/" + sheep.isInLove());
+                    return;
+                }
+                helper.succeed();
+            });
+        });
+    }
+
     private static void finishSpecialistWorkerLoops(
             GameTestHelper helper,
             BlockPos hallPos,
@@ -2005,6 +2055,16 @@ public final class ModGameTests {
             method.invoke(recruit, command);
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Could not set recruit command", exception);
+        }
+    }
+
+    private static void invokeFeedAnimalPair(GalacticRecruitEntity recruit, ServerLevel level) {
+        try {
+            Method method = GalacticRecruitEntity.class.getDeclaredMethod("feedAnimalPair", ServerLevel.class);
+            method.setAccessible(true);
+            method.invoke(recruit, level);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Could not run animal feeding interaction", exception);
         }
     }
 

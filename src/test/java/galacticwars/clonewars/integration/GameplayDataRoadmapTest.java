@@ -78,6 +78,8 @@ public final class GameplayDataRoadmapTest {
         assertContains(manager, "retaining the previous valid snapshot", "last-good reload fallback logging");
         assertContains(manager, "mandalorian_rider", "legacy Mandalorian alias");
         assertContains(manager, "mandalorian_warrior", "Mandalorian alias target");
+        assertContains(manager, "integer(resource.json(), \"schema_version\", -1)",
+                "missing schema versions are rejected");
     }
 
     private static void reciprocal(String own, Set<String> relations, String field, Map<String, String> factions) {

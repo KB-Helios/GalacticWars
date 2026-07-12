@@ -602,7 +602,7 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
     }
 
     private static void requireSchema(ResourceJson resource, int supported) {
-        int schema = integer(resource.json(), "schema_version", supported);
+        int schema = integer(resource.json(), "schema_version", -1);
         if (schema != supported) {
             throw new IllegalArgumentException("Unsupported schema " + schema + " in " + resource.id());
         }

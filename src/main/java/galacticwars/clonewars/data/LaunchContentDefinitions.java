@@ -65,6 +65,8 @@ public record LaunchContentDefinitions(
     public record QuestDefinition(String id, List<String> objectives, int rewardCredits, Set<String> unlocks) {
         public QuestDefinition {
             requireIds(id);
+            Objects.requireNonNull(objectives, "objectives for quest " + id);
+            Objects.requireNonNull(unlocks, "unlocks for quest " + id);
             objectives = List.copyOf(objectives);
             unlocks = Set.copyOf(unlocks);
             if (objectives.isEmpty() || rewardCredits < 0) throw new IllegalArgumentException("Invalid quest " + id);
