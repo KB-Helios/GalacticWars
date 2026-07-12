@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import galacticwars.clonewars.Config;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.army.ArmyFormation;
 import galacticwars.clonewars.army.ArmyGroupLifecycleState;
@@ -26,6 +27,7 @@ import galacticwars.clonewars.entity.RecruitLifecycleService;
 import galacticwars.clonewars.entity.ai.RecruitRangedCombatGoal;
 import galacticwars.clonewars.faction.FactionAlignmentSavedData;
 import galacticwars.clonewars.faction.FactionId;
+import galacticwars.clonewars.faction.FactionRelation;
 import galacticwars.clonewars.kingdom.BuildProject;
 import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomClaim;
@@ -33,6 +35,7 @@ import galacticwars.clonewars.kingdom.KingdomActionId;
 import galacticwars.clonewars.kingdom.KingdomGameplayAction;
 import galacticwars.clonewars.kingdom.KingdomGameplayResult;
 import galacticwars.clonewars.kingdom.KingdomGameplayRuntimeService;
+import galacticwars.clonewars.kingdom.KingdomFactionRelations;
 import galacticwars.clonewars.kingdom.KingdomMemberRole;
 import galacticwars.clonewars.kingdom.KingdomPermission;
 import galacticwars.clonewars.kingdom.KingdomRelation;
@@ -96,6 +99,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -104,7 +108,6 @@ import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
@@ -161,6 +164,7 @@ public final class ModGameTests {
         tests.put(id("recruit_entity_contract"), ModGameTests::recruitEntityContract);
         tests.put(id("worker_tags_and_loot"), ModGameTests::workerTagsAndLoot);
         tests.put(id("recruit_contract_lifecycle"), ModGameTests::recruitContractLifecycle);
+        tests.put(id("local_recruit_protect_owner"), ModGameTests::localRecruitProtectOwner);
         tests.put(id("worker_resource_conservation"), ModGameTests::workerResourceConservation);
         tests.put(id("enabled_worker_loops"), ModGameTests::enabledWorkerLoops);
         tests.put(id("workforce_saved_data_authority"), ModGameTests::workforceSavedDataAuthority);
@@ -197,9 +201,8 @@ public final class ModGameTests {
     }
 
     private static void factionSelectionTransaction(GameTestHelper helper) {
-        BlockPos relativeHall = new BlockPos(1, 1, 1);
-        helper.setBlock(relativeHall, ModBlocks.COMMAND_CENTER.get());
-        CommandCenterBlockEntity hall = helper.getBlockEntity(relativeHall, CommandCenterBlockEntity.class);
+        BlockPos hallPos = isolatedCapital(helper, 6);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
         owner.setPos(hall.getBlockPos().getX() + 0.5D, hall.getBlockPos().getY(), hall.getBlockPos().getZ() + 0.5D);
         if (!hall.claim(owner)) {
@@ -254,13 +257,11 @@ public final class ModGameTests {
     }
 
     private static void planetTravelFailureAtomicity(GameTestHelper helper) {
-        BlockPos relativeHall = new BlockPos(1, 1, 1);
-        helper.setBlock(relativeHall, ModBlocks.COMMAND_CENTER.get());
-        CommandCenterBlockEntity hall = helper.getBlockEntity(relativeHall, CommandCenterBlockEntity.class);
+        BlockPos hallPos = isolatedCapital(helper, 7);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
         hall.claim(owner);
         hall.setFaction("galacticwars:republic");
-        BlockPos hallPos = hall.getBlockPos();
         KingdomSavedData.get(helper.getLevel()).foundKingdom(
                 owner.getUUID(), hall.factionId(),
                 helper.getLevel().dimension().identifier().toString(), hallPos);
@@ -334,13 +335,11 @@ public final class ModGameTests {
     }
 
     private static void armyPlanetTransferTransaction(GameTestHelper helper) {
-        BlockPos relativeHall = new BlockPos(1, 1, 1);
-        helper.setBlock(relativeHall, ModBlocks.COMMAND_CENTER.get());
-        CommandCenterBlockEntity hall = helper.getBlockEntity(relativeHall, CommandCenterBlockEntity.class);
+        BlockPos hallPos = isolatedCapital(helper, 8);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
         hall.claim(owner);
         hall.setFaction("galacticwars:republic");
-        BlockPos hallPos = hall.getBlockPos();
         KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
         data.foundKingdom(owner.getUUID(), hall.factionId(),
                 helper.getLevel().dimension().identifier().toString(), hallPos);
@@ -410,6 +409,14 @@ public final class ModGameTests {
             helper.fail("Army travel commit did not virtualize, relocate, and remove the source squad");
             return;
         }
+        UUID lateRecruit = UUID.randomUUID();
+        if (!data.registerRecruit(owner.getUUID(), lateRecruit)
+                || data.addRecruitToArmy(owner.getUUID(), group.id(), lateRecruit)
+                || data.addRecruitToArmy(owner.getUUID(), lateRecruit)
+                || data.armyGroup(group.id()).orElseThrow().snapshots().size() != 2) {
+            helper.fail("Virtual squad accepted a member without an authoritative materialization snapshot");
+            return;
+        }
         helper.succeed();
     }
 
@@ -455,7 +462,9 @@ public final class ModGameTests {
         GalacticRecruitEntity shooter = helper.spawn(
                 ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
         GalacticRecruitEntity target = helper.spawn(
-                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(6, 1, 2));
+                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(12, 1, 2));
+        shooter.setNoAi(true);
+        target.setNoAi(true);
         shooter.tame(owner);
         shooter.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.DC15_BLASTER.get()));
         shooter.setTarget(target);
@@ -465,14 +474,15 @@ public final class ModGameTests {
             helper.fail("Ungrouped ranged recruit goal rejected a valid local attack target");
             return;
         }
+        AABB shotArea = shooter.getBoundingBox().inflate(20.0D);
         goal.tick();
-        List<Arrow> bolts = helper.getLevel().getEntitiesOfClass(
-                Arrow.class, shooter.getBoundingBox().inflate(8.0D), arrow -> arrow.getOwner() == shooter);
-        if (bolts.size() != 1 || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
-            helper.fail("Ungrouped ranged recruit goal did not fire one weapon-tagged bolt");
-            return;
-        }
-        helper.succeed();
+        helper.succeedWhen(() -> {
+            List<Arrow> bolts = helper.getLevel().getEntitiesOfClass(
+                    Arrow.class, shotArea, arrow -> arrow.getOwner() == shooter);
+            if (bolts.size() != 1 || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
+                helper.fail("Ungrouped ranged recruit goal did not fire one weapon-tagged bolt");
+            }
+        });
     }
 
     private static void blasterFriendlyFire(GameTestHelper helper) {
@@ -520,6 +530,41 @@ public final class ModGameTests {
         BlasterCombatEvents.onProjectileImpact(vanillaImpact);
         if (vanillaImpact.isCanceled() || vanillaArrow.isRemoved()) {
             helper.fail("Untagged vanilla arrow was incorrectly handled as a faction projectile");
+            return;
+        }
+
+        ServerPlayer republicTarget = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+        KingdomSavedData.get(helper.getLevel()).foundKingdom(
+                republicTarget.getUUID(),
+                "galacticwars:republic",
+                helper.getLevel().dimension().identifier().toString(),
+                helper.absolutePos(new BlockPos(1, 1, 1)).offset(0, 0, 50_000));
+        GalacticRecruitEntity separatistGuard = helper.spawn(
+                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(4, 1, 2));
+        separatistGuard.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
+        Arrow hostileBolt = new Arrow(
+                helper.getLevel(), separatistGuard,
+                new ItemStack(ModItems.ENERGY_CELL.get()),
+                new ItemStack(ModItems.DC15_BLASTER.get()));
+        ProjectileImpactEvent hostileImpact = new ProjectileImpactEvent(
+                hostileBolt, new EntityHitResult(republicTarget));
+        BlasterCombatEvents.onProjectileImpact(hostileImpact);
+        boolean hostileHitBlocked = !Config.ALLOW_BLASTER_PVP.getAsBoolean();
+        if (hostileImpact.isCanceled() != hostileHitBlocked || hostileBolt.isRemoved() != hostileHitBlocked) {
+            helper.fail("Hostile faction recruit projectile did not honor the PvP setting");
+            return;
+        }
+
+        ServerPlayer neutralTarget = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+        Arrow neutralBolt = new Arrow(
+                helper.getLevel(), separatistGuard,
+                new ItemStack(ModItems.ENERGY_CELL.get()),
+                new ItemStack(ModItems.DC15_BLASTER.get()));
+        ProjectileImpactEvent neutralImpact = new ProjectileImpactEvent(
+                neutralBolt, new EntityHitResult(neutralTarget));
+        BlasterCombatEvents.onProjectileImpact(neutralImpact);
+        if (!neutralImpact.isCanceled() || !neutralBolt.isRemoved()) {
+            helper.fail("Faction recruit projectile damaged a neutral player");
             return;
         }
         helper.succeed();
@@ -620,9 +665,8 @@ public final class ModGameTests {
     }
 
     private static void kingdomHallAuthority(GameTestHelper helper) {
-        BlockPos hallPos = new BlockPos(1, 1, 1);
-        helper.setBlock(hallPos, ModBlocks.COMMAND_CENTER.get());
-        CommandCenterBlockEntity hall = helper.getBlockEntity(hallPos, CommandCenterBlockEntity.class);
+        BlockPos hallPos = isolatedCapital(helper, 9);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
         ServerPlayer intruder = makeConnectedMockPlayer(helper, GameType.CREATIVE);
         if (!hall.claim(owner) || hall.claim(intruder) || !hall.isOwner(owner)) {
@@ -652,10 +696,21 @@ public final class ModGameTests {
                 owner.getUUID(),
                 hall.factionId(),
                 helper.getLevel().dimension().identifier().toString(),
-                helper.absolutePos(hallPos));
+                hallPos);
         if (!kingdom.ownerId().equals(owner.getUUID())
                 || data.kingdomForOwner(owner.getUUID()).isEmpty()) {
             helper.fail("Kingdom state was not stored authoritatively in overworld SavedData");
+        }
+        BlockPos absoluteHall = hallPos;
+        UUID overlappingOwner = UUID.randomUUID();
+        if (data.activateHall(
+                        overlappingOwner,
+                        "galacticwars:separatist",
+                        helper.getLevel().dimension().identifier().toString(),
+                        absoluteHall.offset(32, 0, 0)).isPresent()
+                || data.kingdomForOwner(overlappingOwner).isPresent()) {
+            helper.fail("Overlapping Command Center capital claims were accepted");
+            return;
         }
         RecruitmentCampaign campaign = new RecruitmentCampaign(
                 UUID.randomUUID(),
@@ -676,72 +731,103 @@ public final class ModGameTests {
                         .reservedCost() != 0) {
             helper.fail("Cancelled commander campaign refund was not conserved through SavedData and Hall storage");
         }
-        BlockPos absoluteHall = helper.absolutePos(hallPos);
-        BlockPos relocatedHall = absoluteHall.offset(16, 0, 0);
+        BlockPos relocatedHall = absoluteHall.offset(64, 0, 0);
         if (data.activateHall(owner.getUUID(), hall.factionId(),
                         helper.getLevel().dimension().identifier().toString(), relocatedHall).isPresent()) {
             helper.fail("A second active Command Center was accepted");
+        }
+        BlockPos localDropHallPos = new BlockPos(1, 1, 1);
+        helper.setBlock(localDropHallPos, ModBlocks.COMMAND_CENTER.get());
+        CommandCenterBlockEntity localDropHall = helper.getBlockEntity(
+                localDropHallPos, CommandCenterBlockEntity.class);
+        localDropHall.setItem(0, new ItemStack(
+                galacticwars.clonewars.registry.ModItems.CREDIT_CHIP.get(), 12));
+        BlockPos absoluteDropHall = helper.absolutePos(localDropHallPos);
+        ModBlocks.COMMAND_CENTER.get().playerWillDestroy(
+                helper.getLevel(), absoluteDropHall,
+                helper.getLevel().getBlockState(absoluteDropHall), intruder);
+        int localRemovalRefund = helper.getLevel().getEntitiesOfClass(
+                        ItemEntity.class,
+                        new net.minecraft.world.phys.AABB(absoluteDropHall).inflate(3.0))
+                .stream()
+                .filter(item -> item.getItem().is(galacticwars.clonewars.registry.ModItems.CREDIT_CHIP.get()))
+                .mapToInt(item -> item.getItem().getCount())
+                .sum();
+        if (localRemovalRefund != 12 || !localDropHall.isEmpty()) {
+            helper.fail("Command Center inventory removal did not conserve its physical drops");
         }
         ModBlocks.COMMAND_CENTER.get().playerWillDestroy(
                 helper.getLevel(), absoluteHall, helper.getLevel().getBlockState(absoluteHall), intruder);
         if (!data.isHallActive(owner.getUUID()) || hall.treasuryCredits() != 12) {
             helper.fail("Intruder Hall removal bypassed owner authority");
         }
-        ModBlocks.COMMAND_CENTER.get().playerWillDestroy(
-                helper.getLevel(), absoluteHall, helper.getLevel().getBlockState(absoluteHall), owner);
-        int removalRefund = helper.getLevel().getEntitiesOfClass(
-                        ItemEntity.class,
-                        new net.minecraft.world.phys.AABB(absoluteHall).inflate(3.0))
-                .stream()
-                .filter(item -> item.getItem().is(galacticwars.clonewars.registry.ModItems.CREDIT_CHIP.get()))
-                .mapToInt(item -> item.getItem().getCount())
-                .sum();
-        if (data.isHallActive(owner.getUUID()) || removalRefund != 12 || !hall.isEmpty()) {
-            helper.fail("Owner Hall removal did not conserve inventory and deactivate authority");
-        }
-        KingdomRecord relocated = data.activateHall(owner.getUUID(), hall.factionId(),
-                        helper.getLevel().dimension().identifier().toString(), relocatedHall)
-                .orElseThrow();
-        if (!relocated.id().equals(kingdom.id())
-                || relocated.settlement().hallX() != relocatedHall.getX()
-                || relocated.settlement().hallY() != relocatedHall.getY()
-                || relocated.settlement().hallZ() != relocatedHall.getZ()) {
-            helper.fail("Command Center relocation did not preserve kingdom identity and update its position");
-        }
+        owner.setPos(absoluteHall.getX() + 0.5, absoluteHall.getY(), absoluteHall.getZ() + 0.5);
+        helper.runAfterDelay(2, () -> {
+            CommandCenterBlockEntity removalHall = (CommandCenterBlockEntity) helper.getLevel()
+                    .getBlockEntity(absoluteHall);
+            int treasuryBeforeRemoval = removalHall == null ? -1 : removalHall.treasuryCredits();
+            ModBlocks.COMMAND_CENTER.get().playerWillDestroy(
+                    helper.getLevel(), absoluteHall, helper.getLevel().getBlockState(absoluteHall), owner);
+            if (data.isHallActive(owner.getUUID()) || removalHall == null || !removalHall.isEmpty()) {
+                helper.fail("Owner Hall removal did not conserve inventory and deactivate authority: active="
+                        + data.isHallActive(owner.getUUID()) + ", treasuryBefore=" + treasuryBeforeRemoval
+                        + ", hallPresent=" + (removalHall != null)
+                        + ", empty=" + (removalHall != null && removalHall.isEmpty()));
+            }
+            KingdomRecord relocated = data.activateHall(owner.getUUID(), hall.factionId(),
+                            helper.getLevel().dimension().identifier().toString(), relocatedHall)
+                    .orElseThrow();
+            if (!relocated.id().equals(kingdom.id())
+                    || relocated.settlement().hallX() != relocatedHall.getX()
+                    || relocated.settlement().hallY() != relocatedHall.getY()
+                    || relocated.settlement().hallZ() != relocatedHall.getZ()
+                    || data.claimAt(
+                            helper.getLevel().dimension().identifier().toString(),
+                            new net.minecraft.world.level.ChunkPos(
+                                    absoluteHall.getX() >> 4, absoluteHall.getZ() >> 4))
+                            .isPresent()
+                    || data.claimAt(
+                            helper.getLevel().dimension().identifier().toString(),
+                            new net.minecraft.world.level.ChunkPos(
+                                    relocatedHall.getX() >> 4, relocatedHall.getZ() >> 4))
+                            .filter(claim -> claim.kingdomId().equals(kingdom.id())).isEmpty()) {
+                helper.fail("Command Center relocation did not preserve kingdom identity and update its position");
+            }
 
-        int housingBeforeReward = relocated.settlement().housingCapacity();
-        KingdomBaseBlueprint farmBlueprint = GameplayDataManager.snapshot()
-                .blueprint("galacticwars:moisture_farm").orElseThrow();
-        BuildProject farmProject = fullyProgressProject(
-                data, owner.getUUID(), farmBlueprint,
-                helper.getLevel().dimension().identifier().toString(),
-                relocatedHall.offset(4, 0, 0));
-        if (!data.completeBuildProject(owner.getUUID(), farmProject, farmBlueprint)
-                || data.completeBuildProject(owner.getUUID(), farmProject, farmBlueprint)) {
-            helper.fail("Build rewards were not applied exactly once");
-        }
-        KingdomRecord rewarded = data.kingdomForOwner(owner.getUUID()).orElseThrow();
-        if (rewarded.settlement().housingCapacity() != housingBeforeReward + farmBlueprint.housingReward()
-                || rewarded.settlement().buildProjects().stream()
-                        .filter(project -> project.blueprintId().equals(farmBlueprint.id()))
-                        .count() != 1
-                || rewarded.settlement().worksites().stream()
-                        .filter(worksite -> worksite.type().equals("farmer"))
-                        .count() != 1) {
-            helper.fail("Build completion rewards were duplicated or omitted");
-        }
-        Tag encoded = KingdomSavedData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
-        KingdomSavedData restored = KingdomSavedData.CODEC.parse(NbtOps.INSTANCE, encoded).getOrThrow();
-        KingdomRecord restoredReward = restored.kingdomForOwner(owner.getUUID()).orElseThrow();
-        if (!restoredReward.settlement().containsCompletedProject(farmProject)
-                || restoredReward.settlement().housingCapacity()
-                        != housingBeforeReward + farmBlueprint.housingReward()
-                || restoredReward.settlement().worksites().stream()
-                        .filter(worksite -> worksite.type().equals("farmer"))
-                        .count() != 1) {
-            helper.fail("Build completion rewards did not survive a SavedData codec round trip");
-        }
-        helper.succeed();
+            int housingBeforeReward = relocated.settlement().housingCapacity();
+            KingdomBaseBlueprint farmBlueprint = GameplayDataManager.snapshot()
+                    .blueprint("galacticwars:moisture_farm").orElseThrow();
+            BuildProject farmProject = fullyProgressProject(
+                    data, owner.getUUID(), farmBlueprint,
+                    helper.getLevel().dimension().identifier().toString(),
+                    relocatedHall.offset(4, 0, 0));
+            if (!data.completeBuildProject(owner.getUUID(), farmProject, farmBlueprint)
+                    || data.completeBuildProject(owner.getUUID(), farmProject, farmBlueprint)) {
+                helper.fail("Build rewards were not applied exactly once");
+            }
+            KingdomRecord rewarded = data.kingdomForOwner(owner.getUUID()).orElseThrow();
+            if (rewarded.settlement().housingCapacity() != housingBeforeReward + farmBlueprint.housingReward()
+                    || rewarded.settlement().buildProjects().stream()
+                            .filter(project -> project.blueprintId().equals(farmBlueprint.id()))
+                            .count() != 1
+                    || rewarded.settlement().worksites().stream()
+                            .filter(worksite -> worksite.type().equals("farmer"))
+                            .count() != 1) {
+                helper.fail("Build completion rewards were duplicated or omitted");
+            }
+            Tag encoded = KingdomSavedData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
+            KingdomSavedData restored = KingdomSavedData.CODEC.parse(NbtOps.INSTANCE, encoded).getOrThrow();
+            KingdomRecord restoredReward = restored.kingdomForOwner(owner.getUUID()).orElseThrow();
+            if (!restoredReward.settlement().containsCompletedProject(farmProject)
+                    || restoredReward.settlement().housingCapacity()
+                            != housingBeforeReward + farmBlueprint.housingReward()
+                    || restoredReward.settlement().worksites().stream()
+                            .filter(worksite -> worksite.type().equals("farmer"))
+                            .count() != 1) {
+                helper.fail("Build completion rewards did not survive a SavedData codec round trip");
+            }
+            helper.succeed();
+        });
     }
 
     private static void kingdomGovernancePersistence(GameTestHelper helper) {
@@ -778,14 +864,32 @@ public final class ModGameTests {
         KingdomRecord enemy = data.foundKingdom(
                 enemyOwner.getUUID(), "galacticwars:separatist",
                 helper.getLevel().dimension().identifier().toString(), enemyCapital);
+        long diplomacyTime = helper.getLevel().getGameTime();
+        FactionId republicFaction = FactionId.of("galacticwars:republic");
+        FactionId separatistFaction = FactionId.of("galacticwars:separatist");
+        if (KingdomFactionRelations.resolve(
+                        GameplayDataManager.snapshot().factions(), data,
+                        kingdom.id(), republicFaction, enemy.id(), separatistFaction, diplomacyTime)
+                        != FactionRelation.ENEMY
+                || !data.setRelation(owner.getUUID(), enemy.id(), KingdomRelation.NEUTRAL, diplomacyTime, 0L)
+                || !data.establishTreaty(owner.getUUID(), enemy.id(), diplomacyTime, 100L, 0L)
+                || KingdomFactionRelations.resolve(
+                        GameplayDataManager.snapshot().factions(), data,
+                        kingdom.id(), republicFaction, enemy.id(), separatistFaction, diplomacyTime + 99L)
+                        != FactionRelation.ALLY
+                || KingdomFactionRelations.resolve(
+                        GameplayDataManager.snapshot().factions(), data,
+                        kingdom.id(), republicFaction, enemy.id(), separatistFaction, diplomacyTime + 100L)
+                        != FactionRelation.NEUTRAL
+                || !data.setRelation(
+                        owner.getUUID(), enemy.id(), KingdomRelation.ENEMY, diplomacyTime + 100L, 0L)) {
+            helper.fail("Kingdom diplomacy did not override faction defaults or expire treaties safely");
+            return;
+        }
         SettlementRecord enemyOutpost = SettlementRecord.create(
                 helper.getLevel().dimension().identifier().toString(),
                 enemyCapital.getX() + 256, enemyCapital.getY(), enemyCapital.getZ());
         KingdomClaim outpostClaim = data.addOutpost(enemyOwner.getUUID(), enemyOutpost).orElseThrow();
-        if (!data.setRelation(owner.getUUID(), enemy.id(), KingdomRelation.ENEMY,
-                helper.getLevel().getGameTime(), 0L)) {
-            helper.fail("Enemy relation could not be declared");
-        }
         KingdomSiege siege = data.startSiege(
                 owner.getUUID(), outpostClaim.id(), true, true, 10,
                 helper.getLevel().getGameTime()).orElseThrow();
@@ -858,9 +962,21 @@ public final class ModGameTests {
             helper.fail("Multiple squad setup could not earn two commander slots");
             return;
         }
-        UUID firstCommander = UUID.randomUUID();
-        UUID secondCommander = UUID.randomUUID();
-        UUID soldier = UUID.randomUUID();
+        GalacticRecruitEntity firstCommanderEntity = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
+        GalacticRecruitEntity secondCommanderEntity = helper.spawn(
+                ModEntityTypes.ARC_TROOPER.get(), new BlockPos(3, 1, 2));
+        GalacticRecruitEntity soldierEntity = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(4, 1, 2));
+        firstCommanderEntity.tame(owner);
+        secondCommanderEntity.tame(owner);
+        soldierEntity.tame(owner);
+        firstCommanderEntity.setNoAi(true);
+        secondCommanderEntity.setNoAi(true);
+        soldierEntity.setNoAi(true);
+        UUID firstCommander = firstCommanderEntity.getUUID();
+        UUID secondCommander = secondCommanderEntity.getUUID();
+        UUID soldier = soldierEntity.getUUID();
         if (!data.registerRecruit(owner.getUUID(), firstCommander)
                 || !data.registerRecruit(owner.getUUID(), secondCommander)
                 || !data.registerRecruit(owner.getUUID(), soldier)
@@ -885,6 +1001,26 @@ public final class ModGameTests {
                         Optional.of(kingdom.claims().getFirst().id()))
                 || !data.changeArmySupply(officer.getUUID(), secondSquad.id(), 32)) {
             helper.fail("Named multiple squads, patrol, claim defense, or supply authority failed");
+            return;
+        }
+        for (int tick = 0; tick < 20; tick++) {
+            secondCommanderEntity.tick();
+        }
+        officer.setPos(secondCommanderEntity.getX(), secondCommanderEntity.getY(), secondCommanderEntity.getZ());
+        builder.setPos(secondCommanderEntity.getX(), secondCommanderEntity.getY(), secondCommanderEntity.getZ());
+        if (!secondCommanderEntity.handleMenuButton(officer, RecruitCommandMenu.BUTTON_HOLD)
+                || secondCommanderEntity.handleMenuButton(builder, RecruitCommandMenu.BUTTON_HOLD)
+                || data.armyGroup(secondSquad.id()).orElseThrow().order().type()
+                        != galacticwars.clonewars.army.ArmyCommandType.HOLD_POSITION) {
+            helper.fail("Officer army command authority was not honored by the recruit runtime menu");
+            return;
+        }
+        if (!secondCommanderEntity.handleMenuButton(officer, RecruitCommandMenu.BUTTON_PATROL)
+                || secondCommanderEntity.handleMenuButton(builder, RecruitCommandMenu.BUTTON_PATROL)
+                || data.armyGroup(secondSquad.id()).orElseThrow().order().type()
+                        != galacticwars.clonewars.army.ArmyCommandType.PATROL_ROUTE
+                || data.armyGroup(secondSquad.id()).orElseThrow().patrolRoute().size() != 2) {
+            helper.fail("Playable officer patrol command did not persist an executable route");
             return;
         }
         if (data.setNpcServiceBranch(owner.getUUID(), soldier, NpcServiceBranch.CIVILIAN)
@@ -1058,7 +1194,7 @@ public final class ModGameTests {
 
     private static void workforceSavedDataAuthority(GameTestHelper helper) {
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
-        BlockPos hallPos = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos hallPos = isolatedCapital(helper, 3);
         KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
         KingdomRecord kingdom = data.activateHall(
                 owner.getUUID(), "galacticwars:republic",
@@ -1103,9 +1239,8 @@ public final class ModGameTests {
     }
 
     private static void recruitContractLifecycle(GameTestHelper helper) {
-        BlockPos hallPos = new BlockPos(1, 1, 1);
-        helper.setBlock(hallPos, ModBlocks.COMMAND_CENTER.get());
-        CommandCenterBlockEntity hall = helper.getBlockEntity(hallPos, CommandCenterBlockEntity.class);
+        BlockPos hallPos = isolatedCapital(helper, 10);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
         ServerPlayer intruder = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
         GalacticRecruitEntity recruit = helper.spawn(
@@ -1118,7 +1253,7 @@ public final class ModGameTests {
                 owner.getUUID(),
                 hall.factionId(),
                 helper.getLevel().dimension().identifier().toString(),
-                helper.absolutePos(hallPos)).orElseThrow();
+                hallPos).orElseThrow();
         FactionAlignmentSavedData.get(helper.getLevel()).setScore(
                 owner.getUUID(), FactionId.of("republic"), 100);
         FactionAlignmentSavedData.get(helper.getLevel()).setScore(
@@ -1136,16 +1271,14 @@ public final class ModGameTests {
                     + ", credits=" + remainingCredits
                     + ", registered=" + registered);
         }
-        BlockPos intruderHallPos = new BlockPos(1, 1, 3);
-        helper.setBlock(intruderHallPos, ModBlocks.COMMAND_CENTER.get());
-        CommandCenterBlockEntity intruderHall = helper.getBlockEntity(
-                intruderHallPos, CommandCenterBlockEntity.class);
+        BlockPos intruderHallPos = hallPos.offset(64, 0, 0);
+        CommandCenterBlockEntity intruderHall = placeCommandCenter(helper, intruderHallPos);
         intruderHall.claim(intruder);
         data.activateHall(
                 intruder.getUUID(),
                 intruderHall.factionId(),
                 helper.getLevel().dimension().identifier().toString(),
-                helper.absolutePos(intruderHallPos)).orElseThrow();
+                intruderHallPos).orElseThrow();
         FactionAlignmentSavedData.get(helper.getLevel()).setScore(
                 intruder.getUUID(), FactionId.of("republic"), 100);
         GalacticRecruitEntity poorRecruit = helper.spawn(
@@ -1213,7 +1346,7 @@ public final class ModGameTests {
         BuildProject keepProject = fullyProgressProject(
                 data, owner.getUUID(), keepBlueprint,
                 helper.getLevel().dimension().identifier().toString(),
-                helper.absolutePos(hallPos).offset(8, 0, 0));
+                hallPos.offset(8, 0, 0));
         if (!data.completeBuildProject(owner.getUUID(), keepProject, keepBlueprint)
                 || !commander.handleMenuButton(owner, RecruitCommandMenu.BUTTON_PROMOTE_COMMANDER)) {
             helper.fail("Commander promotion prerequisites were not applied");
@@ -1286,19 +1419,54 @@ public final class ModGameTests {
         helper.succeed();
     }
 
+    private static void localRecruitProtectOwner(GameTestHelper helper) {
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+        GalacticRecruitEntity recruit = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(1, 1, 1));
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        recruit.setOwner(owner);
+        recruit.setTame(true, true);
+        if (recruit.hasAuthoritativeArmyGroup()
+                || !recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_PROTECT)) {
+            helper.fail("Local recruit protect-order setup failed");
+            return;
+        }
+
+        GalacticRecruitEntity attacker = helper.spawn(
+                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(2, 1, 1));
+        ServerPlayer enemyOwner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+        attacker.setOwner(enemyOwner);
+        attacker.setTame(true, true);
+        attacker.setNoAi(true);
+        attacker.getAttribute(Attributes.MAX_HEALTH).setBaseValue(1024.0D);
+        attacker.setHealth(attacker.getMaxHealth());
+        helper.runAfterDelay(2, () -> owner.setLastHurtByMob(attacker));
+        helper.succeedWhen(() -> {
+            if (recruit.getTarget() != attacker) {
+                helper.fail("Local Protect Me order did not target the owner's attacker: ownerThreat="
+                        + (owner.getLastHurtByMob() == attacker)
+                        + ", timestamp=" + owner.getLastHurtByMobTimestamp()
+                        + ", attackerAlive=" + attacker.isAlive()
+                        + ", wantsToAttack=" + recruit.wantsToAttack(attacker, owner)
+                        + ", command=" + recruit.getRecruitCommand());
+            }
+        });
+    }
+
     private static void workerResourceConservation(GameTestHelper helper) {
-        BlockPos hallPos = new BlockPos(1, 1, 1);
-        BlockPos cropPos = new BlockPos(4, 1, 1);
-        BlockPos chestPos = new BlockPos(5, 1, 1);
-        helper.setBlock(hallPos, ModBlocks.COMMAND_CENTER.get());
-        helper.setBlock(cropPos.below(), Blocks.FARMLAND);
-        helper.setBlock(cropPos, Blocks.WHEAT.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7));
-        helper.setBlock(chestPos, Blocks.CHEST);
-        CommandCenterBlockEntity hall = helper.getBlockEntity(hallPos, CommandCenterBlockEntity.class);
-        Container chest = helper.getBlockEntity(chestPos, ChestBlockEntity.class);
+        BlockPos hallPos = isolatedCapital(helper, 11);
+        BlockPos cropPos = hallPos.offset(3, 0, 0);
+        BlockPos chestPos = hallPos.offset(4, 0, 0);
+        helper.getLevel().setBlock(cropPos.below(), Blocks.FARMLAND.defaultBlockState(), 3);
+        helper.getLevel().setBlock(
+                cropPos, Blocks.WHEAT.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7), 3);
+        helper.getLevel().setBlock(chestPos, Blocks.CHEST.defaultBlockState(), 3);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        Container chest = (Container) helper.getLevel().getBlockEntity(chestPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
         GalacticRecruitEntity recruit = helper.spawn(
                 ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(3, 1, 1));
+        recruit.setPos(hallPos.getX() + 2.5, hallPos.getY(), hallPos.getZ() + 0.5);
         owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
         hall.claim(owner);
         KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
@@ -1306,7 +1474,7 @@ public final class ModGameTests {
                 owner.getUUID(),
                 hall.factionId(),
                 helper.getLevel().dimension().identifier().toString(),
-                helper.absolutePos(hallPos)).orElseThrow();
+                hallPos).orElseThrow();
         FactionAlignmentSavedData.get(helper.getLevel()).setScore(
                 owner.getUUID(), FactionId.of("republic"), 100);
         owner.getInventory().add(new ItemStack(galacticwars.clonewars.registry.ModItems.CREDIT_CHIP.get(), 45));
@@ -1319,19 +1487,17 @@ public final class ModGameTests {
                     + ", owned=" + recruit.isOwnedBy(owner));
         }
 
-        BlockPos absoluteCrop = helper.absolutePos(cropPos);
-        BlockPos absoluteChest = helper.absolutePos(chestPos);
-        setRecruitField(recruit, "workTarget", absoluteCrop);
-        setRecruitField(recruit, "storageTarget", absoluteChest);
+        setRecruitField(recruit, "workTarget", cropPos);
+        setRecruitField(recruit, "storageTarget", chestPos);
         setWorkerInventory(recruit, new ItemStack(Items.WHEAT_SEEDS));
         invokeRecruitCommand(recruit, RecruitmentAction.WORK_AT_SITE);
-        recruit.setPos(absoluteCrop.getX() + 0.5, absoluteCrop.getY(), absoluteCrop.getZ() + 0.5);
+        recruit.setPos(cropPos.getX() + 0.5, cropPos.getY(), cropPos.getZ() + 0.5);
         setRecruitField(recruit, "workerPhase", WorkerPhase.INTERACT);
         setRecruitField(recruit, "workerReason", "navigate_work_target");
-        setRecruitField(recruit, "activeWorkTarget", absoluteCrop);
+        setRecruitField(recruit, "activeWorkTarget", cropPos);
         int toolDamageBefore = recruit.getMainHandItem().getDamageValue();
         recruit.tickWorkerController();
-        if (helper.getBlockState(cropPos).getValue(BlockStateProperties.AGE_7) != 0
+        if (helper.getLevel().getBlockState(cropPos).getValue(BlockStateProperties.AGE_7) != 0
                 || recruit.getMainHandItem().getDamageValue() != toolDamageBefore + 1
                 || workerInventoryCount(recruit) <= 0) {
             helper.fail("Farmer harvesting did not replant, wear its tool, and conserve drops");
@@ -1341,36 +1507,36 @@ public final class ModGameTests {
             chest.setItem(slot, new ItemStack(Items.STONE, 64));
         }
         int carriedBeforeFailedDeposit = workerInventoryCount(recruit);
-        recruit.setPos(absoluteChest.getX() + 0.5, absoluteChest.getY(), absoluteChest.getZ() + 0.5);
+        recruit.setPos(chestPos.getX() + 0.5, chestPos.getY(), chestPos.getZ() + 0.5);
         setRecruitField(recruit, "workerPhase", WorkerPhase.DEPOSIT);
         setRecruitField(recruit, "workerReason", "deposit_inventory");
-        setRecruitField(recruit, "activeWorkTarget", absoluteChest);
+        setRecruitField(recruit, "activeWorkTarget", chestPos);
         recruit.tickWorkerController();
         if (!recruit.getWorkerStatus().reasonCode().equals("storage_full_or_missing")
                 || workerInventoryCount(recruit) != carriedBeforeFailedDeposit) {
             helper.fail("Failed deposit consumed worker resources");
         }
 
+        AABB deathArea = recruit.getBoundingBox().inflate(4.0);
         recruit.die(helper.getLevel().damageSources().generic());
-        int droppedWorkerItems = helper.getLevel().getEntitiesOfClass(
-                        ItemEntity.class, recruit.getBoundingBox().inflate(4.0))
-                .stream()
-                .filter(item -> item.getItem().is(Items.WHEAT) || item.getItem().is(Items.WHEAT_SEEDS))
-                .mapToInt(item -> item.getItem().getCount())
-                .sum();
-        if (droppedWorkerItems != carriedBeforeFailedDeposit
-                || data.kingdomForOwner(owner.getUUID()).orElseThrow()
-                        .settlement().containsRecruit(recruit.getUUID())) {
-            helper.fail("Worker death did not conserve carried resources and release housing");
-        }
-        helper.succeed();
+        helper.succeedWhen(() -> {
+            int droppedWorkerItems = helper.getLevel().getEntitiesOfClass(
+                            ItemEntity.class, deathArea)
+                    .stream()
+                    .filter(item -> item.getItem().is(Items.WHEAT) || item.getItem().is(Items.WHEAT_SEEDS))
+                    .mapToInt(item -> item.getItem().getCount())
+                    .sum();
+            if (droppedWorkerItems != carriedBeforeFailedDeposit
+                    || data.kingdomForOwner(owner.getUUID()).orElseThrow()
+                            .settlement().containsRecruit(recruit.getUUID())) {
+                helper.fail("Worker death did not conserve carried resources and release housing");
+            }
+        });
     }
 
     private static void enabledWorkerLoops(GameTestHelper helper) {
-        BlockPos relativeHall = new BlockPos(1, 1, 1);
-        helper.setBlock(relativeHall, ModBlocks.COMMAND_CENTER.get());
-        BlockPos hallPos = helper.absolutePos(relativeHall);
-        CommandCenterBlockEntity hall = helper.getBlockEntity(relativeHall, CommandCenterBlockEntity.class);
+        BlockPos hallPos = isolatedCapital(helper, 12);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
         GalacticRecruitEntity recruit = helper.spawn(
                 ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(3, 1, 1));
@@ -1666,6 +1832,19 @@ public final class ModGameTests {
         ) {
             this(item, type, false);
         }
+    }
+
+    private static BlockPos isolatedCapital(GameTestHelper helper, int lane) {
+        return helper.absolutePos(new BlockPos(1, 1, 1)).offset(0, 0, lane * 10_000);
+    }
+
+    private static CommandCenterBlockEntity placeCommandCenter(GameTestHelper helper, BlockPos position) {
+        helper.getLevel().getChunkAt(position);
+        if (!helper.getLevel().setBlock(position, ModBlocks.COMMAND_CENTER.get().defaultBlockState(), 3)
+                || !(helper.getLevel().getBlockEntity(position) instanceof CommandCenterBlockEntity hall)) {
+            throw new IllegalStateException("Could not place isolated GameTest Command Center at " + position);
+        }
+        return hall;
     }
 
     @SuppressWarnings("removal")

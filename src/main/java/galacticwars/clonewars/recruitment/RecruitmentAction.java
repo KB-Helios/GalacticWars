@@ -9,5 +9,6 @@ public enum RecruitmentAction {
     WORK_AT_SITE,
     PROTECT_OWNER,
     ATTACK_TARGET,
-    CLEAR_TARGET
+    CLEAR_TARGET,
+    PATROL_ROUTE
 }

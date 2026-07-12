@@ -18,7 +18,7 @@ public class Config {
             .define("allowBlasterFriendlyFire", false);
 
     public static final ModConfigSpec.BooleanValue ALLOW_BLASTER_PVP = BUILDER
-            .comment("Whether player-fired blaster bolts may damage other players")
+            .comment("Whether player and hostile faction recruit blaster bolts may damage players")
             .define("allowBlasterPvp", true);
 
     public static final ModConfigSpec.BooleanValue ALLOW_FORCE_PVP = BUILDER

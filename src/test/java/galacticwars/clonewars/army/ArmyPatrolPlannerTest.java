@@ -2,6 +2,8 @@ package galacticwars.clonewars.army;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 public final class ArmyPatrolPlannerTest {
     private static final ArmyPosition POINT_A = new ArmyPosition(0, 64, 0);
@@ -16,6 +18,8 @@ public final class ArmyPatrolPlannerTest {
         loopsFromLastWaypointToFirst();
         pingPongReversesAtEndWaypoint();
         waitsBeforeMovingToNextWaypoint();
+        persistedPatrolOrdersAdvanceAndLoopAtArrival();
+        persistedPatrolOrdersHoldUntilArrivalAndRecoverInvalidTargets();
         rejectsInvalidInputs();
 
         System.out.println("ArmyPatrolPlannerTest passed");
@@ -77,6 +81,56 @@ public final class ArmyPatrolPlannerTest {
         assertFalse(moving.waiting(), "wait complete should move");
         assertEquals(POINT_B, moving.moveTarget(), "post-wait target");
         assertEquals("moving_to_waypoint", moving.reasonCode(), "post-wait reason");
+    }
+
+    private static void persistedPatrolOrdersAdvanceAndLoopAtArrival() {
+        ArmyLocation first = location(POINT_A);
+        ArmyLocation second = location(POINT_B);
+        ArmyGroupRecord group = patrolGroup(first, second, first);
+
+        ArmyGroupOrder secondOrder = ArmyPatrolOrderPlanner.nextOrder(group, POINT_A);
+        assertEquals(second, secondOrder.targetPosition().orElseThrow(), "persisted next waypoint");
+
+        ArmyGroupOrder loopedOrder = ArmyPatrolOrderPlanner.nextOrder(
+                group.withOrder(secondOrder), POINT_B);
+        assertEquals(first, loopedOrder.targetPosition().orElseThrow(), "persisted loop waypoint");
+    }
+
+    private static void persistedPatrolOrdersHoldUntilArrivalAndRecoverInvalidTargets() {
+        ArmyLocation first = location(POINT_A);
+        ArmyLocation second = location(POINT_B);
+        ArmyGroupRecord group = patrolGroup(first, second, first);
+
+        assertEquals(group.order(), ArmyPatrolOrderPlanner.nextOrder(
+                group, new ArmyPosition(5, 64, 0)), "persisted order before arrival");
+
+        ArmyLocation invalid = location(POINT_C);
+        ArmyGroupOrder invalidOrder = new ArmyGroupOrder(
+                ArmyCommandType.PATROL_ROUTE, Optional.of(invalid), Optional.empty(), ArmyFormation.LINE, 2);
+        ArmyGroupOrder recovered = ArmyPatrolOrderPlanner.nextOrder(group.withOrder(invalidOrder), POINT_C);
+        assertEquals(first, recovered.targetPosition().orElseThrow(), "invalid target recovery");
+    }
+
+    private static ArmyGroupRecord patrolGroup(
+            ArmyLocation first,
+            ArmyLocation second,
+            ArmyLocation activeWaypoint
+    ) {
+        ArmyGroupOrder order = new ArmyGroupOrder(
+                ArmyCommandType.PATROL_ROUTE,
+                Optional.of(activeWaypoint),
+                Optional.empty(),
+                ArmyFormation.LINE,
+                2);
+        return ArmyGroupRecord.create(
+                        UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), List.of(),
+                        ArmyFormation.LINE, first, 0L)
+                .withPatrolRoute(List.of(first, second))
+                .withOrder(order);
+    }
+
+    private static ArmyLocation location(ArmyPosition position) {
+        return new ArmyLocation("minecraft:overworld", position.x(), position.y(), position.z());
     }
 
     private static void rejectsInvalidInputs() {

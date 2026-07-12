@@ -18,6 +18,21 @@ public final class BlasterFriendlyFirePolicyTest {
                 "PvP configuration blocks player damage");
         assertFalse(BlasterFriendlyFirePolicy.blocksHit(true, false, FactionRelation.NEUTRAL, false, true),
                 "PvP configuration permits player damage");
+        assertTrue(BlasterFriendlyFirePolicy.blocksRecruitHitOnPlayer(
+                        true, FactionRelation.ENEMY, true),
+                "recruits cannot shoot their owner");
+        assertTrue(BlasterFriendlyFirePolicy.blocksRecruitHitOnPlayer(
+                        false, FactionRelation.ALLY, true),
+                "recruits cannot shoot allied players");
+        assertTrue(BlasterFriendlyFirePolicy.blocksRecruitHitOnPlayer(
+                        false, FactionRelation.NEUTRAL, true),
+                "recruits cannot shoot neutral players");
+        assertTrue(BlasterFriendlyFirePolicy.blocksRecruitHitOnPlayer(
+                        false, FactionRelation.ENEMY, false),
+                "PvP configuration blocks recruit damage");
+        assertFalse(BlasterFriendlyFirePolicy.blocksRecruitHitOnPlayer(
+                        false, FactionRelation.ENEMY, true),
+                "hostile faction recruits can shoot enemy players when PvP is enabled");
         System.out.println("BlasterFriendlyFirePolicyTest passed");
     }
 

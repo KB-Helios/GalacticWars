@@ -39,7 +39,9 @@ public final class ArmyTargetSelector {
 
         for (ArmyTargetCandidate candidate : candidates) {
             Objects.requireNonNull(candidate, "candidate");
-            if (factions.relation(ownFaction, candidate.factionId()) != FactionRelation.ENEMY) {
+            FactionRelation relation = candidate.relationOverride()
+                    .orElseGet(() -> factions.relation(ownFaction, candidate.factionId()));
+            if (relation != FactionRelation.ENEMY) {
                 continue;
             }
             if (distanceSquared(origin, candidate.position()) > maxDistanceSquared) {

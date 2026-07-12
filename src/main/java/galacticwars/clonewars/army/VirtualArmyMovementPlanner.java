@@ -40,7 +40,7 @@ public final class VirtualArmyMovementPlanner {
         }
 
         Optional<ArmyLocation> destination = switch (order.type()) {
-            case MOVE_TO_POSITION, ATTACK_TARGET -> order.targetPosition();
+            case MOVE_TO_POSITION, ATTACK_TARGET, PATROL_ROUTE -> order.targetPosition();
             case FOLLOW_OWNER, PROTECT_OWNER -> onlineOwnerLocation;
             case HOLD_POSITION, CLEAR_TARGET -> Optional.empty();
         };
@@ -91,7 +91,13 @@ public final class VirtualArmyMovementPlanner {
         }
         ArmyGroupSimulation simulation = group.simulation().advance(
                 decision.anchor(), gameTime, decision.pauseReason());
-        return group.withSimulation(simulation, group.snapshots());
+        ArmyGroupRecord advanced = group.withSimulation(simulation, group.snapshots());
+        if (group.order().type() == ArmyCommandType.PATROL_ROUTE
+                && decision.pauseReason().equals(DESTINATION_REACHED)
+                && group.patrolRoute().size() >= 2) {
+            return advancePatrolWaypoint(advanced, decision.anchor());
+        }
+        return advanced;
     }
 
     public static ArmyGroupRecord pause(ArmyGroupRecord group, String reason, long gameTime) {
@@ -109,5 +115,11 @@ public final class VirtualArmyMovementPlanner {
         return group.withSimulation(
                 group.simulation().advance(group.simulation().anchor(), gameTime, reason),
                 group.snapshots());
+    }
+
+    private static ArmyGroupRecord advancePatrolWaypoint(ArmyGroupRecord group, ArmyLocation currentLocation) {
+        ArmyGroupOrder nextOrder = ArmyPatrolOrderPlanner.nextOrder(
+                group, currentLocation.blockPosition());
+        return nextOrder.equals(group.order()) ? group : group.withOrder(nextOrder);
     }
 }

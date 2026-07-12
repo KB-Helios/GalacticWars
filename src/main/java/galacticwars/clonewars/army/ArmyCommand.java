@@ -40,4 +40,13 @@ public record ArmyCommand(
     public static ArmyCommand clearTarget(UUID issuedBy, UUID groupId) {
         return new ArmyCommand(ArmyCommandType.CLEAR_TARGET, issuedBy, groupId, null, null);
     }
+
+    public static ArmyCommand patrolRoute(UUID issuedBy, UUID groupId, ArmyPosition waypoint) {
+        return new ArmyCommand(
+                ArmyCommandType.PATROL_ROUTE,
+                issuedBy,
+                groupId,
+                Objects.requireNonNull(waypoint, "waypoint"),
+                null);
+    }
 }

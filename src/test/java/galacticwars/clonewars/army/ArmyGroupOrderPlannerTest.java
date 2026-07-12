@@ -17,6 +17,7 @@ public final class ArmyGroupOrderPlannerTest {
     public static void main(String[] args) {
         assignsMoveOrdersToLineFormationPositions();
         assignsHoldOrdersToColumnFormationPositions();
+        assignsPatrolOrdersToFormationPositions();
         assignsFollowAndProtectOrdersToOwnerRelativeFormationPositions();
         propagatesDirectGroupOrders();
         returnsImmutableEmptyAssignmentsForEmptyGroups();
@@ -55,6 +56,24 @@ public final class ArmyGroupOrderPlannerTest {
         assertAssignment(assignments.get(2), THIRD_RECRUIT_ID, ArmyCommandType.HOLD_POSITION,
                 new ArmyPosition(-4, 70, 8), new FormationSlot(2, 0, 6), "hold third");
         assertEquals("hold_group_order", assignments.get(0).reasonCode(), "hold reason");
+    }
+
+    private static void assignsPatrolOrdersToFormationPositions() {
+        ArmyPosition waypoint = new ArmyPosition(20, 64, 20);
+        ArmyGroupState group = populatedGroup()
+                .applyCommand(ArmyCommand.patrolRoute(OWNER_ID, GROUP_ID, waypoint));
+
+        List<ArmyGroupOrderAssignment> assignments = ArmyGroupOrderPlanner.plan(
+                group, ArmyFormation.LINE, 2);
+
+        assertEquals(3, assignments.size(), "patrol assignment count");
+        assertAssignment(assignments.get(0), FIRST_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(18, 64, 20), new FormationSlot(0, -2, 0), "patrol first");
+        assertAssignment(assignments.get(1), SECOND_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(20, 64, 20), new FormationSlot(1, 0, 0), "patrol second");
+        assertAssignment(assignments.get(2), THIRD_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(22, 64, 20), new FormationSlot(2, 2, 0), "patrol third");
+        assertEquals("move_group_order", assignments.get(0).reasonCode(), "patrol movement reason");
     }
 
     private static void propagatesDirectGroupOrders() {

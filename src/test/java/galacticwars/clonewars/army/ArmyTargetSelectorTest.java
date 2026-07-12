@@ -9,6 +9,7 @@ import java.util.UUID;
 import galacticwars.clonewars.faction.FactionCatalog;
 import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.faction.FactionId;
+import galacticwars.clonewars.faction.FactionRelation;
 
 public final class ArmyTargetSelectorTest {
     private static final FactionId REPUBLIC = FactionId.of("republic");
@@ -26,6 +27,7 @@ public final class ArmyTargetSelectorTest {
         prioritizesRecruitAttackerOverHigherThreatEnemy();
         usesThreatBeforeDistanceForOrdinaryEnemies();
         usesDistanceAndUuidTieBreakers();
+        honorsKingdomRelationOverrides();
         rejectsInvalidInputs();
 
         System.out.println("ArmyTargetSelectorTest passed");
@@ -118,6 +120,25 @@ public final class ArmyTargetSelectorTest {
 
         assertEquals(closer, distanceSelection.targetId(), "closer tie target");
         assertEquals(lowerUuid, uuidSelection.targetId(), "uuid tie target");
+    }
+
+    private static void honorsKingdomRelationOverrides() {
+        UUID sameFactionEnemy = UUID.fromString("00000000-0000-0000-0000-000000000251");
+        ArmyTargetSelection selection = ArmyTargetSelector.selectTarget(
+                REPUBLIC,
+                ORIGIN,
+                List.of(
+                        new ArmyTargetCandidate(
+                                sameFactionEnemy, REPUBLIC, new ArmyPosition(4, 64, 0),
+                                false, false, 10, Optional.of(FactionRelation.ENEMY)),
+                        new ArmyTargetCandidate(
+                                UUID.fromString("00000000-0000-0000-0000-000000000252"),
+                                SEPARATIST, new ArmyPosition(1, 64, 0),
+                                false, false, 100, Optional.of(FactionRelation.NEUTRAL))),
+                catalog(),
+                16).orElseThrow();
+
+        assertEquals(sameFactionEnemy, selection.targetId(), "kingdom diplomacy override target");
     }
 
     private static void rejectsInvalidInputs() {

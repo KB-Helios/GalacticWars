@@ -74,6 +74,10 @@ public final class KingdomGovernanceTest {
         assertEquals(KingdomRelation.ALLY, diplomacy.relation(), "treaty relation");
         assertTrue(diplomacy.treatyActive(1199L), "active treaty");
         assertTrue(diplomacy.embargo(), "embargo state");
+        KingdomDiplomacy renewedAlliance = diplomacy.withRelation(KingdomRelation.ALLY, 1400L);
+        assertEquals(0L, renewedAlliance.treatyExpiresGameTime(), "explicit alliance clears treaty expiry");
+        assertEquals(KingdomRelation.ALLY, renewedAlliance.effectiveRelation(1400L),
+                "explicit alliance remains effective after expired treaty");
     }
 
     private static void siegesRequireMilitaryAdvantageToProgress() {

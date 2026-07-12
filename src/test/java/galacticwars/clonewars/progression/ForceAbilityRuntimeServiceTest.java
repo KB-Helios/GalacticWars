@@ -46,6 +46,8 @@ public final class ForceAbilityRuntimeServiceTest {
                 "locked ability cannot be packet-bypassed");
         assertTrue(activation.state().regenerate(20).energy() == 100,
                 "energy regeneration caps at maximum");
+        assertTrue(activation.state().regenerate(Integer.MAX_VALUE).energy() == 100,
+                "energy regeneration saturates without integer overflow");
         System.out.println("ForceAbilityRuntimeServiceTest passed");
     }
 
