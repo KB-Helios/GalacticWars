@@ -6,6 +6,7 @@ import galacticwars.clonewars.combat.BlasterItem;
 import galacticwars.clonewars.combat.BlasterHeatPolicy;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.IdentityChipItem;
+import galacticwars.clonewars.item.GalacticArmorItem;
 import galacticwars.clonewars.world.HyperspaceNavigatorItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.AxeItem;
@@ -134,6 +135,21 @@ public final class ModItems {
     public static final DeferredItem<RecruitSpawnEggItem> NIGHTBROTHER_BRUTE_SPAWN_EGG =
             ITEMS.registerItem("nightbrother_brute_spawn_egg",
                     properties -> new RecruitSpawnEggItem(ModEntityTypes.NIGHTBROTHER_BRUTE.get(), properties));
+    public static final DeferredItem<RecruitSpawnEggItem> REPUBLIC_CIVILIAN_SPAWN_EGG =
+            ITEMS.registerItem("republic_civilian_spawn_egg",
+                    properties -> new RecruitSpawnEggItem(ModEntityTypes.REPUBLIC_CIVILIAN.get(), properties));
+    public static final DeferredItem<RecruitSpawnEggItem> SEPARATIST_TECHNICIAN_SPAWN_EGG =
+            ITEMS.registerItem("separatist_technician_spawn_egg",
+                    properties -> new RecruitSpawnEggItem(ModEntityTypes.SEPARATIST_TECHNICIAN.get(), properties));
+    public static final DeferredItem<RecruitSpawnEggItem> MANDALORIAN_CLANSPERSON_SPAWN_EGG =
+            ITEMS.registerItem("mandalorian_clansperson_spawn_egg",
+                    properties -> new RecruitSpawnEggItem(ModEntityTypes.MANDALORIAN_CLANSPERSON.get(), properties));
+    public static final DeferredItem<RecruitSpawnEggItem> HUTT_CIVILIAN_SPAWN_EGG =
+            ITEMS.registerItem("hutt_civilian_spawn_egg",
+                    properties -> new RecruitSpawnEggItem(ModEntityTypes.HUTT_CIVILIAN.get(), properties));
+    public static final DeferredItem<RecruitSpawnEggItem> NIGHTSISTER_CIVILIAN_SPAWN_EGG =
+            ITEMS.registerItem("nightsister_civilian_spawn_egg",
+                    properties -> new RecruitSpawnEggItem(ModEntityTypes.NIGHTSISTER_CIVILIAN.get(), properties));
 
     private ModItems() {
     }
@@ -178,13 +194,17 @@ public final class ModItems {
                 prefix + "_shovel", properties -> new ShovelItem(family.tool(), 1.5F, -3.0F, properties)));
         items.put(prefix + "_hoe", ITEMS.registerItem(
                 prefix + "_hoe", properties -> new HoeItem(family.tool(), -2.0F, -1.0F, properties)));
-        items.put(prefix + "_helmet", ITEMS.registerSimpleItem(
-                prefix + "_helmet", properties -> properties.humanoidArmor(family.armor(), ArmorType.HELMET)));
-        items.put(prefix + "_chestplate", ITEMS.registerSimpleItem(
-                prefix + "_chestplate", properties -> properties.humanoidArmor(family.armor(), ArmorType.CHESTPLATE)));
-        items.put(prefix + "_leggings", ITEMS.registerSimpleItem(
-                prefix + "_leggings", properties -> properties.humanoidArmor(family.armor(), ArmorType.LEGGINGS)));
-        items.put(prefix + "_boots", ITEMS.registerSimpleItem(
-                prefix + "_boots", properties -> properties.humanoidArmor(family.armor(), ArmorType.BOOTS)));
+        items.put(prefix + "_helmet", ITEMS.registerItem(
+                prefix + "_helmet", properties -> new GalacticArmorItem(
+                        prefix, properties.humanoidArmor(family.armor(), ArmorType.HELMET))));
+        items.put(prefix + "_chestplate", ITEMS.registerItem(
+                prefix + "_chestplate", properties -> new GalacticArmorItem(
+                        prefix, properties.humanoidArmor(family.armor(), ArmorType.CHESTPLATE))));
+        items.put(prefix + "_leggings", ITEMS.registerItem(
+                prefix + "_leggings", properties -> new GalacticArmorItem(
+                        prefix, properties.humanoidArmor(family.armor(), ArmorType.LEGGINGS))));
+        items.put(prefix + "_boots", ITEMS.registerItem(
+                prefix + "_boots", properties -> new GalacticArmorItem(
+                        prefix, properties.humanoidArmor(family.armor(), ArmorType.BOOTS))));
     }
 }

@@ -42,7 +42,7 @@ public class GalacticWarsClient {
     static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
         ModEntityTypes.recruits().forEach(holder -> event.registerEntityRenderer(
                 holder.get(), context -> new GalacticRecruitRenderer<>(
-                        context, ModEntityTypes.renderAlias(holder.get()))));
+                        context, holder.get())));
     }
 
     @SubscribeEvent

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "galacticwars:item/hutt_civilian_spawn_egg"
+  }
+}

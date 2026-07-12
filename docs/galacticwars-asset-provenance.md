@@ -6,6 +6,33 @@ The detailed Clone Trooper, B1 Battle Droid, and lightsaber direction was genera
 
 All assets listed here are original, project-bound artwork. No official Star Wars artwork, film stills, logos, third-party mod textures, or other third-party assets were used.
 
+## Equipped armor and complete NPC model pass
+
+The twenty recruit/civilian models and five equipped armor families are generated together by
+`tools/generate_character_models.py`. Recruit cuboids retain non-overlapping 128x128 box UVs.
+Equipped armor instead uses explicit six-face mappings on 1024x1024 atlases at six texture texels per
+model unit, allowing recessed seams, bevel lighting, controlled wear, vents, fasteners, woven fibers,
+and family-specific plate markings without changing the player-space geometry scale. The script also
+produces the five civilian spawn-egg asset sets that were previously missing. The resulting geometry adds
+separate helmet shells, visors, chest and back plates, pauldrons, gauntlets, belts, pouches, knee and
+shin guards, boots, droid joints, robes, hoods, packs, sensors, and profession details while retaining
+the animation and held-item bone contract.
+
+The armor silhouette pass used the project-owned inventory sheet
+`tools/source_art/generated_armor_icons.png` as its palette input and the built-in image-generation
+result `exec-ec4c1511-f614-4799-8051-f0f34a0dcd67.png` as a generic voxel-material reference. A copy
+is retained at `tools/source_art/generated_armor_model_reference_v2.png`. The prompt explicitly
+required new generic science-fantasy designs, neutral mannequins, and no characters, logos, emblems,
+weapons, or existing-franchise imagery. Final distributable models and UV atlases are deterministic
+script output rather than crops or copied pixels from the reference sheet.
+
+After the initial equipped textures failed visual review for flat, low-density surfaces, a second
+project-owned material study was generated from the five existing inventory icons. It is retained as
+`tools/source_art/generated_armor_material_reference_v3.png`. That study established the final material
+language: off-white layered plastoid, blackened bronze alloy, weathered teal plate, black woven cloth
+with crimson lacquer, and brushed silver beskar. No pixels from the study are shipped directly; the
+generator translates those material decisions into exact per-face GeckoLib UV regions.
+
 ## Method
 
 - Generated source images with the built-in OpenAI image-generation tool on 2026-07-11.

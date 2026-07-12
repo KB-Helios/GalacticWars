@@ -40,11 +40,20 @@
     {
       "id": "units",
       "kind": "geckolib_entity",
-      "size": "64x64",
+      "size": "128x128",
       "transparent": true,
-      "uv_template": "existing 64x64 humanoid GeckoLib template; droids receive compatible dedicated geometry",
-      "ids": ["clone_trooper","arc_trooper","jedi_knight","b1_battle_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute"],
+      "uv_template": "deterministic non-overlapping 128x128 box UVs generated with each detailed GeckoLib model",
+      "ids": ["clone_trooper","arc_trooper","jedi_knight","b1_battle_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute","republic_civilian","separatist_technician","mandalorian_clansperson","hutt_civilian","nightsister_civilian"],
       "path_template": "textures/entity/{id}.png"
+    },
+    {
+      "id": "equipped_armor",
+      "kind": "geckolib_armor",
+      "size": "1024x1024",
+      "transparent": true,
+      "uv_template": "explicit six-face UV mappings at six texels per model unit",
+      "ids": ["republic_plastoid","separatist_alloy","mandalorian_alloy","nightsister_weave","beskar"],
+      "path_template": "textures/armor/{id}.png"
     },
     {
       "id": "combat_and_tools",

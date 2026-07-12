@@ -508,6 +508,17 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         }
     }
 
+    /** Finalizes data-driven stats and prevents a player-placed recruit from despawning. */
+    public void initializeFromSpawnEgg() {
+        if (this.level().isClientSide()) {
+            return;
+        }
+        this.setPersistenceRequired();
+        this.applyUnitDefinition();
+        this.getNavigation().stop();
+        this.setTarget(null);
+    }
+
     @Override
     protected void actuallyHurt(ServerLevel level, DamageSource damageSource, float damageAmount) {
         float before = this.getHealth();

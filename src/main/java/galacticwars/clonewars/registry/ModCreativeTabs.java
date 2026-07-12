@@ -71,6 +71,11 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.NIGHTSISTER_ACOLYTE_SPAWN_EGG.get());
                         output.accept(ModItems.NIGHTSISTER_ARCHER_SPAWN_EGG.get());
                         output.accept(ModItems.NIGHTBROTHER_BRUTE_SPAWN_EGG.get());
+                        output.accept(ModItems.REPUBLIC_CIVILIAN_SPAWN_EGG.get());
+                        output.accept(ModItems.SEPARATIST_TECHNICIAN_SPAWN_EGG.get());
+                        output.accept(ModItems.MANDALORIAN_CLANSPERSON_SPAWN_EGG.get());
+                        output.accept(ModItems.HUTT_CIVILIAN_SPAWN_EGG.get());
+                        output.accept(ModItems.NIGHTSISTER_CIVILIAN_SPAWN_EGG.get());
                     })
                     .build());
 

@@ -11,7 +11,9 @@ public final class RecruitGeckoLibIntegrationTest {
             "b1_battle_droid", "b2_super_battle_droid", "commando_droid",
             "mandalorian_warrior", "mandalorian_marksman", "mandalorian_heavy",
             "hutt_enforcer", "bounty_hunter", "smuggler",
-            "nightsister_acolyte", "nightsister_archer", "nightbrother_brute");
+            "nightsister_acolyte", "nightsister_archer", "nightbrother_brute",
+            "republic_civilian", "separatist_technician", "mandalorian_clansperson",
+            "hutt_civilian", "nightsister_civilian");
 
     private RecruitGeckoLibIntegrationTest() {
     }

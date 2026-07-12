@@ -19,7 +19,7 @@ public final class AssetManifestCompletenessTest {
     private static final Path MANIFEST = Path.of("docs/galacticwars-asset-manifest.json");
     private static final Path ASSET_ROOT = Path.of("src/main/resources/assets/galacticwars");
     private static final Set<String> UNIQUE_BATCHES = Set.of(
-            "units", "combat_and_tools", "planets", "vehicles", "effects_and_gui");
+            "units", "equipped_armor", "combat_and_tools", "planets", "vehicles", "effects_and_gui");
     private static final List<String> FACTIONS = List.of(
             "republic", "separatist", "mandalorian", "hutt_cartel", "nightsister");
     private static final List<String> UNITS = List.of(
@@ -27,7 +27,9 @@ public final class AssetManifestCompletenessTest {
             "b1_battle_droid", "b2_super_battle_droid", "commando_droid",
             "mandalorian_warrior", "mandalorian_marksman", "mandalorian_heavy",
             "hutt_enforcer", "bounty_hunter", "smuggler",
-            "nightsister_acolyte", "nightsister_archer", "nightbrother_brute");
+            "nightsister_acolyte", "nightsister_archer", "nightbrother_brute",
+            "republic_civilian", "separatist_technician", "mandalorian_clansperson",
+            "hutt_civilian", "nightsister_civilian");
     private static final List<String> COMBAT = List.of(
             "vibroblade", "plasma_cutter", "power_drill", "sonic_excavator", "hydrospanner",
             "dc15_blaster", "e5_blaster", "westar_blaster", "scatter_blaster", "nightsister_bow",
@@ -35,6 +37,9 @@ public final class AssetManifestCompletenessTest {
             "blaster_bolt", "force_light", "force_dark");
     private static final List<String> VEHICLES = List.of(
             "barc_speeder", "at_rt", "stap", "aat", "laat_gunship");
+    private static final List<String> ARMOR_FAMILIES = List.of(
+            "republic_plastoid", "separatist_alloy", "mandalorian_alloy",
+            "nightsister_weave", "beskar");
 
     private AssetManifestCompletenessTest() {
     }
@@ -43,13 +48,16 @@ public final class AssetManifestCompletenessTest {
         String manifest = Files.readString(MANIFEST);
         assertContains(manifest, "\"schema_version\": 1", "asset schema");
         assertContains(manifest, "\"namespace\": \"galacticwars\"", "asset namespace");
-        for (String batch : List.of("core", "factions", "units", "combat_and_tools",
+        for (String batch : List.of("core", "factions", "units", "equipped_armor", "combat_and_tools",
                 "planets", "vehicles", "effects_and_gui")) {
             assertContains(manifest, "\"id\": \"" + batch + "\"", "asset batch " + batch);
         }
         for (String id : UNITS) assertContains(manifest, "\"" + id + "\"", "unit manifest id " + id);
         for (String id : COMBAT) assertContains(manifest, "\"" + id + "\"", "combat manifest id " + id);
         for (String id : VEHICLES) assertContains(manifest, "\"" + id + "\"", "vehicle manifest id " + id);
+        for (String id : ARMOR_FAMILIES) {
+            assertContains(manifest, "\"" + id + "\"", "equipped armor manifest id " + id);
+        }
 
         List<ExpectedAsset> assets = expectations();
         Map<String, Set<String>> hashesByBatch = new HashMap<>();
@@ -103,7 +111,11 @@ public final class AssetManifestCompletenessTest {
                     "textures/entity/equipment/humanoid_leggings/" + faction + ".png", "64x32");
         }
         for (String unit : UNITS) {
-            transparent(assets, "units", unit, "textures/entity/" + unit + ".png", "64x64");
+            transparent(assets, "units", unit, "textures/entity/" + unit + ".png", "128x128");
+        }
+        for (String family : ARMOR_FAMILIES) {
+            transparent(assets, "equipped_armor", family,
+                    "textures/armor/" + family + ".png", "1024x1024");
         }
         for (String id : COMBAT) {
             item(assets, "combat_and_tools", id);

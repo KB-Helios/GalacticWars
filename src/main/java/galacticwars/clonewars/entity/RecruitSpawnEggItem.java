@@ -30,15 +30,17 @@ public final class RecruitSpawnEggItem extends SpawnEggItem {
     @Override
     public InteractionResult useOn(UseOnContext context) {
         EntityType<?> componentType = SpawnEggItem.getType(context.getItemInHand());
-        if (componentType != null) {
-            return componentType == recruitType ? super.useOn(context) : InteractionResult.FAIL;
+        if (componentType != null && componentType != recruitType) {
+            return InteractionResult.FAIL;
         }
         if (!(context.getLevel() instanceof ServerLevel serverLevel)) {
             return InteractionResult.SUCCESS;
         }
         BlockEntity clickedBlockEntity = serverLevel.getBlockEntity(context.getClickedPos());
         if (clickedBlockEntity instanceof Spawner) {
-            return InteractionResult.FAIL;
+            // Preserve vanilla spawn-egg behavior for mob spawners. The
+            // explicit recruit creation path below is only for world placement.
+            return super.useOn(context);
         }
         if (!recruitType.canSpawn(serverLevel)) {
             return InteractionResult.FAIL;
@@ -53,6 +55,7 @@ public final class RecruitSpawnEggItem extends SpawnEggItem {
         if (recruit == null) {
             return InteractionResult.FAIL;
         }
+        recruit.initializeFromSpawnEgg();
 
         Player player = context.getPlayer();
         ItemStack stack = context.getItemInHand();

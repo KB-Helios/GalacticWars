@@ -18,6 +18,7 @@ public final class RecruitCompanionAiIntegrationTest {
         groupedNavigationDoesNotDependOnWorksiteState();
         workOrdersStayServerSide();
         workerRuntimeConsumesSavedDataAuthority();
+        localCommandNavigationRecoversFromStalls();
 
         System.out.println("RecruitCompanionAiIntegrationTest passed");
     }
@@ -141,6 +142,16 @@ public final class RecruitCompanionAiIntegrationTest {
         assertContains(entity, "isRegisteredStorage", "registered storage enforcement");
         assertContains(savedData, "validWorkOrderReferences", "order reference validation");
         assertContains(savedData, "insideSettlementClaim", "frontier worksite claim validation");
+    }
+
+    private static void localCommandNavigationRecoversFromStalls() throws IOException {
+        String goal = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitMoveToCommandGoal.java");
+
+        assertContains(goal, "REPATH_INTERVAL = 20", "bounded local command repathing");
+        assertContains(goal, "STALL_TIMEOUT = 200", "local command navigation timeout");
+        assertContains(goal, "RETRY_BACKOFF = 40", "failed path retry backoff");
+        assertContains(goal, "this.recruit.getNavigation().isDone()", "failed path restart");
+        assertContains(goal, "this.stalledTicks >= STALL_TIMEOUT", "no-progress recovery");
     }
 
     private static String read(String relativePath) throws IOException {

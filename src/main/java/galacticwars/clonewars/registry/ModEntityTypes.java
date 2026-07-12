@@ -75,15 +75,6 @@ public final class ModEntityTypes {
         return RECRUITS;
     }
 
-    public static EntityType<GalacticRecruitEntity> renderAlias(EntityType<GalacticRecruitEntity> entityType) {
-        if (entityType == REPUBLIC_CIVILIAN.get()) return CLONE_TROOPER.get();
-        if (entityType == SEPARATIST_TECHNICIAN.get()) return B1_BATTLE_DROID.get();
-        if (entityType == MANDALORIAN_CLANSPERSON.get()) return MANDALORIAN_WARRIOR.get();
-        if (entityType == HUTT_CIVILIAN.get()) return SMUGGLER.get();
-        if (entityType == NIGHTSISTER_CIVILIAN.get()) return NIGHTSISTER_ACOLYTE.get();
-        return entityType;
-    }
-
     private static DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> registerRecruit(
             String name,
             float width,

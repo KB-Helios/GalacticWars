@@ -105,6 +105,7 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -539,13 +540,18 @@ public final class ModGameTests {
                 new SpawnEggCase(ModItems.HUTT_ENFORCER_SPAWN_EGG.get(), ModEntityTypes.HUTT_ENFORCER.get()),
                 new SpawnEggCase(ModItems.BOUNTY_HUNTER_SPAWN_EGG.get(), ModEntityTypes.BOUNTY_HUNTER.get()),
                 new SpawnEggCase(ModItems.SMUGGLER_SPAWN_EGG.get(), ModEntityTypes.SMUGGLER.get()),
-                new SpawnEggCase(ModItems.NIGHTSISTER_ACOLYTE_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_ACOLYTE.get()),
-                new SpawnEggCase(ModItems.NIGHTSISTER_ARCHER_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_ARCHER.get()),
-                new SpawnEggCase(ModItems.NIGHTBROTHER_BRUTE_SPAWN_EGG.get(), ModEntityTypes.NIGHTBROTHER_BRUTE.get()));
+                new SpawnEggCase(ModItems.NIGHTSISTER_ACOLYTE_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_ACOLYTE.get(), false),
+                new SpawnEggCase(ModItems.NIGHTSISTER_ARCHER_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_ARCHER.get(), false),
+                new SpawnEggCase(ModItems.NIGHTBROTHER_BRUTE_SPAWN_EGG.get(), ModEntityTypes.NIGHTBROTHER_BRUTE.get(), false),
+                new SpawnEggCase(ModItems.REPUBLIC_CIVILIAN_SPAWN_EGG.get(), ModEntityTypes.REPUBLIC_CIVILIAN.get(), true),
+                new SpawnEggCase(ModItems.SEPARATIST_TECHNICIAN_SPAWN_EGG.get(), ModEntityTypes.SEPARATIST_TECHNICIAN.get(), true),
+                new SpawnEggCase(ModItems.MANDALORIAN_CLANSPERSON_SPAWN_EGG.get(), ModEntityTypes.MANDALORIAN_CLANSPERSON.get(), true),
+                new SpawnEggCase(ModItems.HUTT_CIVILIAN_SPAWN_EGG.get(), ModEntityTypes.HUTT_CIVILIAN.get(), true),
+                new SpawnEggCase(ModItems.NIGHTSISTER_CIVILIAN_SPAWN_EGG.get(), ModEntityTypes.NIGHTSISTER_CIVILIAN.get(), true));
 
         for (int index = 0; index < cases.size(); index++) {
             SpawnEggCase testCase = cases.get(index);
-            BlockPos relativeClicked = new BlockPos(1 + index, 1, 4);
+            BlockPos relativeClicked = new BlockPos(1 + index % 10 * 2, 1, 4 + index / 10 * 3);
             helper.setBlock(relativeClicked, Blocks.STONE);
             BlockPos clicked = helper.absolutePos(relativeClicked);
             BlockPos expectedSpawn = clicked.above();
@@ -569,13 +575,46 @@ public final class ModGameTests {
             if (result != InteractionResult.SUCCESS) {
                 helper.fail("Spawn egg rejected " + testCase.type());
             }
-            boolean spawned = !helper.getLevel().getEntitiesOfClass(
+            List<GalacticRecruitEntity> spawned = helper.getLevel().getEntitiesOfClass(
                     GalacticRecruitEntity.class,
                     new AABB(expectedSpawn).inflate(1.0D),
-                    recruit -> recruit.getType() == testCase.type()).isEmpty();
-            if (!spawned) {
+                    recruit -> recruit.getType() == testCase.type());
+            if (spawned.size() != 1) {
                 helper.fail("Spawn egg did not create " + testCase.type());
             }
+            GalacticRecruitEntity recruit = spawned.getFirst();
+            if (!recruit.isPersistenceRequired()) {
+                helper.fail("Spawn egg recruit was not marked persistent: " + testCase.type());
+            }
+            if (testCase.civilian()) {
+                if (recruit.getServiceBranch() != NpcServiceBranch.CIVILIAN
+                        || !recruit.getMainHandItem().isEmpty()) {
+                    helper.fail("Civilian spawn egg did not apply its archetype: " + testCase.type());
+                }
+            } else if (recruit.getServiceBranch() != NpcServiceBranch.MILITARY
+                    || recruit.getMainHandItem().isEmpty()) {
+                helper.fail("Military spawn egg did not apply its unit loadout: " + testCase.type());
+            }
+        }
+
+        BlockPos relativeSpawner = new BlockPos(1, 1, 11);
+        helper.setBlock(relativeSpawner, Blocks.SPAWNER);
+        BlockPos spawnerPos = helper.absolutePos(relativeSpawner);
+        SpawnerBlockEntity spawner = helper.getBlockEntity(
+                relativeSpawner, SpawnerBlockEntity.class);
+        ItemStack spawnerEgg = new ItemStack(ModItems.CLONE_TROOPER_SPAWN_EGG.get());
+        player.setItemInHand(InteractionHand.MAIN_HAND, spawnerEgg);
+        InteractionResult spawnerResult = ModItems.CLONE_TROOPER_SPAWN_EGG.get().useOn(
+                new UseOnContext(
+                        player,
+                        InteractionHand.MAIN_HAND,
+                        new BlockHitResult(Vec3.atCenterOf(spawnerPos), Direction.UP, spawnerPos, false)));
+        var spawnerDisplay = spawner.getSpawner().getOrCreateDisplayEntity(
+                helper.getLevel(), spawnerPos);
+        if (spawnerResult != InteractionResult.SUCCESS
+                || spawnerDisplay == null
+                || spawnerDisplay.getType() != ModEntityTypes.CLONE_TROOPER.get()) {
+            helper.fail("Recruit spawn egg did not preserve vanilla spawner configuration behavior");
         }
         helper.succeed();
     }
@@ -1618,8 +1657,15 @@ public final class ModGameTests {
 
     private record SpawnEggCase(
             RecruitSpawnEggItem item,
-            EntityType<GalacticRecruitEntity> type
+            EntityType<GalacticRecruitEntity> type,
+            boolean civilian
     ) {
+        private SpawnEggCase(
+                RecruitSpawnEggItem item,
+                EntityType<GalacticRecruitEntity> type
+        ) {
+            this(item, type, false);
+        }
     }
 
     @SuppressWarnings("removal")
