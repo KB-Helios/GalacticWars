@@ -87,6 +87,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.FunctionGameTestInstance;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -94,6 +95,7 @@ import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -111,7 +113,6 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
@@ -389,36 +390,37 @@ public final class ModGameTests {
         GalacticRecruitEntity shooter = helper.spawn(
                 ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
         GalacticRecruitEntity target = helper.spawn(
-                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(6, 1, 2));
+                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(12, 1, 2));
         shooter.tame(owner);
         ItemStack weapon = new ItemStack(ModItems.DC15_BLASTER.get());
         shooter.setItemInHand(InteractionHand.MAIN_HAND, weapon);
         ModItems.DC15_BLASTER.get().fireAt(helper.getLevel(), shooter, target, weapon);
 
-        List<BlasterBoltEntity> bolts = helper.getLevel().getEntitiesOfClass(
-                BlasterBoltEntity.class, shooter.getBoundingBox().inflate(8.0D), bolt -> bolt.getOwner() == shooter);
-        if (bolts.size() != 1
-                || bolts.getFirst().pickup != net.minecraft.world.entity.projectile.arrow.AbstractArrow.Pickup.DISALLOWED
-                || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
-            helper.fail("Recruit blaster did not spawn one owned, weapon-tagged bolt");
-            return;
-        }
-
         GalacticRecruitEntity archer = helper.spawn(
                 ModEntityTypes.NIGHTSISTER_ARCHER.get(), new BlockPos(2, 1, 4));
         GalacticRecruitEntity bowTarget = helper.spawn(
-                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(6, 1, 4));
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(12, 1, 4));
         archer.tame(owner);
         ItemStack bow = new ItemStack(ModItems.NIGHTSISTER_BOW.get());
         archer.setItemInHand(InteractionHand.MAIN_HAND, bow);
         FactionRangedWeaponService.fireNightsisterBow(helper.getLevel(), archer, bowTarget, bow);
-        List<Arrow> arrows = helper.getLevel().getEntitiesOfClass(
-                Arrow.class, archer.getBoundingBox().inflate(8.0D), arrow -> arrow.getOwner() == archer);
-        if (arrows.size() != 1 || !arrows.getFirst().getWeaponItem().is(ModItems.NIGHTSISTER_BOW.get())) {
-            helper.fail("Nightsister Archer did not spawn one owned, bow-tagged ranged projectile");
-            return;
-        }
-        helper.succeed();
+        AABB blasterShotArea = shooter.getBoundingBox().inflate(20.0D);
+        AABB bowShotArea = archer.getBoundingBox().inflate(20.0D);
+        helper.succeedWhen(() -> {
+            List<BlasterBoltEntity> bolts = helper.getLevel().getEntitiesOfClass(
+                    BlasterBoltEntity.class, blasterShotArea, bolt -> bolt.getOwner() == shooter);
+            if (bolts.size() != 1
+                    || bolts.getFirst().pickup
+                            != net.minecraft.world.entity.projectile.arrow.AbstractArrow.Pickup.DISALLOWED
+                    || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
+                helper.fail("Recruit blaster did not spawn one owned, weapon-tagged bolt");
+            }
+            List<Arrow> arrows = helper.getLevel().getEntitiesOfClass(
+                    Arrow.class, bowShotArea, arrow -> arrow.getOwner() == archer);
+            if (arrows.size() != 1 || !arrows.getFirst().getWeaponItem().is(ModItems.NIGHTSISTER_BOW.get())) {
+                helper.fail("Nightsister Archer did not spawn one owned, bow-tagged ranged projectile");
+            }
+        });
     }
 
     private static void armyPlanetTransferTransaction(GameTestHelper helper) {
@@ -694,17 +696,19 @@ public final class ModGameTests {
             player.setItemInHand(InteractionHand.MAIN_HAND, eggStack);
             InteractionResult result;
             try {
-                result = testCase.item().useOn(new UseOnContext(
+                result = player.gameMode.useItemOn(
                         player,
+                        helper.getLevel(),
+                        eggStack,
                         InteractionHand.MAIN_HAND,
-                        new BlockHitResult(Vec3.atCenterOf(clicked), Direction.UP, clicked, false)));
+                        new BlockHitResult(Vec3.atCenterOf(clicked), Direction.UP, clicked, false));
             } catch (Throwable exception) {
                 GalacticWars.LOGGER.error(
                         "Spawn egg threw while creating {}", testCase.type(), exception);
                 helper.fail("Spawn egg threw while creating " + testCase.type() + ": " + exception);
                 return;
             }
-            if (result != InteractionResult.SUCCESS) {
+            if (!result.consumesAction()) {
                 helper.fail("Spawn egg rejected " + testCase.type());
             }
             List<GalacticRecruitEntity> spawned = helper.getLevel().getEntitiesOfClass(
@@ -729,6 +733,61 @@ public final class ModGameTests {
             }
         }
 
+        ServerPlayer survivalPlayer = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+        BlockPos replaceableFloor = helper.absolutePos(new BlockPos(15, 1, 11));
+        BlockPos replaceableTarget = replaceableFloor.above();
+        helper.getLevel().setBlockAndUpdate(replaceableFloor, Blocks.DIRT.defaultBlockState());
+        helper.getLevel().setBlockAndUpdate(replaceableTarget, Blocks.SHORT_GRASS.defaultBlockState());
+        ItemStack namedEgg = new ItemStack(ModItems.CLONE_TROOPER_SPAWN_EGG.get(), 2);
+        namedEgg.set(DataComponents.CUSTOM_NAME, Component.literal("QA Clone"));
+        survivalPlayer.setItemInHand(InteractionHand.MAIN_HAND, namedEgg);
+        InteractionResult replaceableResult = survivalPlayer.gameMode.useItemOn(
+                survivalPlayer,
+                helper.getLevel(),
+                namedEgg,
+                InteractionHand.MAIN_HAND,
+                new BlockHitResult(
+                        Vec3.atCenterOf(replaceableTarget),
+                        Direction.UP,
+                        replaceableTarget,
+                        false));
+        List<GalacticRecruitEntity> namedRecruits = helper.getLevel().getEntitiesOfClass(
+                GalacticRecruitEntity.class,
+                new AABB(replaceableTarget).inflate(1.0D),
+                recruit -> recruit.getType() == ModEntityTypes.CLONE_TROOPER.get()
+                        && Component.literal("QA Clone").equals(recruit.getCustomName()));
+        if (!replaceableResult.consumesAction() || namedEgg.getCount() != 1 || namedRecruits.size() != 1) {
+            helper.fail("Survival spawn egg did not preserve replaceable-block, naming, or consumption behavior");
+        }
+
+        BlockPos obstructedClicked = helper.absolutePos(new BlockPos(15, 1, 15));
+        helper.getLevel().setBlockAndUpdate(obstructedClicked, Blocks.STONE.defaultBlockState());
+        for (int y = 0; y < 3; y++) {
+            helper.getLevel().setBlockAndUpdate(
+                    obstructedClicked.east().above(y), Blocks.STONE.defaultBlockState());
+        }
+        ItemStack obstructedEgg = new ItemStack(ModItems.B1_BATTLE_DROID_SPAWN_EGG.get(), 2);
+        survivalPlayer.setItemInHand(InteractionHand.MAIN_HAND, obstructedEgg);
+        InteractionResult obstructedResult = survivalPlayer.gameMode.useItemOn(
+                survivalPlayer,
+                helper.getLevel(),
+                obstructedEgg,
+                InteractionHand.MAIN_HAND,
+                new BlockHitResult(
+                        Vec3.atCenterOf(obstructedClicked),
+                        Direction.EAST,
+                        obstructedClicked,
+                        false));
+        List<GalacticRecruitEntity> fallbackRecruits = helper.getLevel().getEntitiesOfClass(
+                GalacticRecruitEntity.class,
+                new AABB(obstructedClicked.above()).inflate(2.0D),
+                recruit -> recruit.getType() == ModEntityTypes.B1_BATTLE_DROID.get());
+        if (!obstructedResult.consumesAction()
+                || obstructedEgg.getCount() != 1
+                || fallbackRecruits.size() != 1) {
+            helper.fail("Spawn egg did not recover from an obstructed clicked face");
+        }
+
         BlockPos relativeSpawner = new BlockPos(1, 1, 11);
         helper.setBlock(relativeSpawner, Blocks.SPAWNER);
         BlockPos spawnerPos = helper.absolutePos(relativeSpawner);
@@ -736,14 +795,15 @@ public final class ModGameTests {
                 relativeSpawner, SpawnerBlockEntity.class);
         ItemStack spawnerEgg = new ItemStack(ModItems.CLONE_TROOPER_SPAWN_EGG.get());
         player.setItemInHand(InteractionHand.MAIN_HAND, spawnerEgg);
-        InteractionResult spawnerResult = ModItems.CLONE_TROOPER_SPAWN_EGG.get().useOn(
-                new UseOnContext(
-                        player,
-                        InteractionHand.MAIN_HAND,
-                        new BlockHitResult(Vec3.atCenterOf(spawnerPos), Direction.UP, spawnerPos, false)));
+        InteractionResult spawnerResult = player.gameMode.useItemOn(
+                player,
+                helper.getLevel(),
+                spawnerEgg,
+                InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(spawnerPos), Direction.UP, spawnerPos, false));
         var spawnerDisplay = spawner.getSpawner().getOrCreateDisplayEntity(
                 helper.getLevel(), spawnerPos);
-        if (spawnerResult != InteractionResult.SUCCESS
+        if (!spawnerResult.consumesAction()
                 || spawnerDisplay == null
                 || spawnerDisplay.getType() != ModEntityTypes.CLONE_TROOPER.get()) {
             helper.fail("Recruit spawn egg did not preserve vanilla spawner configuration behavior");

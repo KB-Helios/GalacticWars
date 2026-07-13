@@ -150,26 +150,11 @@ final class LaunchContentValidator {
         for (JsonObject json : objects(manager, "conquest_regions", "regions")) {
             var definition = new LaunchContentDefinitions.ConquestRegionDefinition(
                     string(json, "id"), string(json, "planet"), integer(json, "protected_radius"),
-    private static Map<String, LaunchContentDefinitions.ConquestRegionDefinition> loadRegions(
-            ResourceManager manager, Set<String> planetIds, Set<String> factionIds) throws IOException {
-        LinkedHashMap<String, LaunchContentDefinitions.ConquestRegionDefinition> result = new LinkedHashMap<>();
-        for (JsonObject json : objects(manager, "conquest_regions", "regions")) {
-            var definition = new LaunchContentDefinitions.ConquestRegionDefinition(
-                    string(json, "id"), string(json, "planet"), integer(json, "protected_radius"),
                     integer(json, "capture_ticks"), integer(json, "reward_credits"),
                     integer(json, "landmark_x"), integer(json, "landmark_z"),
                     integer(json, "capture_radius"), string(json, "defender_faction"));
             if (!planetIds.contains(definition.planetId())) throw new IllegalArgumentException("Unknown region planet " + definition.planetId());
             if (!factionIds.contains(definition.defenderFaction())) throw new IllegalArgumentException("Unknown region defender faction " + definition.defenderFaction());
-            put(result, definition.id(), definition, "conquest region");
-        }
-        return result;
-    }
-            if (!planetIds.contains(definition.planetId())) throw new IllegalArgumentException("Unknown region planet " + definition.planetId());
-            if (!factionIds.contains(definition.defenderFaction())) {
-                throw new IllegalArgumentException(
-                        "Unknown region defender faction " + definition.defenderFaction());
-            }
             put(result, definition.id(), definition, "conquest region");
         }
         return result;

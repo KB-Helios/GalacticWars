@@ -111,6 +111,7 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.Container;
@@ -121,6 +122,7 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntityReference;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -140,6 +142,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
@@ -227,6 +230,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
     private int blacklistedWorkTargetTicks;
     private long lastCommanderCampaignGameTime;
     private boolean deathResourcesReleased;
+    private boolean spawnEggInitialized;
     private String unitId = "";
     private NpcServiceBranch serviceBranch = NpcServiceBranch.MILITARY;
     private long appliedGameplayDataGeneration = -1L;
@@ -528,11 +532,26 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         }
     }
 
+    @Override
+    public SpawnGroupData finalizeSpawn(
+            ServerLevelAccessor level,
+            DifficultyInstance difficulty,
+            EntitySpawnReason reason,
+            @Nullable SpawnGroupData spawnGroupData
+    ) {
+        SpawnGroupData finalized = super.finalizeSpawn(level, difficulty, reason, spawnGroupData);
+        if (reason == EntitySpawnReason.SPAWN_ITEM_USE) {
+            this.initializeFromSpawnEgg();
+        }
+        return finalized;
+    }
+
     /** Finalizes data-driven stats and prevents a player-placed recruit from despawning. */
     public void initializeFromSpawnEgg() {
-        if (this.level().isClientSide()) {
+        if (this.level().isClientSide() || this.spawnEggInitialized) {
             return;
         }
+        this.spawnEggInitialized = true;
         this.setPersistenceRequired();
         this.applyUnitDefinition();
         this.getNavigation().stop();
