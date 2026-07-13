@@ -80,7 +80,8 @@ public final class RecruitMeleeCombatBehaviour
 
     private static boolean canFight(GalacticRecruitEntity recruit) {
         LivingEntity target = target(recruit);
-        return !recruit.hasAuthoritativeArmyGroup()
+        return recruit.getRecruitDuty() == galacticwars.clonewars.recruitment.RecruitDuty.SOLDIER
+                && !recruit.hasAuthoritativeArmyGroup()
                 && recruit.canUseLocalAttackTarget(target)
                 && !FactionRangedWeaponService.supportsRecruitRangedCombat(
                         recruit.getMainHandItem());
