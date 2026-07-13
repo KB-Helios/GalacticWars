@@ -119,6 +119,7 @@ public final class RecruitTextureAtlasTest {
 
     private static void validatesArmorIdentity(String family, String geometry) throws IOException {
         String generator = Files.readString(Path.of("tools/generate_character_models.py"));
+        String familySource = armorIdentitySource(generator, family);
         assertContains(geometry, "\"name\": \"armorHead\"",
                 family + " equipped helmet bone");
         List<String> requiredParts = switch (family) {
@@ -140,9 +141,46 @@ public final class RecruitTextureAtlasTest {
             default -> throw new AssertionError("unmapped armor family " + family);
         };
         for (String part : requiredParts) {
-            assertContains(generator, "\"" + part + "\"",
+            assertContains(familySource, "\"" + part + "\"",
                     family + " reproducible authored armor component " + part);
         }
+    }
+
+    private static String armorIdentitySource(String generator, String family) {
+        int functionStart = generator.indexOf("def add_family_armor_details(");
+        if (functionStart < 0) {
+            throw new AssertionError("armor family generator function missing");
+        }
+        String marker = (family.equals("republic_plastoid") ? "    if" : "    elif")
+                + " family == \"" + family + "\":";
+        int branchStart = generator.indexOf(marker, functionStart);
+        if (branchStart < 0) {
+            throw new AssertionError(family + " armor generator branch missing");
+        }
+        int nextBranch = generator.indexOf("\n    elif family ==", branchStart + marker.length());
+        int elseBranch = generator.indexOf("\n    else:", branchStart + marker.length());
+        int branchEnd = nextBranch < 0 ? elseBranch : Math.min(nextBranch, elseBranch);
+        if (branchEnd < 0) {
+            throw new AssertionError(family + " armor generator branch is unterminated");
+        }
+
+        String helper = switch (family) {
+            case "republic_plastoid" -> "add_republic_helmet";
+            case "separatist_alloy" -> "add_separatist_helmet";
+            case "mandalorian_alloy", "beskar" -> "add_mandalorian_helmet";
+            case "nightsister_weave" -> "add_nightsister_helmet";
+            default -> throw new AssertionError("unmapped armor family " + family);
+        };
+        return generator.substring(branchStart, branchEnd) + functionSource(generator, helper);
+    }
+
+    private static String functionSource(String source, String functionName) {
+        int start = source.indexOf("def " + functionName + "(");
+        if (start < 0) {
+            throw new AssertionError(functionName + " generator helper missing");
+        }
+        int end = source.indexOf("\ndef ", start + 1);
+        return end < 0 ? source.substring(start) : source.substring(start, end);
     }
 
     private static void assertArmorBoneParent(

@@ -1,3 +1,6 @@
 {
-  "parent": "galacticwars:item/spawn_capsule_base"
+  "parent": "galacticwars:item/spawn_capsule_base",
+  "textures": {
+    "particle": "galacticwars:item/arc_trooper_spawn_egg"
+  }
 }

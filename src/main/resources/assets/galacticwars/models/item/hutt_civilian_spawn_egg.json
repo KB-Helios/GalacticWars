@@ -1,3 +1,6 @@
 {
-  "parent": "galacticwars:item/spawn_capsule_base"
+  "parent": "galacticwars:item/spawn_capsule_base",
+  "textures": {
+    "particle": "galacticwars:item/hutt_civilian_spawn_egg"
+  }
 }

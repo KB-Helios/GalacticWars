@@ -36,17 +36,22 @@ public final class SpawnCapsuleAssetIntegrationTest {
         require(json("geckolib/animations/item/spawn_capsule.animation.json")
                         .contains("animation.spawn_capsule.idle"),
                 "spawn capsule idle animation");
-        require(json("models/item/spawn_capsule_base.json").contains("\"parent\": \"builtin/entity\""),
+        String baseModel = json("models/item/spawn_capsule_base.json");
+        require(baseModel.contains("\"parent\": \"builtin/entity\""),
                 "spawn capsule display model delegates to GeckoLib");
+        require(baseModel.contains("\"particle\": \"galacticwars:item/clone_trooper_spawn_egg\""),
+                "spawn capsule display model declares a valid fallback particle texture");
 
         for (String id : VISUAL_IDS) {
             String definition = json("items/" + id + "_spawn_egg.json");
             require(definition.contains("\"type\": \"minecraft:special\"")
                             && definition.contains("\"type\": \"geckolib:geckolib\""),
                     id + " spawn capsule special item definition");
-            require(json("models/item/" + id + "_spawn_egg.json")
-                            .contains("galacticwars:item/spawn_capsule_base"),
+            String itemModel = json("models/item/" + id + "_spawn_egg.json");
+            require(itemModel.contains("galacticwars:item/spawn_capsule_base"),
                     id + " spawn capsule display-model parent");
+            require(itemModel.contains("\"particle\": \"galacticwars:item/" + id + "_spawn_egg\""),
+                    id + " spawn capsule particle texture");
             image("textures/item/" + id + "_spawn_egg.png", 16, 16, true);
             image("textures/item/spawn_capsule/" + id + ".png", 512, 512, true);
             image("textures/item/spawn_capsule/" + id + "_glowmask.png", 512, 512, true);

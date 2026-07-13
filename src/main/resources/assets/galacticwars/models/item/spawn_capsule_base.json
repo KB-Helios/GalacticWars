@@ -2,6 +2,9 @@
   "parent": "builtin/entity",
   "ambientocclusion": false,
   "gui_light": "front",
+  "textures": {
+    "particle": "galacticwars:item/clone_trooper_spawn_egg"
+  },
   "display": {
     "thirdperson_righthand": {
       "rotation": [

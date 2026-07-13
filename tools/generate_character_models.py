@@ -1076,6 +1076,9 @@ def write_spawn_capsule_item_files(visual_id: str) -> None:
         "parent": "builtin/entity",
         "ambientocclusion": False,
         "gui_light": "front",
+        "textures": {
+            "particle": "galacticwars:item/clone_trooper_spawn_egg",
+        },
         "display": {
             "thirdperson_righthand": {
                 "rotation": [0, -35, 20], "translation": [0, 2.5, 0], "scale": [0.72, 0.72, 0.72]},
@@ -1095,6 +1098,9 @@ def write_spawn_capsule_item_files(visual_id: str) -> None:
     }, indent=2) + "\n", encoding="utf-8")
     (ITEM_MODELS / f"{item_id}.json").write_text(json.dumps({
         "parent": "galacticwars:item/spawn_capsule_base",
+        "textures": {
+            "particle": f"galacticwars:item/{item_id}",
+        },
     }, indent=2) + "\n", encoding="utf-8")
     (ITEM_DEFINITIONS / f"{item_id}.json").write_text(json.dumps({
         "model": {

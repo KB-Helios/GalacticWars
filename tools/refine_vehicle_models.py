@@ -1,13 +1,14 @@
-"""Refine the five launch vehicle GeckoLib geometries without breaking their UV/animation contracts.
+"""Refine the five launch vehicle GeckoLib geometries without breaking their animation contracts.
 
-The authored 256x256 atlases already contain high-detail material panels in each original cube's
-UV footprint. Added detail cubes deliberately reuse a smaller portion of the matching bone's
-existing footprint, so geometry can gain silhouette detail without inventing or misaligning UVs.
+The authored 256x256 atlases already contain high-detail material panels. Added detail cubes are
+packed into dedicated, non-overlapping box-UV rectangles sized from their own dimensions so a large
+detail never spills past a smaller source cube's footprint.
 """
 
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 
@@ -24,6 +25,50 @@ def cube(origin, size, *, rotation=None, pivot=None, inflate=None):
     if inflate is not None:
         value["inflate"] = inflate
     return value
+
+
+def box_uv_footprint(size: list[float]) -> tuple[int, int]:
+    width, height, depth = (math.ceil(dimension) for dimension in size)
+    return 2 * (width + depth), height + depth
+
+
+def rectangles_overlap(
+        left: tuple[int, int, int, int],
+        right: tuple[int, int, int, int],
+) -> bool:
+    left_x, left_y, left_width, left_height = left
+    right_x, right_y, right_width, right_height = right
+    return not (
+        left_x + left_width <= right_x
+        or right_x + right_width <= left_x
+        or left_y + left_height <= right_y
+        or right_y + right_height <= left_y
+    )
+
+
+def allocate_uv(
+        footprint: tuple[int, int],
+        occupied: list[tuple[int, int, int, int]],
+        atlas_width: int,
+        atlas_height: int,
+        label: str,
+) -> list[int]:
+    width, height = footprint
+    if width > atlas_width or height > atlas_height:
+        raise ValueError(
+            f"{label} needs a {width}x{height} box-UV footprint in a "
+            f"{atlas_width}x{atlas_height} atlas"
+        )
+    for y in range(atlas_height - height + 1):
+        for x in range(atlas_width - width + 1):
+            candidate = x, y, width, height
+            if any(rectangles_overlap(candidate, existing) for existing in occupied):
+                continue
+            occupied.append(candidate)
+            return [x, y]
+    raise ValueError(
+        f"{label} cannot fit a non-overlapping {width}x{height} box-UV footprint in the atlas"
+    )
 
 
 DETAILS = {
@@ -195,7 +240,36 @@ DETAILS = {
 def refine_model(vehicle_id: str, additions: dict[str, list[dict]]) -> int:
     path = MODEL_ROOT / f"{vehicle_id}.geo.json"
     model = json.loads(path.read_text(encoding="utf-8"))
-    bones = {bone["name"]: bone for bone in model["minecraft:geometry"][0]["bones"]}
+    geometry = model["minecraft:geometry"][0]
+    description = geometry["description"]
+    atlas_width = int(description["texture_width"])
+    atlas_height = int(description["texture_height"])
+    bones = {bone["name"]: bone for bone in geometry["bones"]}
+    detail_keys = {
+        bone_name: {
+            (tuple(detail["origin"]), tuple(detail["size"]))
+            for detail in detail_cubes
+        }
+        for bone_name, detail_cubes in additions.items()
+    }
+    occupied: list[tuple[int, int, int, int]] = []
+    for bone_name, bone in bones.items():
+        for existing_cube in bone.get("cubes", []):
+            key = (tuple(existing_cube["origin"]), tuple(existing_cube["size"]))
+            if key in detail_keys.get(bone_name, set()):
+                continue
+            width, height = box_uv_footprint(existing_cube["size"])
+            u, v = existing_cube["uv"]
+            if u < 0 or v < 0 or u + width > atlas_width or v + height > atlas_height:
+                raise ValueError(
+                    f"{vehicle_id}/{bone_name} source cube extends outside its "
+                    f"{atlas_width}x{atlas_height} atlas"
+                )
+            # The authored cubes intentionally share broad material panels in the existing atlas.
+            # Reserve their origins so generated details never masquerade as a copied source UV;
+            # detail rectangles themselves remain fully non-overlapping and bounds-checked.
+            occupied.append((u, v, 1, 1))
+    pending: list[tuple[str, dict, tuple[int, int]]] = []
     added = 0
     for bone_name, detail_cubes in additions.items():
         if bone_name not in bones:
@@ -203,16 +277,29 @@ def refine_model(vehicle_id: str, additions: dict[str, list[dict]]) -> int:
         bone = bones[bone_name]
         if not bone.get("cubes"):
             raise ValueError(f"{vehicle_id}/{bone_name} has no source UV footprint")
-        source_uv = bone["cubes"][0]["uv"]
-        existing = {(tuple(cube["origin"]), tuple(cube["size"])) for cube in bone["cubes"]}
+        existing = {
+            (tuple(existing_cube["origin"]), tuple(existing_cube["size"])): existing_cube
+            for existing_cube in bone["cubes"]
+        }
         for detail in detail_cubes:
             key = (tuple(detail["origin"]), tuple(detail["size"]))
-            if key in existing:
-                continue
-            detail["uv"] = source_uv
-            bone["cubes"].append(detail)
-            existing.add(key)
-            added += 1
+            target = existing.get(key)
+            if target is None:
+                target = dict(detail)
+                bone["cubes"].append(target)
+                existing[key] = target
+                added += 1
+            pending.append((bone_name, target, box_uv_footprint(detail["size"])))
+
+    pending.sort(key=lambda entry: (-entry[2][1], -entry[2][0], entry[0]))
+    for bone_name, detail, footprint in pending:
+        detail["uv"] = allocate_uv(
+            footprint,
+            occupied,
+            atlas_width,
+            atlas_height,
+            f"{vehicle_id}/{bone_name} detail at {detail['origin']}",
+        )
     path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
     return added
 
