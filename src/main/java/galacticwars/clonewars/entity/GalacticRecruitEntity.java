@@ -21,6 +21,10 @@ import galacticwars.clonewars.army.ArmyRecruitRuntimeController;
 import galacticwars.clonewars.army.ArmySnapshotEquipment;
 import galacticwars.clonewars.army.ArmyUnitDefinition;
 import galacticwars.clonewars.army.RecruitVitals;
+import galacticwars.clonewars.classes.ClassAbilityRuntimeService;
+import galacticwars.clonewars.classes.ClassProgressCodecs;
+import galacticwars.clonewars.classes.ClassProgressState;
+import galacticwars.clonewars.classes.UnitClassDefinition;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.entity.ai.RecruitWorkerGoal;
 import galacticwars.clonewars.entity.ai.RecruitRangedCombatGoal;
@@ -95,6 +99,7 @@ import galacticwars.clonewars.world.CivilianArchetypeDefinition;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.Component;
@@ -142,6 +147,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -225,6 +231,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
     private int morale = 100;
     private int hunger = 100;
     private int unpaidTicks;
+    private ClassProgressState classProgressState = ClassProgressState.unassigned();
     private long armySnapshotGeneration;
     private long nextNaturalProductionGameTime;
     private final ArmyRecruitRuntimeController armyRuntimeController = new ArmyRecruitRuntimeController();
@@ -333,10 +340,11 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         output.putInt("Morale", this.morale);
         output.putInt("Hunger", this.hunger);
         output.putInt("UnpaidTicks", this.unpaidTicks);
+        output.store("ClassProgress", ClassProgressCodecs.CODEC, this.classProgressState);
         output.putLong("ArmySnapshotGeneration", this.armySnapshotGeneration);
         output.putLong("NextNaturalProductionGameTime", this.nextNaturalProductionGameTime);
         this.getWorkerProfession().ifPresent(profession -> output.putString("WorkerProfession", profession.id()));
-        output.putInt("RecruitDataVersion", 5);
+        output.putInt("RecruitDataVersion", 6);
         output.storeNullable("KingdomId", UUIDUtil.CODEC, this.kingdomId);
         output.storeNullable("SettlementId", UUIDUtil.CODEC, this.settlementId);
         output.storeNullable("FactionOutpostId", UUIDUtil.CODEC, this.factionOutpostId);
@@ -400,6 +408,8 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         this.morale = clampVital(input.getIntOr("Morale", 100));
         this.hunger = clampVital(input.getIntOr("Hunger", 100));
         this.unpaidTicks = Math.max(0, input.getIntOr("UnpaidTicks", 0));
+        this.classProgressState = input.read("ClassProgress", ClassProgressCodecs.CODEC)
+                .orElseGet(ClassProgressState::unassigned);
         this.armySnapshotGeneration = Math.max(0L, input.getLongOr("ArmySnapshotGeneration", 0L));
         this.nextNaturalProductionGameTime = Math.max(
                 0L, input.getLongOr("NextNaturalProductionGameTime", 0L));
@@ -837,6 +847,49 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                 this.unpaidTicks);
     }
 
+    public ClassProgressState classProgressState() {
+        return this.classProgressState;
+    }
+
+    public Optional<UnitClassDefinition> unitClassDefinition() {
+        if (this.classProgressState.classId().isBlank()) {
+            return Optional.empty();
+        }
+        return GameplayDataManager.snapshot().unitClass(this.classProgressState.classId());
+    }
+
+    public ClassAbilityRuntimeService.ActivationDecision activateClassAbility(
+            String abilityId,
+            long gameTime,
+            boolean targetPresent,
+            double targetDistance,
+            boolean targetsPlayer
+    ) {
+        UnitClassDefinition unitClass = this.unitClassDefinition().orElse(null);
+        var ability = GameplayDataManager.snapshot().ability(abilityId).orElse(null);
+        if (unitClass == null || ability == null) {
+            return ClassAbilityRuntimeService.ActivationDecision.rejected(
+                    "unknown_class_ability", this.classProgressState);
+        }
+        ClassAbilityRuntimeService.ActivationDecision decision = ClassAbilityRuntimeService.activate(
+                unitClass,
+                ability,
+                this.classProgressState,
+                gameTime,
+                targetPresent,
+                targetDistance,
+                targetsPlayer,
+                Config.ALLOW_CLASS_PVP.getAsBoolean());
+        if (decision.accepted()) {
+            this.classProgressState = decision.state();
+        }
+        return decision;
+    }
+
+    public void grantClassExperience(long amount) {
+        this.classProgressState = this.classProgressState.gainExperience(amount);
+    }
+
     public Optional<WorkerAssignment> getWorkerAssignment() {
         if (this.workTarget == null || this.getWorkerProfession().isEmpty()) {
             return Optional.empty();
@@ -897,6 +950,10 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         lines.add(Component.translatable(
                 "screen.galacticwars.recruit.status.duty",
                 Component.literal(this.getRecruitDuty().id())));
+        this.unitClassDefinition().ifPresent(unitClass -> lines.add(Component.translatable(
+                "screen.galacticwars.recruit.status.class",
+                Component.literal(unitClass.displayName()),
+                this.classProgressState.rank())));
         lines.add(Component.translatable(
                 "screen.galacticwars.recruit.status.profession",
                 this.getWorkerProfession()
@@ -1577,7 +1634,9 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         }
         if (!this.workerInventoryIsEmpty()
                 && profession != WorkerProfession.BUILDER
-                && profession != WorkerProfession.COURIER) {
+                && profession != WorkerProfession.COURIER
+                && profession != WorkerProfession.ANIMAL_FARMER
+                && profession != WorkerProfession.COOK) {
             if (this.storageTarget == null
                     || !this.isRegisteredStorageTarget(this.storageTarget)
                     || this.findContainer(this.storageTarget).isEmpty()) {
@@ -1589,7 +1648,8 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         }
 
         switch (profession) {
-            case FARMER, MINER -> this.transitionWorker(WorkerPhase.FIND_TARGET, "scan_worksite", null);
+            case FARMER, FISHERMAN, MINER ->
+                    this.transitionWorker(WorkerPhase.FIND_TARGET, "scan_worksite", null);
             case LUMBERJACK -> {
                 if (!this.workerInventoryContains(Items.OAK_SAPLING)) {
                     if (this.storageTarget == null || !this.containerContains(this.storageTarget, Items.OAK_SAPLING)) {
@@ -1601,9 +1661,14 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                     this.transitionWorker(WorkerPhase.FIND_TARGET, "scan_worksite", null);
                 }
             }
+            case ANIMAL_FARMER -> this.acquireAnimalFarmerOrder();
             case BUILDER -> this.acquireBuilderOrder();
+            case COOK -> this.acquireCookOrder();
+            case MERCHANT -> {
+                this.workerCooldownTicks = 100;
+                this.transitionWorker(WorkerPhase.COOLDOWN, "market_open", this.workTarget);
+            }
             case COURIER -> this.acquireCourierOrder();
-            default -> this.blockWorker("profession_not_enabled");
         }
     }
 
@@ -1929,6 +1994,25 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                     this.blockWorker("courier_source_empty");
                 }
             }
+            case "withdraw_animal_feed" -> {
+                net.minecraft.world.item.Item feed = this.requiredAnimalFeed();
+                if (feed != null && this.withdrawSpecificItem(this.activeWorkTarget, feed, 2)) {
+                    this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "animal_feed_ready", null);
+                } else {
+                    this.blockWorker("animal_feed_missing");
+                }
+            }
+            case "withdraw_cooking_ingredient" -> {
+                net.minecraft.world.item.Item ingredient = this.missingCookingIngredient();
+                if (ingredient != null && this.withdrawSpecificItem(this.activeWorkTarget, ingredient, 1)) {
+                    this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "cooking_ingredient_ready", null);
+                } else {
+                    this.blockWorker("cooking_ingredient_missing");
+                }
+            }
+            case "feed_animals" -> this.feedAnimalPair(level);
+            case "harvest_animal" -> this.harvestExcessAnimal(level);
+            case "cook_food" -> this.cookStoredFood();
             case "build_place" -> this.placeCurrentBuildBlock();
             case "navigate_work_target" -> this.performGatheringInteraction(level);
             default -> this.blockWorker("unknown_worker_action");
@@ -1977,6 +2061,27 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         BlockState state = level.getBlockState(target);
         if (!this.isWorkerTarget(profession, state)) {
             this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "target_changed", null);
+            return;
+        }
+
+        if (profession == WorkerProfession.FISHERMAN) {
+            NonNullList<ItemStack> nextInventory = this.copyWorkerInventory();
+            ItemStack catchStack = new ItemStack(
+                    Math.floorMod(this.getUUID().hashCode() + this.tickCount, 4) == 0
+                            ? Items.SALMON
+                            : Items.COD);
+            if (!mergeAll(nextInventory, List.of(catchStack))) {
+                this.blockWorker("worker_inventory_full");
+                return;
+            }
+            ItemStack rod = this.getMainHandItem();
+            if (!rod.is(Items.FISHING_ROD)) {
+                this.blockWorker("fishing_rod_required");
+                return;
+            }
+            rod.hurtAndBreak(1, this, EquipmentSlot.MAINHAND);
+            this.workerInventory = nextInventory;
+            this.transitionWorker(WorkerPhase.COLLECT, "fish_caught", null);
             return;
         }
 
@@ -2092,6 +2197,131 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         } else {
             this.transitionWorker(WorkerPhase.NAVIGATE_STORAGE, "courier_deliver", this.workTarget);
         }
+    }
+
+    private void acquireAnimalFarmerOrder() {
+        List<Animal> livestock = this.livestockInWorkArea();
+        if (livestock.size() > 12) {
+            Animal target = livestock.stream().filter(animal -> !animal.isBaby()).findFirst().orElse(null);
+            if (target == null) {
+                this.blockWorker("adult_livestock_required");
+                return;
+            }
+            this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "harvest_animal", target.blockPosition());
+            return;
+        }
+        net.minecraft.world.item.Item feed = this.requiredAnimalFeed(livestock);
+        if (feed == null) {
+            this.blockWorker("breeding_pair_required");
+            return;
+        }
+        if (this.workerInventoryCount(feed) < 2) {
+            if (this.storageTarget == null || !this.containerContains(this.storageTarget, feed)) {
+                this.blockWorker("animal_feed_missing");
+            } else {
+                this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "withdraw_animal_feed", this.storageTarget);
+            }
+            return;
+        }
+        Animal target = this.breedingPair(livestock, feed).getFirst();
+        this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "feed_animals", target.blockPosition());
+    }
+
+    private void acquireCookOrder() {
+        net.minecraft.world.item.Item rawFood = this.availableRawCookingInput();
+        net.minecraft.world.item.Item missing = rawFood == null ? this.availableStoredRawCookingInput() : null;
+        if (rawFood == null && missing == null) {
+            this.blockWorker("raw_food_missing");
+            return;
+        }
+        if (rawFood == null) {
+            this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "withdraw_cooking_ingredient", this.storageTarget);
+            return;
+        }
+        if (!this.workerInventoryContains(Items.COAL)) {
+            if (this.storageTarget == null || !this.containerContains(this.storageTarget, Items.COAL)) {
+                this.blockWorker("cooking_fuel_missing");
+            } else {
+                this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "withdraw_cooking_ingredient", this.storageTarget);
+            }
+            return;
+        }
+        this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "cook_food", this.workTarget);
+    }
+
+    private void feedAnimalPair(ServerLevel level) {
+        List<Animal> livestock = this.livestockNearRecruit(5.0D);
+        net.minecraft.world.item.Item feed = this.requiredAnimalFeed(livestock);
+        if (feed == null || this.workerInventoryCount(feed) < 2) {
+            this.blockWorker("breeding_pair_required");
+            return;
+        }
+        List<Animal> pair = this.breedingPair(livestock, feed);
+        if (pair.isEmpty()) {
+            this.blockWorker("breeding_pair_required");
+            return;
+        }
+        if (!removeOneFromStacks(this.workerInventory, feed)
+                || !removeOneFromStacks(this.workerInventory, feed)) {
+            this.blockWorker("animal_feed_missing");
+            return;
+        }
+        pair.forEach(animal -> animal.setInLove(null));
+        this.transitionWorker(WorkerPhase.COLLECT, "animals_fed", null);
+    }
+
+    private void harvestExcessAnimal(ServerLevel level) {
+        Animal animal = this.livestockNearRecruit(4.0D).stream()
+                .filter(candidate -> !candidate.isBaby())
+                .findFirst().orElse(null);
+        if (animal == null || this.livestockInWorkArea().size() <= 12) {
+            this.blockWorker("population_within_limit");
+            return;
+        }
+        List<ItemStack> products = new ArrayList<>();
+        EntityType<?> livestockType = animal.getType();
+        if (livestockType == net.minecraft.world.entity.EntityTypes.SHEEP) {
+            products.add(new ItemStack(Items.MUTTON, 2));
+            products.add(new ItemStack(Items.STRING, 2));
+        } else if (livestockType == net.minecraft.world.entity.EntityTypes.PIG) {
+            products.add(new ItemStack(Items.PORKCHOP, 2));
+        } else if (livestockType == net.minecraft.world.entity.EntityTypes.CHICKEN) {
+            products.add(new ItemStack(Items.CHICKEN));
+            products.add(new ItemStack(Items.FEATHER, 2));
+        } else if (livestockType == net.minecraft.world.entity.EntityTypes.COW
+                || livestockType == net.minecraft.world.entity.EntityTypes.MOOSHROOM) {
+            products.add(new ItemStack(Items.BEEF, 2));
+            products.add(new ItemStack(Items.LEATHER));
+        } else {
+            this.blockWorker("unsupported_livestock_type");
+            return;
+        }
+        NonNullList<ItemStack> nextInventory = this.copyWorkerInventory();
+        if (!mergeAll(nextInventory, products)) {
+            this.blockWorker("worker_inventory_full");
+            return;
+        }
+        animal.discard();
+        this.workerInventory = nextInventory;
+        this.transitionWorker(WorkerPhase.COLLECT, "livestock_harvested", null);
+    }
+
+    private void cookStoredFood() {
+        net.minecraft.world.item.Item raw = this.availableRawCookingInput();
+        net.minecraft.world.item.Item cooked = cookedFoodFor(raw);
+        if (raw == null || cooked == null || !this.workerInventoryContains(Items.COAL)) {
+            this.blockWorker("cooking_ingredient_missing");
+            return;
+        }
+        NonNullList<ItemStack> nextInventory = this.copyWorkerInventory();
+        if (!removeOneFromStacks(nextInventory, raw)
+                || !removeOneFromStacks(nextInventory, Items.COAL)
+                || !mergeAll(nextInventory, List.of(new ItemStack(cooked)))) {
+            this.blockWorker("worker_inventory_full");
+            return;
+        }
+        this.workerInventory = nextInventory;
+        this.transitionWorker(WorkerPhase.COLLECT, "food_cooked", null);
     }
 
     private void finishCompletedBlueprint() {
@@ -2220,9 +2450,101 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         return switch (profession) {
             case FARMER -> state.getBlock() instanceof CropBlock cropBlock && cropBlock.isMaxAge(state);
             case LUMBERJACK -> state.is(ModBlockTags.WORKER_LOGS);
+            case FISHERMAN -> state.getFluidState().is(FluidTags.WATER) && state.getFluidState().isSource();
             case MINER -> state.is(ModBlockTags.WORKER_MINEABLE);
             default -> false;
         };
+    }
+
+    private List<Animal> livestockInWorkArea() {
+        return this.livestockNear(this.workTarget, this.worksiteScanRadius());
+    }
+
+    private List<Animal> livestockNear(@Nullable BlockPos center, double radius) {
+        if (center == null || !(this.level() instanceof ServerLevel serverLevel)) {
+            return List.of();
+        }
+        AABB bounds = new AABB(center).inflate(radius, 4.0D, radius);
+        return serverLevel.getEntitiesOfClass(Animal.class, bounds, animal ->
+                animal.isAlive() && !(animal instanceof GalacticRecruitEntity));
+    }
+
+    private List<Animal> livestockNearRecruit(double radius) {
+        if (!(this.level() instanceof ServerLevel serverLevel)) {
+            return List.of();
+        }
+        return serverLevel.getEntitiesOfClass(Animal.class, this.getBoundingBox().inflate(radius), animal ->
+                animal.isAlive() && !(animal instanceof GalacticRecruitEntity));
+    }
+
+    private net.minecraft.world.item.Item requiredAnimalFeed() {
+        return this.requiredAnimalFeed(this.livestockInWorkArea());
+    }
+
+    private net.minecraft.world.item.Item requiredAnimalFeed(List<Animal> livestock) {
+        for (net.minecraft.world.item.Item feed : List.of(Items.WHEAT, Items.CARROT, Items.WHEAT_SEEDS)) {
+            if (!this.breedingPair(livestock, feed).isEmpty()) {
+                return feed;
+            }
+        }
+        return null;
+    }
+
+    private List<Animal> breedingPair(List<Animal> livestock, net.minecraft.world.item.Item feed) {
+        ItemStack feedStack = new ItemStack(feed);
+        for (int firstIndex = 0; firstIndex < livestock.size(); firstIndex++) {
+            Animal first = livestock.get(firstIndex);
+            if (first.isBaby() || !first.canFallInLove() || !first.isFood(feedStack)) {
+                continue;
+            }
+            for (int secondIndex = firstIndex + 1; secondIndex < livestock.size(); secondIndex++) {
+                Animal second = livestock.get(secondIndex);
+                if (second.getType() == first.getType()
+                        && !second.isBaby()
+                        && second.canFallInLove()
+                        && second.isFood(feedStack)) {
+                    return List.of(first, second);
+                }
+            }
+        }
+        return List.of();
+    }
+
+    private net.minecraft.world.item.Item availableStoredRawCookingInput() {
+        if (this.storageTarget == null) {
+            return null;
+        }
+        return rawCookingInputs().stream()
+                .filter(item -> this.containerContains(this.storageTarget, item))
+                .findFirst().orElse(null);
+    }
+
+    private net.minecraft.world.item.Item availableRawCookingInput() {
+        return rawCookingInputs().stream()
+                .filter(this::workerInventoryContains)
+                .findFirst().orElse(null);
+    }
+
+    private net.minecraft.world.item.Item missingCookingIngredient() {
+        net.minecraft.world.item.Item carriedRaw = this.availableRawCookingInput();
+        if (carriedRaw == null) {
+            return this.availableStoredRawCookingInput();
+        }
+        return this.workerInventoryContains(Items.COAL) ? null : Items.COAL;
+    }
+
+    private static List<net.minecraft.world.item.Item> rawCookingInputs() {
+        return List.of(Items.BEEF, Items.PORKCHOP, Items.CHICKEN, Items.COD, Items.SALMON, Items.POTATO);
+    }
+
+    private static net.minecraft.world.item.Item cookedFoodFor(net.minecraft.world.item.Item raw) {
+        if (raw == Items.BEEF) return Items.COOKED_BEEF;
+        if (raw == Items.PORKCHOP) return Items.COOKED_PORKCHOP;
+        if (raw == Items.CHICKEN) return Items.COOKED_CHICKEN;
+        if (raw == Items.COD) return Items.COOKED_COD;
+        if (raw == Items.SALMON) return Items.COOKED_SALMON;
+        if (raw == Items.POTATO) return Items.BAKED_POTATO;
+        return null;
     }
 
     private boolean canModifyWorkerTarget(BlockPos target) {
@@ -2381,6 +2703,13 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
 
     private boolean workerInventoryContains(net.minecraft.world.item.Item item) {
         return this.workerInventory.stream().anyMatch(stack -> stack.is(item));
+    }
+
+    private int workerInventoryCount(net.minecraft.world.item.Item item) {
+        return this.workerInventory.stream()
+                .filter(stack -> stack.is(item))
+                .mapToInt(ItemStack::getCount)
+                .sum();
     }
 
     private NonNullList<ItemStack> copyWorkerInventory() {
@@ -3153,6 +3482,11 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         }
         ArmyUnitDefinition unit = unitOptional.orElseThrow();
         this.unitId = unit.id().toString();
+        GameplayDataManager.snapshot().unitClassForUnit(unit.id()).ifPresent(unitClass -> {
+            if (!this.classProgressState.classId().equals(unitClass.id().toString())) {
+                this.classProgressState = this.classProgressState.assign(unitClass.id());
+            }
+        });
         float healthRatio = this.getMaxHealth() <= 0.0F ? 1.0F : this.getHealth() / this.getMaxHealth();
         this.getAttribute(Attributes.MAX_HEALTH).setBaseValue(unit.maxHealth());
         this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(unit.movementSpeed());

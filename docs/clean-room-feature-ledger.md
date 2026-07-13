@@ -1,9 +1,10 @@
 # Clean-room feature ledger
 
-This project may study the behavior of the local Villager Recruits and Villager Workers checkouts,
-but both declare `All Rights Reserved`. Their source, assets, translations, names, packet formats,
-and internal architecture must not be copied. Every implementation below is original Galactic Wars
-work and is verified through project-owned tests.
+Historical entries below were implemented clean-room while the local Villager Recruits and
+Villager Workers checkouts were behavioral references only. On 2026-07-12, the project owner
+authorized derivative reuse and redistribution from those local projects. New direct reuse must
+be tracked separately in `authorized-source-intake.md`; this ledger remains the provenance record
+for features that were created without copying upstream source or assets.
 
 | Reference behavior | Galactic Wars adaptation | Project implementation | Verification | Provenance |
 | --- | --- | --- | --- | --- |

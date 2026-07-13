@@ -17,6 +17,7 @@ import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
@@ -42,6 +43,9 @@ public class GalacticWarsClient {
 
     @SubscribeEvent
     static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerEntityRenderer(
+                ModEntityTypes.BLASTER_BOLT.get(),
+                context -> new ThrownItemRenderer<>(context, 1.0F, true));
         ModEntityTypes.recruits().forEach(holder -> event.registerEntityRenderer(
                 holder.get(), context -> new GalacticRecruitRenderer<>(
                         context, holder.get())));

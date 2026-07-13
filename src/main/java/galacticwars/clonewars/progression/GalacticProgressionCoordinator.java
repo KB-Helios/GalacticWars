@@ -5,8 +5,6 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class GalacticProgressionCoordinator {
-    private static final Set<String> PLANETS = Set.of("tatooine", "geonosis", "kamino", "coruscant");
-
     private GalacticProgressionCoordinator() {
     }
 
@@ -21,7 +19,7 @@ public final class GalacticProgressionCoordinator {
         }
         String faction = state.factionId();
         if (event.type() == ProgressionEventType.FACTION_PLEDGED) {
-            if (!LaunchContentCatalog.FACTIONS.contains(event.subjectId())) {
+            if (!LaunchContentCatalog.factions().contains(event.subjectId())) {
                 return ProgressionDecision.rejected("unknown_faction", state);
             }
             if (!faction.isEmpty()) {
@@ -33,7 +31,8 @@ public final class GalacticProgressionCoordinator {
                 && subjectPath(event.subjectId()).equals("command_center"))) {
             return ProgressionDecision.rejected("faction_required", state);
         }
-        if (event.type() == ProgressionEventType.PLANET_VISITED && !PLANETS.contains(event.subjectId())) {
+        if (event.type() == ProgressionEventType.PLANET_VISITED
+                && !LaunchContentCatalog.planets().contains(event.subjectId())) {
             return ProgressionDecision.rejected("unknown_planet", state);
         }
         if (event.type() == ProgressionEventType.PLANET_VISITED
@@ -60,7 +59,7 @@ public final class GalacticProgressionCoordinator {
             String faction
     ) {
         String questId = event.subjectId();
-        if (!LaunchContentCatalog.QUESTS.contains(questId)) {
+        if (!LaunchContentCatalog.quests().contains(questId)) {
             return ProgressionDecision.rejected("unknown_quest", state);
         }
         String factionPath = faction.substring(faction.indexOf(':') + 1);

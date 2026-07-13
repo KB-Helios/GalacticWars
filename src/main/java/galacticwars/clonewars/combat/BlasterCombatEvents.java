@@ -16,6 +16,14 @@ public final class BlasterCombatEvents {
     }
 
     public static void onProjectileImpact(ProjectileImpactEvent event) {
+        if (event.getProjectile() instanceof BlasterBoltEntity bolt
+                && event.getRayTraceResult() instanceof EntityHitResult boltHit
+                && boltHit.getEntity() instanceof LivingEntity defender
+                && LightsaberDeflectionService.tryDeflect(
+                        bolt, defender, defender.level().getGameTime())) {
+            event.setCanceled(true);
+            return;
+        }
         if (!(event.getProjectile() instanceof AbstractArrow arrow)
                 || !FactionRangedWeaponService.isProtectedFactionProjectile(arrow.getWeaponItem())
                 || !(arrow.getOwner() instanceof LivingEntity shooter)

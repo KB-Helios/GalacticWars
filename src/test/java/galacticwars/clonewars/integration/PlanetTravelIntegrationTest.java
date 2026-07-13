@@ -11,6 +11,7 @@ public final class PlanetTravelIntegrationTest {
     public static void main(String[] args) throws IOException {
         String block = read("src/main/java/galacticwars/clonewars/settlement/CommandCenterBlock.java");
         String menu = read("src/main/java/galacticwars/clonewars/menu/CommandCenterNavigationMenu.java");
+        String menuProvider = read("src/main/java/galacticwars/clonewars/menu/CommandCenterNavigationMenuProvider.java");
         String service = read("src/main/java/galacticwars/clonewars/world/PlanetTravelService.java");
         String arrival = read("src/main/java/galacticwars/clonewars/world/PlanetArrivalService.java");
         String armyTravel = read("src/main/java/galacticwars/clonewars/army/ArmyTravelService.java");
@@ -19,6 +20,11 @@ public final class PlanetTravelIntegrationTest {
 
         assertContains(block, "new CommandCenterNavigationMenuProvider()", "post-pledge navigation entrypoint");
         assertContains(menu, "this.stillValid(player)", "server menu distance and ownership validation");
+        assertContains(menu, "size > MAX_PLANET_IDS", "navigation payload read cap");
+        assertContains(menuProvider, "planets.size() > CommandCenterNavigationMenu.MAX_PLANET_IDS",
+                "navigation payload write cap");
+        assertContains(menuProvider, "LaunchContentDefinitions.MAX_SERIALIZED_PLANET_ID_BYTES",
+                "navigation planet id wire limit");
         assertContains(service, "state.unlocks().contains(\"planet_travel\")", "Forward Base unlock validation");
         assertContains(service, "hall != null && hall.upkeepPaid()", "upkeep validation");
         assertContains(service, "player.teleportTo", "server dimension transfer");

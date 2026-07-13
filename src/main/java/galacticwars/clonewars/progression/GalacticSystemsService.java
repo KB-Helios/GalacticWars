@@ -1,28 +1,12 @@
 package galacticwars.clonewars.progression;
 
+import galacticwars.clonewars.data.LaunchContentDefinitions;
+
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
 public final class GalacticSystemsService {
-    private static final Set<String> REGIONS = Set.of(
-            "tatooine_spaceport", "geonosis_foundry", "kamino_platform", "coruscant_district");
-    private static final Map<String, String> VEHICLE_REQUIREMENTS = Map.of(
-            "barc_speeder", "republic_chapter_2",
-            "at_rt", "republic_chapter_3",
-            "stap", "separatist_chapter_2",
-            "aat", "separatist_chapter_3",
-            "laat_gunship", "vehicle_mastery");
-    private static final Map<String, String> FORCE_REQUIREMENTS = Map.of(
-            "light_push", "republic_chapter_2",
-            "light_pull", "republic_chapter_2",
-            "light_leap", "republic_chapter_3",
-            "dark_push", "nightsister_chapter_2",
-            "dark_choke", "nightsister_chapter_3",
-            "dark_dash", "nightsister_chapter_2");
-
     private GalacticSystemsService() {
     }
 
@@ -31,11 +15,20 @@ public final class GalacticSystemsService {
             UUID eventId,
             String vehicleId
     ) {
-        if (!LaunchContentCatalog.VEHICLES.contains(vehicleId)) {
+        return acquireVehicle(state, eventId, vehicleId, LaunchContentCatalog.data());
+    }
+
+    static SystemDecision acquireVehicle(
+            ProgressionState state,
+            UUID eventId,
+            String vehicleId,
+            LaunchContentDefinitions content
+    ) {
+        LaunchContentDefinitions.VehicleDefinition vehicle = content.vehicles().get(vehicleId);
+        if (vehicle == null) {
             return SystemDecision.rejected("unknown_vehicle", state);
         }
-        String requirement = VEHICLE_REQUIREMENTS.get(vehicleId);
-        if (!requirementSatisfied(state, requirement)) {
+        if (!requirementSatisfied(state, vehicle.requiredUnlock())) {
             return SystemDecision.rejected("vehicle_quest_locked", state);
         }
         return apply(state, new ProgressionEvent(eventId, state.playerId(),
@@ -47,27 +40,21 @@ public final class GalacticSystemsService {
             UUID eventId,
             String abilityId
     ) {
-        if (!LaunchContentCatalog.FORCE_ABILITIES.contains(abilityId)) {
+        return unlockForceAbility(state, eventId, abilityId, LaunchContentCatalog.data());
+    }
+
+    static SystemDecision unlockForceAbility(
+            ProgressionState state,
+            UUID eventId,
+            String abilityId,
+            LaunchContentDefinitions content
+    ) {
+        LaunchContentDefinitions.ForceAbilityDefinition ability =
+                content.forceAbilities().get(abilityId);
+        if (ability == null) {
             return SystemDecision.rejected("unknown_force_ability", state);
         }
-        if (!state.unlocks().contains("force_path")) {
-            return SystemDecision.rejected("force_path_locked", state);
-        }
-        if (!requirementSatisfied(state, FORCE_REQUIREMENTS.get(abilityId))) {
-            return SystemDecision.rejected("force_quest_locked", state);
-        }
-        if (state.hasSubject(ProgressionEventType.FORCE_ABILITY_UNLOCKED, abilityId)) {
-            return SystemDecision.duplicate(state);
-        }
-        String chosenPath = abilityId.substring(0, abilityId.indexOf('_'));
-        Set<String> unlocked = state.eventSubjects().getOrDefault(
-                ProgressionEventType.FORCE_ABILITY_UNLOCKED, Set.of());
-        boolean otherPath = unlocked.stream().anyMatch(existing -> !existing.startsWith(chosenPath + "_"));
-        if (otherPath) {
-            return SystemDecision.rejected("force_path_already_chosen", state);
-        }
-        return apply(state, new ProgressionEvent(eventId, state.playerId(),
-                ProgressionEventType.FORCE_ABILITY_UNLOCKED, abilityId, 1));
+        return SystemDecision.rejected("force_runtime_disabled", state);
     }
 
     /** @deprecated Runtime purchases must use physical Credit Chips through PhysicalTradeService. */
@@ -77,7 +64,16 @@ public final class GalacticSystemsService {
             UUID eventId,
             String tradeId
     ) {
-        LaunchContentCatalog.TradeDefinition trade = LaunchContentCatalog.TRADES.get(tradeId);
+        return purchase(state, eventId, tradeId, LaunchContentCatalog.data());
+    }
+
+    static SystemDecision purchase(
+            ProgressionState state,
+            UUID eventId,
+            String tradeId,
+            LaunchContentDefinitions content
+    ) {
+        LaunchContentDefinitions.TradeDefinition trade = content.trades().get(tradeId);
         if (trade == null) {
             return SystemDecision.rejected("unknown_trade", state);
         }
@@ -112,7 +108,16 @@ public final class GalacticSystemsService {
             UUID eventId,
             String regionId
     ) {
-        if (!REGIONS.contains(regionId)) {
+        return captureRegion(state, eventId, regionId, LaunchContentCatalog.data());
+    }
+
+    static SystemDecision captureRegion(
+            ProgressionState state,
+            UUID eventId,
+            String regionId,
+            LaunchContentDefinitions content
+    ) {
+        if (!content.conquestRegions().containsKey(regionId)) {
             return SystemDecision.rejected("unknown_region", state);
         }
         String factionPath = state.factionId().contains(":")

@@ -17,15 +17,23 @@ import java.util.Optional;
 import java.util.Set;
 
 import galacticwars.clonewars.GalacticWars;
+import galacticwars.clonewars.ability.AbilityActivation;
+import galacticwars.clonewars.ability.AbilityDefinition;
+import galacticwars.clonewars.ability.AbilityId;
+import galacticwars.clonewars.ability.AbilityKind;
 import galacticwars.clonewars.army.ArmyEquipmentLoadout;
 import galacticwars.clonewars.army.ArmyFormation;
 import galacticwars.clonewars.army.ArmyUnitCatalog;
 import galacticwars.clonewars.army.ArmyUnitDefinition;
 import galacticwars.clonewars.army.ArmyUnitId;
 import galacticwars.clonewars.army.ArmyUnitRole;
+import galacticwars.clonewars.classes.ProgressionRequirement;
+import galacticwars.clonewars.classes.UnitClassDefinition;
+import galacticwars.clonewars.classes.UnitClassId;
 import galacticwars.clonewars.faction.FactionCatalog;
 import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.faction.FactionId;
+import galacticwars.clonewars.faction.FactionRuntimePolicy;
 import galacticwars.clonewars.faction.FactionStrategyDefinition;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.settlement.BaseBlockPlacement;
@@ -76,12 +84,19 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
         try {
             Map<FactionId, FactionDefinition> factions = loadFactions(manager);
             List<ArmyUnitDefinition> units = loadUnits(manager, factions);
+            Map<AbilityId, AbilityDefinition> abilities = loadAbilities(manager);
+            Map<UnitClassId, UnitClassDefinition> unitClasses = loadUnitClasses(
+                    manager, factions, units, abilities);
+            Map<FactionId, FactionRuntimePolicy> factionPolicies = loadFactionPolicies(manager, factions);
             Map<String, KingdomBaseBlueprint> blueprints = loadBlueprints(manager);
             Map<String, CivilianArchetypeDefinition> civilianArchetypes = loadCivilianArchetypes(
                     manager, factions);
             Map<String, OverworldFactionSpawnProfile> overworldSpawnProfiles = loadOverworldSpawnProfiles(
                     manager, factions, units, civilianArchetypes);
-            LaunchContentValidator.validate(manager);
+            LaunchContentDefinitions launchContent = LaunchContentValidator.load(
+                    manager,
+                    factions.keySet().stream().map(FactionId::path)
+                            .collect(java.util.stream.Collectors.toSet()));
             validateRelations(factions);
             LinkedHashMap<String, ArmyUnitId> byEntityType = new LinkedHashMap<>();
             for (ArmyUnitDefinition unit : units) {
@@ -101,6 +116,10 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 requireRegistered(BuiltInRegistries.ITEM, faction.pledgeTokenItemId(),
                         "pledge token for " + faction.id());
             }
+            for (LaunchContentDefinitions.TradeDefinition trade : launchContent.trades().values()) {
+                requireRegistered(BuiltInRegistries.ITEM, trade.itemId(),
+                        "stock item for trade " + trade.id());
+            }
             for (KingdomBaseBlueprint blueprint : blueprints.values()) {
                 for (BaseBlockPlacement placement : blueprint.placements()) {
                     requireRegistered(BuiltInRegistries.BLOCK, placement.blockId(),
@@ -116,7 +135,11 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                     Map.of("galacticwars:mandalorian_rider", ArmyUnitId.of("galacticwars:mandalorian_warrior")),
                     blueprints,
                     overworldSpawnProfiles,
-                    civilianArchetypes);
+                    civilianArchetypes,
+                    abilities,
+                    unitClasses,
+                    factionPolicies,
+                    launchContent);
             return LoadResult.success(loaded);
         } catch (RuntimeException | IOException exception) {
             return LoadResult.failure(exception);
@@ -127,14 +150,30 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
     protected void apply(LoadResult result, ResourceManager manager, ProfilerFiller profiler) {
         if (result.snapshot().isPresent()) {
             snapshot = result.snapshot().orElseThrow();
+            LinkedHashMap<String, List<String>> launchUnits = new LinkedHashMap<>();
+            snapshot.factions().definitions().keySet().forEach(faction -> launchUnits.put(
+                    faction.path(), snapshot.units().definitions().values().stream()
+                            .filter(unit -> unit.factionId().equals(faction))
+                            .map(unit -> unit.id().path()).toList()));
+            LaunchContentRuntime.install(
+                    snapshot.launchContent(),
+                    snapshot.selectableFactions().stream().map(faction -> faction.id().toString()).toList(),
+                    launchUnits);
             generation++;
             GalacticWars.LOGGER.info(
-                    "Loaded {} factions, {} units, {} civilian archetypes, {} base blueprints, {} Overworld spawn profiles, and the validated launch progression catalogs",
+                    "Loaded {} factions, {} units, {} classes, {} abilities, {} faction policies, {} civilian archetypes, {} base blueprints, {} Overworld spawn profiles, {} quests, {} trades, {} vehicles, and {} planets",
                     snapshot.factions().definitions().size(),
                     snapshot.units().definitions().size(),
+                    snapshot.unitClasses().size(),
+                    snapshot.abilities().size(),
+                    snapshot.factionPolicies().size(),
                     snapshot.civilianArchetypesByEntityType().size(),
                     snapshot.blueprints().size(),
-                    snapshot.overworldSpawnProfiles().size());
+                    snapshot.overworldSpawnProfiles().size(),
+                    snapshot.launchContent().quests().size(),
+                    snapshot.launchContent().trades().size(),
+                    snapshot.launchContent().vehicles().size(),
+                    snapshot.launchContent().planets().size());
         } else {
             GalacticWars.LOGGER.error(
                     "Rejected gameplay data reload; retaining the previous valid snapshot",
@@ -228,6 +267,131 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
             throw new IllegalArgumentException("No army unit definitions were loaded");
         }
         return List.copyOf(definitions);
+    }
+
+    private static Map<AbilityId, AbilityDefinition> loadAbilities(ResourceManager manager) throws IOException {
+        LinkedHashMap<AbilityId, AbilityDefinition> definitions = new LinkedHashMap<>();
+        for (ResourceJson resource : resources(manager, "galacticwars/abilities")) {
+            requireSchema(resource, 1);
+            for (JsonObject json : definitionObjects(resource, "abilities")) {
+                AbilityDefinition definition = new AbilityDefinition(
+                        AbilityId.of(requiredString(json, "id", resource.id())),
+                        requiredString(json, "display_name", resource.id()),
+                        AbilityKind.valueOf(requiredString(json, "kind", resource.id())
+                                .toUpperCase(Locale.ROOT)),
+                        AbilityActivation.valueOf(requiredString(json, "activation", resource.id())
+                                .toUpperCase(Locale.ROOT)),
+                        integer(json, "cooldown_ticks", 0),
+                        integer(json, "resource_cost", 0),
+                        decimal(json, "range", 0.0D),
+                        integer(json, "ai_interval_ticks", 20),
+                        bool(json, "enabled", true));
+                if (definitions.putIfAbsent(definition.id(), definition) != null) {
+                    throw new IllegalArgumentException("Duplicate ability id " + definition.id()
+                            + " in " + resource.id());
+                }
+            }
+        }
+        if (definitions.isEmpty()) {
+            throw new IllegalArgumentException("No ability definitions were loaded");
+        }
+        return Map.copyOf(definitions);
+    }
+
+    private static Map<UnitClassId, UnitClassDefinition> loadUnitClasses(
+            ResourceManager manager,
+            Map<FactionId, FactionDefinition> factions,
+            List<ArmyUnitDefinition> units,
+            Map<AbilityId, AbilityDefinition> abilities
+    ) throws IOException {
+        LinkedHashMap<ArmyUnitId, ArmyUnitDefinition> unitsById = new LinkedHashMap<>();
+        for (ArmyUnitDefinition unit : units) {
+            unitsById.put(unit.id(), unit);
+        }
+        LinkedHashMap<UnitClassId, UnitClassDefinition> definitions = new LinkedHashMap<>();
+        LinkedHashSet<ArmyUnitId> representedUnits = new LinkedHashSet<>();
+        for (ResourceJson resource : resources(manager, "galacticwars/classes")) {
+            requireSchema(resource, 1);
+            for (JsonObject json : definitionObjects(resource, "classes")) {
+                FactionId factionId = FactionId.of(requiredString(json, "faction", resource.id()));
+                ArmyUnitId unitId = ArmyUnitId.of(requiredString(json, "unit", resource.id()));
+                ArmyUnitDefinition unit = unitsById.get(unitId);
+                if (!factions.containsKey(factionId)) {
+                    throw new IllegalArgumentException("Class references unknown faction " + factionId);
+                }
+                if (unit == null || !unit.factionId().equals(factionId)) {
+                    throw new IllegalArgumentException("Class unit " + unitId
+                            + " is missing or does not belong to " + factionId);
+                }
+                List<AbilityId> abilityIds = strings(json, "abilities").stream().map(AbilityId::of).toList();
+                for (AbilityId abilityId : abilityIds) {
+                    if (!abilities.containsKey(abilityId)) {
+                        throw new IllegalArgumentException("Class references unknown ability " + abilityId);
+                    }
+                }
+                ArrayList<ProgressionRequirement> requirements = new ArrayList<>();
+                JsonArray requirementArray = json.has("requirements")
+                        ? json.getAsJsonArray("requirements") : new JsonArray();
+                for (JsonElement element : requirementArray) {
+                    JsonObject requirement = element.getAsJsonObject();
+                    requirements.add(new ProgressionRequirement(
+                            requiredString(requirement, "type", resource.id()),
+                            requiredString(requirement, "subject", resource.id()),
+                            integer(requirement, "amount", 1)));
+                }
+                UnitClassDefinition definition = new UnitClassDefinition(
+                        UnitClassId.of(requiredString(json, "id", resource.id())),
+                        requiredString(json, "display_name", resource.id()),
+                        factionId,
+                        unitId,
+                        bool(json, "player_assignable", false),
+                        abilityIds,
+                        requirements,
+                        string(json, "force_path_slot", ""));
+                if (definitions.putIfAbsent(definition.id(), definition) != null) {
+                    throw new IllegalArgumentException("Duplicate class id " + definition.id()
+                            + " in " + resource.id());
+                }
+                if (!representedUnits.add(unitId)) {
+                    throw new IllegalArgumentException("Multiple classes target unit " + unitId);
+                }
+            }
+        }
+        if (!representedUnits.equals(unitsById.keySet())) {
+            LinkedHashSet<ArmyUnitId> missing = new LinkedHashSet<>(unitsById.keySet());
+            missing.removeAll(representedUnits);
+            throw new IllegalArgumentException("Every launch unit requires one class; missing " + missing);
+        }
+        return Map.copyOf(definitions);
+    }
+
+    private static Map<FactionId, FactionRuntimePolicy> loadFactionPolicies(
+            ResourceManager manager,
+            Map<FactionId, FactionDefinition> factions
+    ) throws IOException {
+        LinkedHashMap<FactionId, FactionRuntimePolicy> policies = new LinkedHashMap<>();
+        for (ResourceJson resource : resources(manager, "galacticwars/faction_policies")) {
+            requireSchema(resource, 1);
+            for (JsonObject json : definitionObjects(resource, "policies")) {
+                FactionId factionId = FactionId.of(requiredString(json, "faction", resource.id()));
+                if (!factions.containsKey(factionId)) {
+                    throw new IllegalArgumentException("Policy references unknown faction " + factionId);
+                }
+                FactionRuntimePolicy policy = new FactionRuntimePolicy(
+                        factionId,
+                        Set.copyOf(strings(json, "traits")),
+                        integerMap(json, "modifiers", resource.id()));
+                if (policies.putIfAbsent(factionId, policy) != null) {
+                    throw new IllegalArgumentException("Duplicate faction policy for " + factionId);
+                }
+            }
+        }
+        if (!policies.keySet().equals(factions.keySet())) {
+            LinkedHashSet<FactionId> missing = new LinkedHashSet<>(factions.keySet());
+            missing.removeAll(policies.keySet());
+            throw new IllegalArgumentException("Every faction requires one runtime policy; missing " + missing);
+        }
+        return Map.copyOf(policies);
     }
 
     private static Map<String, KingdomBaseBlueprint> loadBlueprints(ResourceManager manager) throws IOException {
@@ -421,6 +585,57 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
         return Set.copyOf(result);
     }
 
+    private static List<JsonObject> definitionObjects(ResourceJson resource, String arrayKey) {
+        if (!resource.json().has(arrayKey)) {
+            return List.of(resource.json());
+        }
+        JsonArray array = requiredArray(resource.json(), arrayKey, resource.id());
+        ArrayList<JsonObject> definitions = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (!element.isJsonObject()) {
+                throw new IllegalArgumentException("Resource " + resource.id()
+                        + " contains a non-object in " + arrayKey);
+            }
+            definitions.add(element.getAsJsonObject());
+        }
+        return List.copyOf(definitions);
+    }
+
+    private static void requireSchema(ResourceJson resource, int supported) {
+        int schema = integer(resource.json(), "schema_version", -1);
+        if (schema != supported) {
+            throw new IllegalArgumentException("Unsupported schema " + schema + " in " + resource.id());
+        }
+    }
+
+    private static List<String> strings(JsonObject json, String key) {
+        if (!json.has(key)) {
+            return List.of();
+        }
+        ArrayList<String> values = new ArrayList<>();
+        for (JsonElement element : json.getAsJsonArray(key)) {
+            String value = element.getAsString().trim().toLowerCase(Locale.ROOT);
+            if (value.isEmpty()) {
+                throw new IllegalArgumentException(key + " cannot contain a blank value");
+            }
+            values.add(value);
+        }
+        return List.copyOf(values);
+    }
+
+    private static Map<String, Integer> integerMap(
+            JsonObject json,
+            String key,
+            Identifier resourceId
+    ) {
+        JsonObject object = requiredObject(json, key, resourceId);
+        LinkedHashMap<String, Integer> values = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+            values.put(entry.getKey(), entry.getValue().getAsInt());
+        }
+        return Map.copyOf(values);
+    }
+
     private static String requiredString(JsonObject json, String key, Identifier resourceId) {
         if (!json.has(key) || json.get(key).getAsString().isBlank()) {
             throw new IllegalArgumentException("Resource " + resourceId + " is missing " + key);
@@ -465,6 +680,10 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
         return json.has(key) ? json.get(key).getAsDouble() : fallback;
     }
 
+    private static boolean bool(JsonObject json, String key, boolean fallback) {
+        return json.has(key) ? json.get(key).getAsBoolean() : fallback;
+    }
+
     private static void validateEquipment(ArmyUnitDefinition unit) {
         ArmyEquipmentLoadout equipment = unit.equipment();
         for (String itemId : List.of(
@@ -502,7 +721,11 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 Map.of("galacticwars:mandalorian_rider", ArmyUnitId.of("galacticwars:mandalorian_warrior")),
                 indexed,
                 Map.of(),
-                Map.of());
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                LaunchContentDefinitions.empty());
     }
 
     record LoadResult(Optional<GameplayDataSnapshot> snapshot, Optional<Throwable> failure) {

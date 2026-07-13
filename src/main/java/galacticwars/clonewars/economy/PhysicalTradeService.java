@@ -1,6 +1,7 @@
 package galacticwars.clonewars.economy;
 
 import galacticwars.clonewars.progression.LaunchContentCatalog;
+import galacticwars.clonewars.data.LaunchContentDefinitions;
 import galacticwars.clonewars.progression.ProgressionDecision;
 import galacticwars.clonewars.progression.ProgressionEvent;
 import galacticwars.clonewars.progression.ProgressionEventType;
@@ -25,7 +26,7 @@ public final class PhysicalTradeService {
         if (tradeId == null) {
             return TradeResult.rejected("unknown_trade");
         }
-        LaunchContentCatalog.TradeDefinition trade = LaunchContentCatalog.TRADES.get(tradeId);
+        LaunchContentDefinitions.TradeDefinition trade = LaunchContentCatalog.trades().get(tradeId);
         if (trade == null) {
             return TradeResult.rejected("unknown_trade");
         }

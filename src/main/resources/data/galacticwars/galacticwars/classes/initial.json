@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "classes": [
+    {"id":"galacticwars:clone_trooper","display_name":"Clone Trooper","faction":"galacticwars:republic","unit":"galacticwars:clone_trooper","player_assignable":true,"abilities":["galacticwars:suppressive_fire","galacticwars:formation_discipline"],"requirements":[]},
+    {"id":"galacticwars:arc_trooper","display_name":"ARC Trooper","faction":"galacticwars:republic","unit":"galacticwars:arc_trooper","player_assignable":true,"abilities":["galacticwars:tactical_scan","galacticwars:combat_mobility"],"requirements":[]},
+    {"id":"galacticwars:jedi_guardian","display_name":"Jedi Guardian","faction":"galacticwars:republic","unit":"galacticwars:jedi_knight","player_assignable":true,"abilities":["galacticwars:saber_guard","galacticwars:guardian_rally"],"requirements":[{"type":"quest","subject":"republic_chapter_2","amount":1}],"force_path_slot":"light"},
+
+    {"id":"galacticwars:b1_line_droid","display_name":"B1 Line Droid","faction":"galacticwars:separatist","unit":"galacticwars:b1_battle_droid","player_assignable":true,"abilities":["galacticwars:networked_volley","galacticwars:droid_link"],"requirements":[]},
+    {"id":"galacticwars:b2_heavy_droid","display_name":"B2 Heavy Droid","faction":"galacticwars:separatist","unit":"galacticwars:b2_super_battle_droid","player_assignable":true,"abilities":["galacticwars:brace","galacticwars:heavy_fire"],"requirements":[]},
+    {"id":"galacticwars:commando_droid","display_name":"Commando Droid","faction":"galacticwars:separatist","unit":"galacticwars:commando_droid","player_assignable":true,"abilities":["galacticwars:ambush_dash","galacticwars:target_disruption"],"requirements":[]},
+
+    {"id":"galacticwars:mandalorian_warrior","display_name":"Mandalorian Warrior","faction":"galacticwars:mandalorian","unit":"galacticwars:mandalorian_warrior","player_assignable":true,"abilities":["galacticwars:close_assault_roll","galacticwars:beskar_training"],"requirements":[]},
+    {"id":"galacticwars:mandalorian_marksman","display_name":"Mandalorian Marksman","faction":"galacticwars:mandalorian","unit":"galacticwars:mandalorian_marksman","player_assignable":true,"abilities":["galacticwars:target_paint","galacticwars:steady_aim"],"requirements":[]},
+    {"id":"galacticwars:mandalorian_heavy","display_name":"Mandalorian Heavy","faction":"galacticwars:mandalorian","unit":"galacticwars:mandalorian_heavy","player_assignable":true,"abilities":["galacticwars:braced_barrage","galacticwars:heavy_resistance"],"requirements":[]},
+
+    {"id":"galacticwars:hutt_enforcer","display_name":"Hutt Enforcer","faction":"galacticwars:hutt_cartel","unit":"galacticwars:hutt_enforcer","player_assignable":true,"abilities":["galacticwars:intimidation","galacticwars:streetwise"],"requirements":[]},
+    {"id":"galacticwars:bounty_hunter","display_name":"Bounty Hunter","faction":"galacticwars:hutt_cartel","unit":"galacticwars:bounty_hunter","player_assignable":true,"abilities":["galacticwars:marked_quarry","galacticwars:bounty_focus"],"requirements":[]},
+    {"id":"galacticwars:smuggler","display_name":"Smuggler","faction":"galacticwars:hutt_cartel","unit":"galacticwars:smuggler","player_assignable":true,"abilities":["galacticwars:quick_draw","galacticwars:smoke_charge"],"requirements":[]},
+
+    {"id":"galacticwars:nightsister_acolyte","display_name":"Nightsister Acolyte","faction":"galacticwars:nightsister","unit":"galacticwars:nightsister_acolyte","player_assignable":true,"abilities":["galacticwars:blade_dance","galacticwars:defensive_ward"],"requirements":[]},
+    {"id":"galacticwars:nightsister_archer","display_name":"Nightsister Archer","faction":"galacticwars:nightsister","unit":"galacticwars:nightsister_archer","player_assignable":true,"abilities":["galacticwars:crippling_shot","galacticwars:hunter_patience"],"requirements":[]},
+    {"id":"galacticwars:nightbrother_brute","display_name":"Nightbrother Brute","faction":"galacticwars:nightsister","unit":"galacticwars:nightbrother_brute","player_assignable":true,"abilities":["galacticwars:berserk","galacticwars:knockback_resistance"],"requirements":[]}
+  ]
+}

@@ -25,6 +25,10 @@ public class Config {
             .comment("Whether Force abilities may directly affect other players")
             .define("allowForcePvp", true);
 
+    public static final ModConfigSpec.BooleanValue ALLOW_CLASS_PVP = BUILDER
+            .comment("Whether non-Force class abilities may directly affect other players")
+            .define("allowClassPvp", false);
+
     static final ModConfigSpec SPEC = BUILDER.build();
 
     public static void save() {

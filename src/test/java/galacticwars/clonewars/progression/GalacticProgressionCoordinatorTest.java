@@ -1,9 +1,15 @@
 package galacticwars.clonewars.progression;
 
+import galacticwars.clonewars.data.LaunchContentDefinitions;
+import galacticwars.clonewars.data.LaunchContentRuntime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class GalacticProgressionCoordinatorTest {
     public static void main(String[] args) {
+        installContent();
         UUID player = UUID.randomUUID();
         ProgressionState state = ProgressionState.create(player);
         state = accepted(state, event(player, ProgressionEventType.FACTION_PLEDGED, "galacticwars:republic", 1));
@@ -74,6 +80,45 @@ public final class GalacticProgressionCoordinatorTest {
         assertTrue(!mandalorian.unlocks().contains("force_path"),
                 "Mandalorian chapter 2 does not receive the Republic/Nightsister Force reward");
         System.out.println("GalacticProgressionCoordinatorTest passed");
+    }
+
+    private static void installContent() {
+        Map<String, LaunchContentDefinitions.PlanetDefinition> planets = Map.of(
+                "tatooine", planet("tatooine", "hutt_cartel"),
+                "geonosis", planet("geonosis", "separatist"),
+                "kamino", planet("kamino", "republic"),
+                "coruscant", planet("coruscant", "republic"));
+        Map<String, LaunchContentDefinitions.QuestDefinition> quests = Map.of(
+                "republic_chapter_1", quest("republic_chapter_1",
+                        List.of("faction_pledged", "command_center", "clone_trooper"), 40,
+                        Set.of("workforce")),
+                "republic_chapter_2", quest("republic_chapter_2",
+                        List.of("delivery_completed", "forward_base", "kamino"), 70,
+                        Set.of("barc_speeder", "force_path")),
+                "nightsister_chapter_1", quest("nightsister_chapter_1",
+                        List.of("faction_pledged", "command_center", "nightsister_acolyte"), 40,
+                        Set.of("workforce")),
+                "mandalorian_chapter_1", quest("mandalorian_chapter_1",
+                        List.of("faction_pledged", "command_center", "mandalorian_warrior"), 40,
+                        Set.of("workforce")),
+                "mandalorian_chapter_2", quest("mandalorian_chapter_2",
+                        List.of("delivery_completed", "beskar_ingot", "tatooine"), 75,
+                        Set.of("vehicle_crafting")));
+        LaunchContentRuntime.install(
+                new LaunchContentDefinitions(planets, Map.of(), Map.of(), quests, Map.of(), Map.of()),
+                List.of("galacticwars:republic", "galacticwars:mandalorian", "galacticwars:nightsister"),
+                Map.of());
+    }
+
+    private static LaunchContentDefinitions.PlanetDefinition planet(String id, String faction) {
+        return new LaunchContentDefinitions.PlanetDefinition(
+                id, "galacticwars:" + id, "arrival", "theme", faction);
+    }
+
+    private static LaunchContentDefinitions.QuestDefinition quest(
+            String id, List<String> objectives, int credits, Set<String> unlocks
+    ) {
+        return new LaunchContentDefinitions.QuestDefinition(id, objectives, credits, unlocks);
     }
 
     private static ProgressionEvent event(UUID player, ProgressionEventType type, String subject, int amount) {

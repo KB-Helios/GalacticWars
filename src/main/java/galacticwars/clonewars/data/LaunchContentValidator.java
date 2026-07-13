@@ -5,176 +5,184 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import galacticwars.clonewars.GalacticWars;
-import galacticwars.clonewars.progression.LaunchContentCatalog;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 final class LaunchContentValidator {
+    private static final Set<String> RUNTIME_UNLOCKS = Set.of(
+            "faction_intro", "treasury", "recruitment", "workforce",
+            "commander", "planet_travel", "vehicle_crafting", "advanced_trading",
+            "vehicle_control", "veteran_trades");
+
     private LaunchContentValidator() {
     }
 
-    static void validate(ResourceManager manager) throws IOException {
-        assertIds(manager, "planets", "planets", Set.copyOf(LaunchContentCatalog.PLANETS));
-        assertIds(manager, "vehicles", "vehicles", Set.copyOf(LaunchContentCatalog.VEHICLES));
-        assertIds(manager, "force_abilities", "abilities", LaunchContentCatalog.FORCE_ABILITIES);
-        assertIds(manager, "quests", "quests", Set.copyOf(LaunchContentCatalog.QUESTS));
-        assertIds(manager, "trades", "trades", LaunchContentCatalog.TRADES.keySet());
-        assertQuestContracts(manager);
-        assertTradeContracts(manager);
-        assertCount(manager, "conquest_regions", "regions", 4);
-        assertRegionRewards(manager);
+    static LaunchContentDefinitions load(ResourceManager manager, Set<String> factionIds) throws IOException {
+        Map<String, LaunchContentDefinitions.PlanetDefinition> planets = loadPlanets(manager, factionIds);
+        Map<String, LaunchContentDefinitions.VehicleDefinition> vehicles = loadVehicles(manager);
+        Map<String, LaunchContentDefinitions.ForceAbilityDefinition> forceAbilities = loadForceAbilities(manager);
+        Map<String, LaunchContentDefinitions.QuestDefinition> quests = loadQuests(manager);
+        Map<String, LaunchContentDefinitions.TradeDefinition> trades = loadTrades(manager, factionIds);
+        Map<String, LaunchContentDefinitions.ConquestRegionDefinition> regions = loadRegions(manager, planets.keySet());
+        requireCount("planets", planets, 4);
+        requireCount("vehicles", vehicles, 5);
+        requireCount("force abilities", forceAbilities, 6);
+        requireCount("quests", quests, 15);
+        requireCount("trades", trades, 5);
+        requireCount("conquest regions", regions, 4);
+        validateReferences(vehicles, forceAbilities, quests, trades);
+        return new LaunchContentDefinitions(planets, vehicles, forceAbilities, quests, trades, regions);
     }
 
-    private static void assertQuestContracts(ResourceManager manager) throws IOException {
-        FileToIdConverter converter = FileToIdConverter.json("galacticwars/quests");
-        Map<String, Set<String>> actualUnlocks = new HashMap<>();
-        Map<String, java.util.List<String>> actualObjectives = new HashMap<>();
-        Map<String, Integer> actualRewards = new HashMap<>();
-        for (Map.Entry<Identifier, Resource> entry
-                : converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID).entrySet()) {
-            try (BufferedReader reader = entry.getValue().openAsReader()) {
-                JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
-                JsonArray quests = json.getAsJsonArray("quests");
-                if (quests == null) {
-                    throw new IllegalArgumentException("Missing quests in " + entry.getKey());
-                }
-                for (JsonElement element : quests) {
-                    JsonObject quest = element.getAsJsonObject();
-                    String id = quest.get("id").getAsString();
-                    JsonArray unlocksJson = quest.getAsJsonArray("unlocks");
-                    JsonArray objectivesJson = quest.getAsJsonArray("objectives");
-                    if (unlocksJson == null || objectivesJson == null || !quest.has("reward_credits")) {
-                        throw new IllegalArgumentException("Quest " + id + " has an incomplete progression contract");
-                    }
-                    HashSet<String> unlocks = new HashSet<>();
-                    unlocksJson.forEach(unlock -> unlocks.add(unlock.getAsString()));
-                    java.util.ArrayList<String> objectives = new java.util.ArrayList<>();
-                    objectivesJson.forEach(objective -> objectives.add(objective.getAsString()));
-                    if (actualUnlocks.putIfAbsent(id, Set.copyOf(unlocks)) != null) {
-                        throw new IllegalArgumentException("Duplicate quest id " + id);
-                    }
-                    actualObjectives.put(id, java.util.List.copyOf(objectives));
-                    actualRewards.put(id, quest.get("reward_credits").getAsInt());
-                }
+    static void validateReferences(
+            Map<String, LaunchContentDefinitions.VehicleDefinition> vehicles,
+            Map<String, LaunchContentDefinitions.ForceAbilityDefinition> forceAbilities,
+            Map<String, LaunchContentDefinitions.QuestDefinition> quests,
+            Map<String, LaunchContentDefinitions.TradeDefinition> trades
+    ) {
+        LinkedHashSet<String> knownUnlocks = new LinkedHashSet<>(RUNTIME_UNLOCKS);
+        knownUnlocks.addAll(quests.keySet());
+        quests.values().forEach(quest -> knownUnlocks.addAll(quest.unlocks()));
+        for (LaunchContentDefinitions.ForceAbilityDefinition ability : forceAbilities.values()) {
+            if (!quests.containsKey(ability.requiredQuest())) {
+                throw new IllegalArgumentException("Force ability " + ability.id() + " references unknown quest");
             }
         }
-        if (!actualUnlocks.equals(LaunchContentCatalog.QUEST_UNLOCKS)
-                || !actualObjectives.equals(LaunchContentCatalog.QUEST_OBJECTIVES)
-                || !actualRewards.equals(LaunchContentCatalog.QUEST_REWARD_CREDITS)) {
-            throw new IllegalArgumentException("Quest unlocks do not match launch data contract; expected "
-                    + LaunchContentCatalog.QUEST_UNLOCKS + " but found " + actualUnlocks);
-        }
-    }
-
-    private static void assertRegionRewards(ResourceManager manager) throws IOException {
-        FileToIdConverter converter = FileToIdConverter.json("galacticwars/conquest_regions");
-        Map<String, Integer> actual = new HashMap<>();
-        for (Map.Entry<Identifier, Resource> entry
-                : converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID).entrySet()) {
-            try (BufferedReader reader = entry.getValue().openAsReader()) {
-                JsonArray regions = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonArray("regions");
-                for (JsonElement element : regions) {
-                    JsonObject region = element.getAsJsonObject();
-                    String id = region.get("id").getAsString();
-                    if (!region.has("reward_credits")
-                            || actual.putIfAbsent(id, region.get("reward_credits").getAsInt()) != null) {
-                        throw new IllegalArgumentException("Invalid conquest reward contract for " + id);
-                    }
-                }
+        for (LaunchContentDefinitions.VehicleDefinition vehicle : vehicles.values()) {
+            if (!knownUnlocks.contains(vehicle.requiredUnlock())) {
+                throw new IllegalArgumentException("Vehicle " + vehicle.id() + " references unknown unlock");
             }
         }
-        if (!actual.equals(LaunchContentCatalog.REGION_REWARD_CREDITS)) {
-            throw new IllegalArgumentException("Conquest rewards do not match launch data contract");
-        }
-    }
-
-    private static void assertTradeContracts(ResourceManager manager) throws IOException {
-        FileToIdConverter converter = FileToIdConverter.json("galacticwars/trades");
-        Map<String, LaunchContentCatalog.TradeDefinition> actual = new HashMap<>();
-        for (Map.Entry<Identifier, Resource> entry
-                : converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID).entrySet()) {
-            try (BufferedReader reader = entry.getValue().openAsReader()) {
-                JsonArray trades = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonArray("trades");
-                if (trades == null) {
-                    throw new IllegalArgumentException("Missing trades in " + entry.getKey());
-                }
-                for (JsonElement element : trades) {
-                    JsonObject trade = element.getAsJsonObject();
-                    String id = trade.get("id").getAsString();
-                    LaunchContentCatalog.TradeDefinition definition = new LaunchContentCatalog.TradeDefinition(
-                            trade.get("faction").getAsString(),
-                            trade.get("cost").getAsInt(),
-                            trade.get("item").getAsString(),
-                            trade.get("count").getAsInt(),
-                            trade.get("unlock").getAsString());
-                    if (actual.putIfAbsent(id, definition) != null) {
-                        throw new IllegalArgumentException("Duplicate trade id " + id);
-                    }
-                }
+        for (LaunchContentDefinitions.TradeDefinition trade : trades.values()) {
+            if (!knownUnlocks.contains(trade.requiredUnlock())) {
+                throw new IllegalArgumentException("Trade " + trade.id() + " references unknown unlock");
             }
         }
-        if (!actual.equals(LaunchContentCatalog.TRADES)) {
-            throw new IllegalArgumentException("Trade definitions do not match launch data contract");
-        }
     }
 
-    private static void assertIds(
-            ResourceManager manager,
-            String directory,
-            String arrayName,
-            Set<String> expected
-    ) throws IOException {
-        Set<String> actual = ids(manager, directory, arrayName);
-        if (!actual.equals(expected)) {
-            throw new IllegalArgumentException(directory + " ids do not match launch contract; expected "
-                    + expected + " but found " + actual);
+    private static Map<String, LaunchContentDefinitions.PlanetDefinition> loadPlanets(
+            ResourceManager manager, Set<String> factions) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.PlanetDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "planets", "planets")) {
+            var definition = new LaunchContentDefinitions.PlanetDefinition(
+                    string(json, "id"), string(json, "dimension"), string(json, "arrival"),
+                    string(json, "theme"), string(json, "faction"));
+            if (!factions.contains(definition.factionId())) throw new IllegalArgumentException("Unknown planet faction " + definition.factionId());
+            put(result, definition.id(), definition, "planet");
         }
+        return result;
     }
 
-    private static void assertCount(ResourceManager manager, String directory, String arrayName, int expected)
-            throws IOException {
-        int actual = ids(manager, directory, arrayName).size();
-        if (actual != expected) {
-            throw new IllegalArgumentException(directory + " expected " + expected + " entries but found " + actual);
+    private static Map<String, LaunchContentDefinitions.VehicleDefinition> loadVehicles(ResourceManager manager) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.VehicleDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "vehicles", "vehicles")) {
+            var definition = new LaunchContentDefinitions.VehicleDefinition(
+                    string(json, "id"), string(json, "movement"), integer(json, "seats"),
+                    integer(json, "max_health"), integer(json, "fuel_capacity"), string(json, "unlock"));
+            put(result, definition.id(), definition, "vehicle");
         }
+        return result;
     }
 
-    private static Set<String> ids(ResourceManager manager, String directory, String arrayName) throws IOException {
+    private static Map<String, LaunchContentDefinitions.ForceAbilityDefinition> loadForceAbilities(ResourceManager manager) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.ForceAbilityDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "force_abilities", "abilities")) {
+            var definition = new LaunchContentDefinitions.ForceAbilityDefinition(
+                    string(json, "id"), string(json, "path"), integer(json, "energy"),
+                    integer(json, "cooldown_ticks"), string(json, "quest"), false);
+            put(result, definition.id(), definition, "Force ability");
+        }
+        return result;
+    }
+
+    private static Map<String, LaunchContentDefinitions.QuestDefinition> loadQuests(ResourceManager manager) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.QuestDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "quests", "quests")) {
+            var definition = new LaunchContentDefinitions.QuestDefinition(
+                    string(json, "id"), strings(json, "objectives"), integer(json, "reward_credits"),
+                    Set.copyOf(strings(json, "unlocks")));
+            put(result, definition.id(), definition, "quest");
+        }
+        return result;
+    }
+
+    private static Map<String, LaunchContentDefinitions.TradeDefinition> loadTrades(
+            ResourceManager manager, Set<String> factions) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.TradeDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "trades", "trades")) {
+            var definition = new LaunchContentDefinitions.TradeDefinition(
+                    string(json, "id"), string(json, "faction"), integer(json, "cost"),
+                    string(json, "item"), integer(json, "count"), string(json, "unlock"));
+            if (!factions.contains(definition.factionId())) throw new IllegalArgumentException("Unknown trade faction " + definition.factionId());
+            put(result, definition.id(), definition, "trade");
+        }
+        return result;
+    }
+
+    private static Map<String, LaunchContentDefinitions.ConquestRegionDefinition> loadRegions(
+            ResourceManager manager, Set<String> planetIds) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.ConquestRegionDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "conquest_regions", "regions")) {
+            var definition = new LaunchContentDefinitions.ConquestRegionDefinition(
+                    string(json, "id"), string(json, "planet"), integer(json, "protected_radius"),
+                    integer(json, "capture_ticks"), integer(json, "reward_credits"));
+            if (!planetIds.contains(definition.planetId())) throw new IllegalArgumentException("Unknown region planet " + definition.planetId());
+            put(result, definition.id(), definition, "conquest region");
+        }
+        return result;
+    }
+
+    private static List<JsonObject> objects(ResourceManager manager, String directory, String array) throws IOException {
         FileToIdConverter converter = FileToIdConverter.json("galacticwars/" + directory);
-        HashSet<String> ids = new HashSet<>();
         Map<Identifier, Resource> resources = converter.listMatchingResourcesFromNamespace(manager, GalacticWars.MODID);
-        if (resources.isEmpty()) {
-            throw new IllegalArgumentException("Missing launch content directory " + directory);
-        }
+        if (resources.isEmpty()) throw new IllegalArgumentException("Missing launch content directory " + directory);
+        java.util.ArrayList<JsonObject> result = new java.util.ArrayList<>();
         for (Map.Entry<Identifier, Resource> entry : resources.entrySet()) {
             try (BufferedReader reader = entry.getValue().openAsReader()) {
-                JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
-                int schema = json.has("schema_version") ? json.get("schema_version").getAsInt() : 0;
-                if (schema != 1) {
-                    throw new IllegalArgumentException("Unsupported " + directory + " schema " + schema
-                            + " in " + entry.getKey());
+                JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
+                if (!root.has("schema_version") || root.get("schema_version").getAsInt() != 1) {
+                    throw new IllegalArgumentException("Unsupported " + directory + " schema in " + entry.getKey());
                 }
-                JsonArray definitions = json.getAsJsonArray(arrayName);
-                if (definitions == null) {
-                    throw new IllegalArgumentException("Missing " + arrayName + " in " + entry.getKey());
-                }
-                for (JsonElement element : definitions) {
-                    String id = element.getAsJsonObject().get("id").getAsString();
-                    if (!ids.add(id)) {
-                        throw new IllegalArgumentException("Duplicate " + directory + " id " + id);
-                    }
-                }
+                JsonArray values = root.getAsJsonArray(array);
+                if (values == null) throw new IllegalArgumentException("Missing " + array + " in " + entry.getKey());
+                for (JsonElement value : values) result.add(value.getAsJsonObject());
             }
         }
-        return Set.copyOf(ids);
+        return List.copyOf(result);
+    }
+
+    private static String string(JsonObject json, String key) {
+        if (!json.has(key) || json.get(key).getAsString().isBlank()) throw new IllegalArgumentException("Missing " + key);
+        return json.get(key).getAsString();
+    }
+
+    private static int integer(JsonObject json, String key) {
+        if (!json.has(key)) throw new IllegalArgumentException("Missing " + key);
+        return json.get(key).getAsInt();
+    }
+
+    private static List<String> strings(JsonObject json, String key) {
+        JsonArray values = json.getAsJsonArray(key);
+        if (values == null) throw new IllegalArgumentException("Missing " + key);
+        java.util.ArrayList<String> result = new java.util.ArrayList<>();
+        values.forEach(value -> result.add(value.getAsString()));
+        return List.copyOf(result);
+    }
+
+    private static <V> void put(Map<String, V> target, String id, V value, String label) {
+        if (target.putIfAbsent(id, value) != null) throw new IllegalArgumentException("Duplicate " + label + " " + id);
+    }
+
+    private static void requireCount(String label, Map<?, ?> values, int expected) {
+        if (values.size() != expected) throw new IllegalArgumentException(label + " expected " + expected + " entries but found " + values.size());
     }
 }

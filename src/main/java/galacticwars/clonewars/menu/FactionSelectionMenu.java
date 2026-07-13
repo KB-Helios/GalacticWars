@@ -11,7 +11,6 @@ import galacticwars.clonewars.kingdom.KingdomGameplayAction;
 import galacticwars.clonewars.kingdom.KingdomGameplayResult;
 import galacticwars.clonewars.kingdom.KingdomGameplayRuntimeService;
 import galacticwars.clonewars.progression.ProgressionEventType;
-import galacticwars.clonewars.progression.LaunchContentCatalog;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.progression.ProgressionState;
 import galacticwars.clonewars.registry.ModMenuTypes;
@@ -30,9 +29,6 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 
 public final class FactionSelectionMenu extends AbstractContainerMenu {
-    @Deprecated
-    public static final List<String> FACTION_IDS = LaunchContentCatalog.FACTIONS;
-
     private final BlockPos commandCenterPos;
     private final List<String> factionIds;
 

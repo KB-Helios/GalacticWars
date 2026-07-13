@@ -12,9 +12,14 @@ import java.util.Optional;
 import galacticwars.clonewars.army.ArmyUnitCatalog;
 import galacticwars.clonewars.army.ArmyUnitDefinition;
 import galacticwars.clonewars.army.ArmyUnitId;
+import galacticwars.clonewars.ability.AbilityDefinition;
+import galacticwars.clonewars.ability.AbilityId;
+import galacticwars.clonewars.classes.UnitClassDefinition;
+import galacticwars.clonewars.classes.UnitClassId;
 import galacticwars.clonewars.faction.FactionCatalog;
 import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.faction.FactionId;
+import galacticwars.clonewars.faction.FactionRuntimePolicy;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import galacticwars.clonewars.world.OverworldFactionSpawnProfile;
 import galacticwars.clonewars.world.CivilianArchetypeDefinition;
@@ -26,7 +31,11 @@ public record GameplayDataSnapshot(
         Map<String, ArmyUnitId> unitAliases,
         Map<String, KingdomBaseBlueprint> blueprints,
         Map<String, OverworldFactionSpawnProfile> overworldSpawnProfiles,
-        Map<String, CivilianArchetypeDefinition> civilianArchetypesByEntityType
+        Map<String, CivilianArchetypeDefinition> civilianArchetypesByEntityType,
+        Map<AbilityId, AbilityDefinition> abilities,
+        Map<UnitClassId, UnitClassDefinition> unitClasses,
+        Map<FactionId, FactionRuntimePolicy> factionPolicies,
+        LaunchContentDefinitions launchContent
 ) {
     public GameplayDataSnapshot {
         Objects.requireNonNull(factions, "factions");
@@ -50,6 +59,10 @@ public record GameplayDataSnapshot(
         overworldSpawnProfiles = immutableMap(overworldSpawnProfiles, "overworldSpawnProfiles");
         civilianArchetypesByEntityType = immutableMap(
                 civilianArchetypesByEntityType, "civilianArchetypesByEntityType");
+        abilities = immutableMap(abilities, "abilities");
+        unitClasses = immutableMap(unitClasses, "unitClasses");
+        factionPolicies = immutableMap(factionPolicies, "factionPolicies");
+        Objects.requireNonNull(launchContent, "launchContent");
     }
 
     public GameplayDataSnapshot(
@@ -59,7 +72,8 @@ public record GameplayDataSnapshot(
             Map<String, ArmyUnitId> unitAliases,
             Map<String, KingdomBaseBlueprint> blueprints
     ) {
-        this(factions, units, unitIdsByEntityType, unitAliases, blueprints, Map.of(), Map.of());
+        this(factions, units, unitIdsByEntityType, unitAliases, blueprints, Map.of(), Map.of(),
+                Map.of(), Map.of(), Map.of(), LaunchContentDefinitions.empty());
     }
 
     public GameplayDataSnapshot(
@@ -70,7 +84,21 @@ public record GameplayDataSnapshot(
             Map<String, KingdomBaseBlueprint> blueprints,
             Map<String, OverworldFactionSpawnProfile> overworldSpawnProfiles
     ) {
-        this(factions, units, unitIdsByEntityType, unitAliases, blueprints, overworldSpawnProfiles, Map.of());
+        this(factions, units, unitIdsByEntityType, unitAliases, blueprints, overworldSpawnProfiles, Map.of(),
+                Map.of(), Map.of(), Map.of(), LaunchContentDefinitions.empty());
+    }
+
+    public GameplayDataSnapshot(
+            FactionCatalog factions,
+            ArmyUnitCatalog units,
+            Map<String, ArmyUnitId> unitIdsByEntityType,
+            Map<String, ArmyUnitId> unitAliases,
+            Map<String, KingdomBaseBlueprint> blueprints,
+            Map<String, OverworldFactionSpawnProfile> overworldSpawnProfiles,
+            Map<String, CivilianArchetypeDefinition> civilianArchetypesByEntityType
+    ) {
+        this(factions, units, unitIdsByEntityType, unitAliases, blueprints, overworldSpawnProfiles,
+                civilianArchetypesByEntityType, Map.of(), Map.of(), Map.of(), LaunchContentDefinitions.empty());
     }
 
     public Optional<FactionDefinition> faction(String id) {
@@ -114,6 +142,39 @@ public record GameplayDataSnapshot(
 
     public Optional<CivilianArchetypeDefinition> civilianArchetypeForEntity(String entityTypeId) {
         return Optional.ofNullable(civilianArchetypesByEntityType.get(entityTypeId));
+    }
+
+    public Optional<AbilityDefinition> ability(String id) {
+        if (id == null || id.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(abilities.get(AbilityId.of(id)));
+    }
+
+    public Optional<UnitClassDefinition> unitClass(String id) {
+        if (id == null || id.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(unitClasses.get(UnitClassId.of(id)));
+    }
+
+    public Optional<UnitClassDefinition> unitClassForUnit(ArmyUnitId unitId) {
+        if (unitId == null) {
+            return Optional.empty();
+        }
+        return unitClasses.values().stream().filter(definition -> definition.unitId().equals(unitId)).findFirst();
+    }
+
+    public List<AbilityDefinition> abilitiesForClass(UnitClassId classId) {
+        UnitClassDefinition definition = unitClasses.get(classId);
+        if (definition == null) {
+            return List.of();
+        }
+        return definition.abilityIds().stream().map(abilities::get).filter(Objects::nonNull).toList();
+    }
+
+    public Optional<FactionRuntimePolicy> factionPolicy(FactionId factionId) {
+        return Optional.ofNullable(factionPolicies.get(factionId));
     }
 
     public static String normalizeBlueprintId(String id) {

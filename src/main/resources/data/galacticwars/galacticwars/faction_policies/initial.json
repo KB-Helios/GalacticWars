@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "policies": [
+    {"faction":"galacticwars:republic","traits":["officer_coordination","supply_dependence"],"modifiers":{"coordination_percent":115,"supply_efficiency_percent":90}},
+    {"faction":"galacticwars:separatist","traits":["mass_production","command_node_dependence"],"modifiers":{"production_percent":125,"without_command_node_percent":75}},
+    {"faction":"galacticwars:mandalorian","traits":["elite_mobility","limited_population"],"modifiers":{"mobility_percent":120,"recruitment_capacity_percent":90}},
+    {"faction":"galacticwars:hutt_cartel","traits":["mercantile_network","loyalty_risk"],"modifiers":{"trade_value_percent":120,"loyalty_percent":90}},
+    {"faction":"galacticwars:nightsister","traits":["high_morale","limited_industry"],"modifiers":{"morale_percent":125,"production_percent":85}}
+  ]
+}

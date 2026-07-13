@@ -14,8 +14,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
-import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -62,9 +60,7 @@ public final class BlasterItem extends Item {
                 SoundEvents.CROSSBOW_SHOOT, SoundSource.PLAYERS, 0.65F,
                 1.45F + level.getRandom().nextFloat() * 0.15F);
         ServerLevel serverLevel = (ServerLevel) level;
-        Arrow bolt = new Arrow(level, player, new ItemStack(ModItems.ENERGY_CELL.get()), weapon);
-        bolt.pickup = AbstractArrow.Pickup.DISALLOWED;
-        bolt.setBaseDamage(damage);
+        BlasterBoltEntity bolt = new BlasterBoltEntity(level, player, weapon, damage);
         bolt.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, velocity, inaccuracy);
         serverLevel.addFreshEntity(bolt);
         weapon.hurtAndBreak(1, player, hand);
@@ -97,9 +93,7 @@ public final class BlasterItem extends Item {
         level.playSound(null, shooter.getX(), shooter.getY(), shooter.getZ(),
                 SoundEvents.CROSSBOW_SHOOT, SoundSource.NEUTRAL, 0.65F,
                 1.45F + level.getRandom().nextFloat() * 0.15F);
-        Arrow bolt = new Arrow(level, shooter, new ItemStack(ModItems.ENERGY_CELL.get()), weapon);
-        bolt.pickup = AbstractArrow.Pickup.DISALLOWED;
-        bolt.setBaseDamage(damage);
+        BlasterBoltEntity bolt = new BlasterBoltEntity(level, shooter, weapon, damage);
         double targetY = target.getY() + target.getBbHeight() * 0.6D;
         bolt.shoot(target.getX() - shooter.getX(), targetY - bolt.getY(), target.getZ() - shooter.getZ(),
                 velocity, inaccuracy);

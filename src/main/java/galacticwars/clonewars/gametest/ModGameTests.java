@@ -15,9 +15,11 @@ import galacticwars.clonewars.army.ArmyGroupLifecycleState;
 import galacticwars.clonewars.army.ArmyLocation;
 import galacticwars.clonewars.army.ArmyTravelService;
 import galacticwars.clonewars.combat.BlasterCombatEvents;
+import galacticwars.clonewars.combat.BlasterBoltEntity;
 import galacticwars.clonewars.combat.FactionRangedWeaponService;
 import galacticwars.clonewars.combat.BlasterHeatPolicy;
 import galacticwars.clonewars.combat.BlasterItem;
+import galacticwars.clonewars.combat.LightsaberDeflectionService;
 import galacticwars.clonewars.economy.CreditTransactionService;
 import galacticwars.clonewars.economy.PhysicalTradeService;
 import galacticwars.clonewars.data.GameplayDataManager;
@@ -91,6 +93,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -99,6 +102,8 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
@@ -161,15 +166,19 @@ public final class ModGameTests {
         tests.put(id("physical_trade_transaction"), ModGameTests::physicalTradeTransaction);
         tests.put(id("faction_selection_transaction"), ModGameTests::factionSelectionTransaction);
         tests.put(id("progression_runtime_adapter"), ModGameTests::progressionRuntimeAdapter);
+        tests.put(id("class_ability_runtime_data"), ModGameTests::classAbilityRuntimeData);
         tests.put(id("recruit_entity_contract"), ModGameTests::recruitEntityContract);
         tests.put(id("worker_tags_and_loot"), ModGameTests::workerTagsAndLoot);
         tests.put(id("recruit_contract_lifecycle"), ModGameTests::recruitContractLifecycle);
         tests.put(id("local_recruit_protect_owner"), ModGameTests::localRecruitProtectOwner);
         tests.put(id("worker_resource_conservation"), ModGameTests::workerResourceConservation);
         tests.put(id("enabled_worker_loops"), ModGameTests::enabledWorkerLoops);
+        tests.put(id("specialist_worker_loops"), ModGameTests::specialistWorkerLoops);
+        tests.put(id("animal_farmer_species_pairing"), ModGameTests::animalFarmerSpeciesPairing);
         tests.put(id("workforce_saved_data_authority"), ModGameTests::workforceSavedDataAuthority);
         tests.put(id("recruit_spawn_eggs"), ModGameTests::recruitSpawnEggs);
         tests.put(id("blaster_friendly_fire"), ModGameTests::blasterFriendlyFire);
+        tests.put(id("lightsaber_bolt_deflection"), ModGameTests::lightsaberBoltDeflection);
         tests.put(id("recruit_blaster_projectile"), ModGameTests::recruitBlasterProjectile);
         tests.put(id("player_blaster_heat"), ModGameTests::playerBlasterHeat);
         tests.put(id("ungrouped_recruit_ranged_goal"), ModGameTests::ungroupedRecruitRangedGoal);
@@ -177,6 +186,45 @@ public final class ModGameTests {
         tests.put(id("planet_arrival_runtime"), ModGameTests::planetArrivalRuntime);
         tests.put(id("army_planet_transfer_transaction"), ModGameTests::armyPlanetTransferTransaction);
         return Map.copyOf(tests);
+    }
+
+    private static void classAbilityRuntimeData(GameTestHelper helper) {
+        var snapshot = GameplayDataManager.snapshot();
+        if (snapshot.unitClasses().size() != 15
+                || snapshot.abilities().size() != 30
+                || snapshot.factionPolicies().size() != 5
+                || snapshot.launchContent().planets().size() != 4
+                || snapshot.launchContent().vehicles().size() != 5
+                || snapshot.launchContent().forceAbilities().size() != 6
+                || snapshot.launchContent().quests().size() != 15
+                || snapshot.launchContent().trades().size() != 5
+                || snapshot.launchContent().conquestRegions().size() != 4
+                || snapshot.launchContent().forceAbilities().values().stream()
+                        .anyMatch(galacticwars.clonewars.data.LaunchContentDefinitions.ForceAbilityDefinition::enabled)) {
+            helper.fail("Atomic gameplay snapshot did not load the launch class catalogs");
+            return;
+        }
+        GalacticRecruitEntity recruit = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
+        recruit.initializeFromSpawnEgg();
+        if (!recruit.classProgressState().classId().equals("galacticwars:clone_trooper")) {
+            helper.fail("Recruit did not derive its shared class state from the unit catalog");
+            return;
+        }
+        var accepted = recruit.activateClassAbility(
+                "galacticwars:suppressive_fire", helper.getLevel().getGameTime(),
+                true, 8.0D, false);
+        var replay = recruit.activateClassAbility(
+                "galacticwars:suppressive_fire", helper.getLevel().getGameTime(),
+                true, 8.0D, false);
+        if (!accepted.accepted()
+                || accepted.state().resource() != 85
+                || replay.accepted()
+                || !replay.reason().equals("ability_cooldown")) {
+            helper.fail("Recruit class activation was not server-authoritative and cooldown-safe");
+            return;
+        }
+        helper.succeed();
     }
 
     private static void progressionRuntimeAdapter(GameTestHelper helper) {
@@ -273,15 +321,12 @@ public final class ModGameTests {
                 UUID.randomUUID(), owner.getUUID(), ProgressionEventType.BUILDING_COMPLETED,
                 "forward_base", 1));
 
-        owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.HYPERSPACE_NAVIGATOR.get()));
-        InteractionResult navigatorResult = ModItems.HYPERSPACE_NAVIGATOR.get().use(
-                helper.getLevel(), owner, InteractionHand.MAIN_HAND);
-        if (navigatorResult != InteractionResult.SUCCESS
-                || !(owner.containerMenu instanceof CommandCenterNavigationMenu)) {
-            helper.fail("Hyperspace Navigator did not open the authoritative navigation menu");
+        CommandCenterNavigationMenu navigation = new CommandCenterNavigationMenu(
+                0, owner.getInventory());
+        if (!navigation.planetIds().equals(GameplayDataManager.snapshot().launchContent().planetIds())) {
+            helper.fail("Navigation menu did not capture the authoritative planet snapshot");
             return;
         }
-        owner.closeContainer();
 
         PlanetTravelService.TravelResult result = PlanetTravelService.travel(owner, "tatooine");
         if (result.accepted() || !result.reason().equals("destination_unavailable")) {
@@ -310,9 +355,11 @@ public final class ModGameTests {
         shooter.setItemInHand(InteractionHand.MAIN_HAND, weapon);
         ModItems.DC15_BLASTER.get().fireAt(helper.getLevel(), shooter, target, weapon);
 
-        List<Arrow> bolts = helper.getLevel().getEntitiesOfClass(
-                Arrow.class, shooter.getBoundingBox().inflate(8.0D), arrow -> arrow.getOwner() == shooter);
-        if (bolts.size() != 1 || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
+        List<BlasterBoltEntity> bolts = helper.getLevel().getEntitiesOfClass(
+                BlasterBoltEntity.class, shooter.getBoundingBox().inflate(8.0D), bolt -> bolt.getOwner() == shooter);
+        if (bolts.size() != 1
+                || bolts.getFirst().pickup != net.minecraft.world.entity.projectile.arrow.AbstractArrow.Pickup.DISALLOWED
+                || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
             helper.fail("Recruit blaster did not spawn one owned, weapon-tagged bolt");
             return;
         }
@@ -477,8 +524,8 @@ public final class ModGameTests {
         AABB shotArea = shooter.getBoundingBox().inflate(20.0D);
         goal.tick();
         helper.succeedWhen(() -> {
-            List<Arrow> bolts = helper.getLevel().getEntitiesOfClass(
-                    Arrow.class, shotArea, arrow -> arrow.getOwner() == shooter);
+            List<BlasterBoltEntity> bolts = helper.getLevel().getEntitiesOfClass(
+                    BlasterBoltEntity.class, shotArea, bolt -> bolt.getOwner() == shooter);
             if (bolts.size() != 1 || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
                 helper.fail("Ungrouped ranged recruit goal did not fire one weapon-tagged bolt");
             }
@@ -1686,6 +1733,216 @@ public final class ModGameTests {
         helper.succeed();
     }
 
+    private static void lightsaberBoltDeflection(GameTestHelper helper) {
+        GalacticRecruitEntity shooter = helper.spawn(
+                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(2, 1, 2));
+        GalacticRecruitEntity guardian = helper.spawn(
+                ModEntityTypes.JEDI_KNIGHT.get(), new BlockPos(5, 1, 2));
+        shooter.initializeFromSpawnEgg();
+        guardian.initializeFromSpawnEgg();
+        guardian.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.BLUE_LIGHTSABER.get()));
+        int resourceBeforeRejectedDeflection = guardian.classProgressState().resource();
+        BlasterBoltEntity selfOwnedBolt = new BlasterBoltEntity(
+                helper.getLevel(), guardian, new ItemStack(ModItems.BLUE_LIGHTSABER.get()), 5.0D);
+        if (LightsaberDeflectionService.tryDeflect(
+                selfOwnedBolt, guardian, helper.getLevel().getGameTime())
+                || guardian.classProgressState().resource() != resourceBeforeRejectedDeflection) {
+            helper.fail("Rejected self-owned bolt deflection consumed saber guard resources");
+            return;
+        }
+        BlasterBoltEntity bolt = new BlasterBoltEntity(
+                helper.getLevel(), shooter, new ItemStack(ModItems.E5_BLASTER.get()), 5.0D);
+        bolt.setPos(guardian.getX() - 0.5D, guardian.getEyeY(), guardian.getZ());
+        bolt.setDeltaMovement(1.0D, 0.0D, 0.0D);
+        ProjectileImpactEvent impact = new ProjectileImpactEvent(bolt, new EntityHitResult(guardian));
+        BlasterCombatEvents.onProjectileImpact(impact);
+        if (!impact.isCanceled()
+                || bolt.getOwner() != guardian
+                || bolt.getDeltaMovement().x >= 0.0D
+                || guardian.classProgressState().resource() >= 100) {
+            helper.fail("Jedi saber guard did not authoritatively deflect and charge the class ability");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void specialistWorkerLoops(GameTestHelper helper) {
+        BlockPos hallPos = helper.absolutePos(new BlockPos(1, 1, 1));
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        GalacticRecruitEntity recruit = ModEntityTypes.CLONE_TROOPER.get().create(
+                helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        if (recruit == null) {
+            helper.fail("Could not create specialist worker recruit");
+            return;
+        }
+        recruit.setPos(hallPos.getX() + 2.5, hallPos.getY(), hallPos.getZ() + 0.5);
+        helper.getLevel().addFreshEntity(recruit);
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        hall.claim(owner);
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        data.activateHall(owner.getUUID(), hall.factionId(),
+                helper.getLevel().dimension().identifier().toString(), hallPos).orElseThrow();
+        putContainerItem(hall, new ItemStack(ModItems.CREDIT_CHIP.get(), 32));
+        FactionAlignmentSavedData.get(helper.getLevel()).setScore(
+                owner.getUUID(), FactionId.of("republic"), 100);
+        if (!recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_HIRE)) {
+            helper.fail("Specialist worker loop recruit could not be hired");
+            return;
+        }
+
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        if (!recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_ASSIGN_FISHERMAN)) {
+            helper.fail("Fisher contract was rejected");
+            return;
+        }
+        BlockPos waterPos = hallPos.offset(3, 0, 1);
+        helper.getLevel().setBlock(waterPos, Blocks.WATER.defaultBlockState(), 3);
+        UUID fisherOrder = acquirePersistedOrder(recruit);
+        interactWorkerAt(recruit, waterPos, "navigate_work_target");
+        depositWorkerAt(recruit, hallPos);
+        assertCompletedOrder(helper, data, owner.getUUID(), fisherOrder, "fisher");
+        if (countContainerItem(hall, Items.COD) + countContainerItem(hall, Items.SALMON) != 1) {
+            helper.fail("Fisher did not deposit one physical catch");
+            return;
+        }
+
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        if (!recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_ASSIGN_ANIMAL_FARMER)) {
+            helper.fail("Animal farmer contract was rejected");
+            return;
+        }
+        Animal first = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        Animal second = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        if (first == null || second == null) {
+            helper.fail("Could not create livestock for animal farmer test");
+            return;
+        }
+        first.setPos(hallPos.getX() + 3.5, hallPos.getY(), hallPos.getZ() + 2.5);
+        second.setPos(hallPos.getX() + 4.5, hallPos.getY(), hallPos.getZ() + 2.5);
+        helper.getLevel().addFreshEntity(first);
+        helper.getLevel().addFreshEntity(second);
+        helper.runAfterDelay(2, () -> finishSpecialistWorkerLoops(
+                helper, hallPos, hall, owner, recruit, data, first, second));
+    }
+
+    private static void animalFarmerSpeciesPairing(GameTestHelper helper) {
+        GalacticRecruitEntity recruit = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
+        Animal cow = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        Animal sheep = EntityTypes.SHEEP.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        Animal secondCow = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        if (cow == null || sheep == null || secondCow == null) {
+            helper.fail("Could not create cross-species livestock pair");
+            return;
+        }
+        cow.setPos(recruit.getX() + 1.0D, recruit.getY(), recruit.getZ());
+        sheep.setPos(recruit.getX() - 1.0D, recruit.getY(), recruit.getZ());
+        secondCow.setPos(recruit.getX() + 2.0D, recruit.getY(), recruit.getZ());
+        secondCow.setAge(-24_000);
+        helper.getLevel().addFreshEntity(cow);
+        helper.getLevel().addFreshEntity(sheep);
+        helper.getLevel().addFreshEntity(secondCow);
+        helper.runAfterDelay(2, () -> {
+            setWorkerInventory(recruit, new ItemStack(Items.WHEAT, 2));
+            invokeFeedAnimalPair(recruit, helper.getLevel());
+            if (!recruit.getWorkerStatus().reasonCode().equals("breeding_pair_required")
+                    || cow.isInLove()
+                    || sheep.isInLove()
+                    || workerInventoryCount(recruit) != 2) {
+                helper.fail("Animal farmer accepted an incompatible cow/sheep breeding pair");
+                return;
+            }
+
+            secondCow.setAge(0);
+            helper.runAfterDelay(2, () -> {
+                invokeFeedAnimalPair(recruit, helper.getLevel());
+                if (!cow.isInLove()
+                        || !secondCow.isInLove()
+                        || sheep.isInLove()
+                        || workerInventoryCount(recruit) != 0) {
+                    helper.fail("Animal farmer did not select and feed the compatible cow pair; reason="
+                            + recruit.getWorkerStatus().reasonCode()
+                            + ", carried=" + workerInventoryCount(recruit)
+                            + ", firstCow=" + cow.isAlive() + "/" + cow.canFallInLove() + "/" + cow.isInLove()
+                            + ", secondCow=" + secondCow.isAlive() + "/" + secondCow.canFallInLove() + "/" + secondCow.isInLove()
+                            + ", sheep=" + sheep.isAlive() + "/" + sheep.canFallInLove() + "/" + sheep.isInLove());
+                    return;
+                }
+                helper.succeed();
+            });
+        });
+    }
+
+    private static void finishSpecialistWorkerLoops(
+            GameTestHelper helper,
+            BlockPos hallPos,
+            CommandCenterBlockEntity hall,
+            ServerPlayer owner,
+            GalacticRecruitEntity recruit,
+            KingdomSavedData data,
+            Animal first,
+            Animal second
+    ) {
+        setWorkerInventory(recruit, new ItemStack(Items.WHEAT, 2));
+        UUID animalOrder = acquirePersistedOrder(recruit);
+        interactWorkerAt(recruit, first.blockPosition(), "feed_animals");
+        recruit.tickWorkerController();
+        WorkOrder animalWorkOrder = data.workOrder(owner.getUUID(), animalOrder).orElseThrow();
+        if (animalWorkOrder.state() != WorkOrderState.COMPLETED) {
+            helper.fail("Animal farmer order remained " + animalWorkOrder.state()
+                    + "; phase=" + recruit.getWorkerStatus().phase()
+                    + ", reason=" + recruit.getWorkerStatus().reasonCode()
+                    + ", carried=" + workerInventoryCount(recruit)
+                    + ", first=" + first.blockPosition() + "/" + first.canFallInLove()
+                    + "/" + first.isFood(new ItemStack(Items.WHEAT))
+                    + ", second=" + second.blockPosition() + "/" + second.canFallInLove()
+                    + "/" + second.isFood(new ItemStack(Items.WHEAT)));
+            return;
+        }
+        if (!first.isInLove() || !second.isInLove()) {
+            helper.fail("Animal farmer did not consume feed and breed a bounded pair");
+            return;
+        }
+
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        if (!recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_ASSIGN_COOK)) {
+            helper.fail("Cook contract was rejected");
+            return;
+        }
+        putContainerItem(hall, new ItemStack(Items.BEEF));
+        putContainerItem(hall, new ItemStack(Items.COAL));
+        setWorkerInventory(recruit, ItemStack.EMPTY);
+        UUID cookOrder = acquirePersistedOrder(recruit);
+        interactWorkerAt(recruit, hallPos, "withdraw_cooking_ingredient");
+        setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+        recruit.tickWorkerController();
+        interactWorkerAt(recruit, hallPos, "withdraw_cooking_ingredient");
+        setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+        recruit.tickWorkerController();
+        interactWorkerAt(recruit, hallPos, "cook_food");
+        depositWorkerAt(recruit, hallPos);
+        assertCompletedOrder(helper, data, owner.getUUID(), cookOrder, "cook");
+        if (countContainerItem(hall, Items.COOKED_BEEF) != 1) {
+            helper.fail("Cook did not consume physical food and fuel into stored food");
+            return;
+        }
+
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        if (!recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_ASSIGN_MERCHANT)) {
+            helper.fail("Merchant contract was rejected");
+            return;
+        }
+        UUID merchantOrder = acquirePersistedOrder(recruit);
+        WorkOrder order = data.workOrder(owner.getUUID(), merchantOrder).orElseThrow();
+        if (!recruit.getWorkerStatus().reasonCode().equals("market_open")
+                || order.state().terminal()) {
+            helper.fail("Merchant did not maintain a persisted open-market assignment");
+            return;
+        }
+        helper.succeed();
+    }
+
     private static void setWorkerInventory(GalacticRecruitEntity recruit, ItemStack stack) {
         NonNullList<ItemStack> inventory = NonNullList.withSize(9, ItemStack.EMPTY);
         if (!stack.isEmpty()) {
@@ -1700,7 +1957,17 @@ public final class ModGameTests {
         recruit.tickWorkerController();
         Object orderId = getRecruitField(recruit, "workOrderId");
         if (!(orderId instanceof UUID uuid)) {
-            throw new IllegalStateException("Worker did not claim a persisted work order");
+            throw new IllegalStateException("Worker did not claim a persisted work order; profession="
+                    + recruit.getWorkerProfession().orElse(null)
+                    + ", phase=" + recruit.getWorkerStatus().phase()
+                    + ", reason=" + recruit.getWorkerStatus().reasonCode()
+                    + ", target=" + recruit.getTarget()
+                    + ", tame=" + recruit.isTame()
+                    + ", removed=" + recruit.isRemoved()
+                    + ", duty=" + recruit.getRecruitDuty()
+                    + ", command=" + recruit.getRecruitCommand()
+                    + ", workTarget=" + recruit.getWorkTarget()
+                    + ", shouldRun=" + recruit.shouldRunWorkerCycle());
         }
         return uuid;
     }
@@ -1798,6 +2065,16 @@ public final class ModGameTests {
             method.invoke(recruit, command);
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Could not set recruit command", exception);
+        }
+    }
+
+    private static void invokeFeedAnimalPair(GalacticRecruitEntity recruit, ServerLevel level) {
+        try {
+            Method method = GalacticRecruitEntity.class.getDeclaredMethod("feedAnimalPair", ServerLevel.class);
+            method.setAccessible(true);
+            method.invoke(recruit, level);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Could not run animal feeding interaction", exception);
         }
     }
 

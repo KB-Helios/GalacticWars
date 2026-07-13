@@ -1,11 +1,17 @@
 package galacticwars.clonewars.kingdom;
 
+import galacticwars.clonewars.data.LaunchContentDefinitions;
+import galacticwars.clonewars.data.LaunchContentRuntime;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionState;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class KingdomGameplayTransactionTest {
     public static void main(String[] args) {
+        LaunchContentRuntime.install(
+                LaunchContentDefinitions.empty(), List.of("galacticwars:republic"), Map.of());
         UUID player = UUID.randomUUID();
         KingdomActionId first = KingdomActionId.of("faction_pledge", player, "galacticwars:republic");
         KingdomActionId replay = KingdomActionId.of("faction_pledge", player, "galacticwars:republic");

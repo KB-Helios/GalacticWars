@@ -129,7 +129,7 @@ public final class PlanetTravelService {
     }
 
     private static ResourceKey<Level> dimensionKey(String planetId) {
-        if (!galacticwars.clonewars.progression.LaunchContentCatalog.PLANETS.contains(planetId)) {
+        if (!galacticwars.clonewars.progression.LaunchContentCatalog.planets().contains(planetId)) {
             return null;
         }
         return ResourceKey.create(Registries.DIMENSION,

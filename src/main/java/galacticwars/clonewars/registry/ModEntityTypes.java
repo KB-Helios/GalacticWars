@@ -2,6 +2,7 @@ package galacticwars.clonewars.registry;
 
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
+import galacticwars.clonewars.combat.BlasterBoltEntity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.neoforged.bus.api.IEventBus;
@@ -13,6 +14,15 @@ import java.util.List;
 public final class ModEntityTypes {
     public static final DeferredRegister.Entities ENTITY_TYPES =
             DeferredRegister.createEntities(GalacticWars.MODID);
+
+    public static final DeferredHolder<EntityType<?>, EntityType<BlasterBoltEntity>> BLASTER_BOLT =
+            ENTITY_TYPES.registerEntityType(
+                    "blaster_bolt",
+                    BlasterBoltEntity::new,
+                    MobCategory.MISC,
+                    builder -> builder.sized(0.18F, 0.18F)
+                            .clientTrackingRange(8)
+                            .updateInterval(1));
 
     public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> CLONE_TROOPER =
             registerRecruit("clone_trooper", 0.60F, 1.95F);

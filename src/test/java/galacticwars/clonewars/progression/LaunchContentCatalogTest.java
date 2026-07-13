@@ -1,21 +1,57 @@
 package galacticwars.clonewars.progression;
 
+import galacticwars.clonewars.data.LaunchContentDefinitions;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 public final class LaunchContentCatalogTest {
     public static void main(String[] args) {
-        assertEquals(5, LaunchContentCatalog.UNITS.size(), "factions");
-        assertEquals(15, LaunchContentCatalog.UNITS.values().stream().mapToInt(java.util.List::size).sum(), "units");
-        assertEquals(4, LaunchContentCatalog.PLANETS.size(), "planets");
-        assertEquals(5, LaunchContentCatalog.VEHICLES.size(), "vehicles");
-        assertEquals(6, LaunchContentCatalog.FORCE_ABILITIES.size(), "Force abilities");
-        assertEquals(15, LaunchContentCatalog.QUESTS.size(), "quests");
-        assertEquals(15, LaunchContentCatalog.QUEST_UNLOCKS.size(), "quest unlock definitions");
-        assertEquals(java.util.Set.of("barc_speeder", "force_path"),
-                LaunchContentCatalog.questUnlocks("republic_chapter_2"), "Republic chapter 2 unlocks");
-        assertEquals(java.util.Set.of("vehicle_crafting"),
-                LaunchContentCatalog.questUnlocks("mandalorian_chapter_2"), "Mandalorian chapter 2 unlocks");
-        assertEquals(java.util.Set.of("vehicle_crafting"),
-                LaunchContentCatalog.questUnlocks("hutt_cartel_chapter_2"), "Hutt chapter 2 unlocks");
+        var quest = new LaunchContentDefinitions.QuestDefinition(
+                "republic_chapter_2", List.of("delivery_completed"), 70,
+                Set.of("barc_speeder", "force_path"));
+        var definitions = new LaunchContentDefinitions(
+                Map.of(), Map.of(), Map.of(), Map.of(quest.id(), quest), Map.of(), Map.of());
+        assertEquals(Set.of("barc_speeder", "force_path"),
+                definitions.questUnlocks("republic_chapter_2"), "datapack quest unlocks");
+        assertEquals(70, definitions.questRewardCredits("republic_chapter_2"), "datapack quest reward");
+        boolean rejected = false;
+        try {
+            new LaunchContentDefinitions.ForceAbilityDefinition(
+                    "light_push", "light", 20, 60, "republic_chapter_2", true);
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        assertEquals(true, rejected, "Force runtime remains disabled");
+        assertNullQuestCollectionRejected(null, Set.of(), "objectives for quest broken");
+        assertNullQuestCollectionRejected(List.of("command_center"), null, "unlocks for quest broken");
+        assertThrows(() -> new LaunchContentDefinitions.PlanetDefinition(
+                "a".repeat(LaunchContentDefinitions.MAX_SERIALIZED_PLANET_ID_BYTES + 1),
+                "galacticwars:test", "arrival", "theme", "republic"),
+                "oversized planet id rejected");
         System.out.println("LaunchContentCatalogTest passed");
+    }
+
+    private static void assertThrows(Runnable action, String label) {
+        try {
+            action.run();
+        } catch (IllegalArgumentException expected) {
+            return;
+        }
+        throw new AssertionError(label);
+    }
+
+    private static void assertNullQuestCollectionRejected(
+            List<String> objectives,
+            Set<String> unlocks,
+            String expectedMessage
+    ) {
+        try {
+            new LaunchContentDefinitions.QuestDefinition("broken", objectives, 0, unlocks);
+            throw new AssertionError("Null quest collection was accepted");
+        } catch (NullPointerException expected) {
+            assertEquals(expectedMessage, expected.getMessage(), "null quest collection diagnostic");
+        }
     }
 
     private static void assertEquals(Object expected, Object actual, String label) {

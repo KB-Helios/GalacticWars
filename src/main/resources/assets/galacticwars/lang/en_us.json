@@ -145,6 +145,7 @@
   "screen.galacticwars.recruit.status.command": "Order: %s",
   "screen.galacticwars.recruit.status.profession": "Worker: %s",
   "screen.galacticwars.recruit.status.duty": "Duty: %s",
+  "screen.galacticwars.recruit.status.class": "Class: %s (Rank %s)",
   "screen.galacticwars.recruit.status.resource_action": "Task: %s (%s)",
   "screen.galacticwars.recruit.status.worksite": "Worksite: %s",
   "screen.galacticwars.recruit.status.work_radius": "Work area: %s blocks",
@@ -202,6 +203,7 @@
   "item.galacticwars.raw_beskar": "Raw Beskar",
   "item.galacticwars.credit_chip": "Credit Chip",
   "item.galacticwars.energy_cell": "Blaster Energy Cell",
+  "item.galacticwars.blaster_bolt": "Blaster Bolt",
   "item.galacticwars.republic_plastoid_ingot": "Republic Plastoid",
   "item.galacticwars.mandalorian_fiber": "Mandalorian Fiber",
   "item.galacticwars.mandalorian_alloy_ingot": "Mandalorian Alloy Ingot",
@@ -349,6 +351,8 @@
   "config.galacticwars.option.allow_blaster_friendly_fire.description": "Allow player blaster bolts to damage owned, same-faction, or allied recruits.",
   "config.galacticwars.option.allow_blaster_pvp": "Blaster PvP",
   "config.galacticwars.option.allow_blaster_pvp.description": "Allow player-fired blaster bolts to damage other players.",
+  "config.galacticwars.option.allow_class_pvp": "Class Ability PvP",
+  "config.galacticwars.option.allow_class_pvp.description": "Allow non-Force class abilities to directly affect other players.",
   "config.galacticwars.option.allow_force_pvp": "Force PvP",
   "config.galacticwars.option.allow_force_pvp.description": "Allow Force abilities to directly affect other players."
 }

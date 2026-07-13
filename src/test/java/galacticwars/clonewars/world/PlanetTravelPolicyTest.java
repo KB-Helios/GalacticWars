@@ -1,10 +1,20 @@
 package galacticwars.clonewars.world;
 
+import galacticwars.clonewars.data.LaunchContentDefinitions;
+import galacticwars.clonewars.data.LaunchContentRuntime;
+import java.util.List;
+import java.util.Map;
+
 public final class PlanetTravelPolicyTest {
     private PlanetTravelPolicyTest() {
     }
 
     public static void main(String[] args) {
+        LaunchContentRuntime.install(new LaunchContentDefinitions(
+                        Map.of("tatooine", new LaunchContentDefinitions.PlanetDefinition(
+                                "tatooine", "galacticwars:tatooine", "spaceport", "desert", "hutt_cartel")),
+                        Map.of(), Map.of(), Map.of(), Map.of(), Map.of()),
+                List.of(), Map.of());
         assertRejected("unknown_planet", "alderaan", true, true, true, true, true, true, false);
         assertRejected("not_owner", "tatooine", false, true, true, true, true, true, false);
         assertRejected("not_owner", "tatooine", true, false, true, true, true, true, false);

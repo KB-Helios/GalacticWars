@@ -1,7 +1,6 @@
 package galacticwars.clonewars.client.gui;
 
 import galacticwars.clonewars.menu.CommandCenterNavigationMenu;
-import galacticwars.clonewars.progression.LaunchContentCatalog;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -28,10 +27,10 @@ public final class CommandCenterNavigationScreen extends Screen implements MenuA
     protected void init() {
         super.init();
         int x = (this.width - BUTTON_WIDTH) / 2;
-        int firstY = Math.max(42, (this.height - LaunchContentCatalog.PLANETS.size()
+        int firstY = Math.max(42, (this.height - menu.planetIds().size()
                 * (BUTTON_HEIGHT + GAP)) / 2);
-        for (int index = 0; index < LaunchContentCatalog.PLANETS.size(); index++) {
-            String planetId = LaunchContentCatalog.PLANETS.get(index);
+        for (int index = 0; index < menu.planetIds().size(); index++) {
+            String planetId = menu.planetIds().get(index);
             int buttonId = index;
             this.addRenderableWidget(Button.builder(
                             Component.translatable("planet.galacticwars." + planetId),

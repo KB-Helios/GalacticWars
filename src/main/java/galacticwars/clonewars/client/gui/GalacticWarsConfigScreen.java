@@ -39,6 +39,7 @@ public final class GalacticWarsConfigScreen {
                                         "allow_blaster_friendly_fire",
                                         Config.ALLOW_BLASTER_FRIENDLY_FIRE))
                                 .option(booleanOption("allow_blaster_pvp", Config.ALLOW_BLASTER_PVP))
+                                .option(booleanOption("allow_class_pvp", Config.ALLOW_CLASS_PVP))
                                 .option(booleanOption("allow_force_pvp", Config.ALLOW_FORCE_PVP))
                                 .build())
                         .build())

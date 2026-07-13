@@ -16,7 +16,7 @@ public final class PlanetTravelPolicy {
             boolean destinationLoaded,
             boolean alreadyThere
     ) {
-        if (!LaunchContentCatalog.PLANETS.contains(planetId)) {
+        if (!LaunchContentCatalog.planets().contains(planetId)) {
             return TravelAuthorization.rejected("unknown_planet");
         }
         if (!owner || !authoritativeCommandCenter) {

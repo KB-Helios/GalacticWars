@@ -44,6 +44,8 @@ public final class ModItems {
             ITEMS.registerSimpleItem("credit_chip", properties -> properties.stacksTo(64));
     public static final DeferredItem<Item> ENERGY_CELL =
             ITEMS.registerSimpleItem("energy_cell", properties -> properties.stacksTo(64));
+    public static final DeferredItem<Item> BLASTER_BOLT =
+            ITEMS.registerSimpleItem("blaster_bolt", properties -> properties.stacksTo(1));
     public static final DeferredItem<HyperspaceNavigatorItem> HYPERSPACE_NAVIGATOR =
             ITEMS.registerItem("hyperspace_navigator", HyperspaceNavigatorItem::new);
     public static final DeferredItem<BlasterItem> DC15_BLASTER =
