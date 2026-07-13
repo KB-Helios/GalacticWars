@@ -19,7 +19,6 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.minecraft.resources.Identifier;
@@ -46,12 +45,6 @@ public class GalacticWarsClient {
     @SubscribeEvent
     static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         galacticwars.clonewars.client.ForceKeyMappings.register(event);
-    }
-
-    @SubscribeEvent
-    static void registerClientPayloads(RegisterClientPayloadHandlersEvent event) {
-        event.register(galacticwars.clonewars.network.ForceHudPayload.TYPE,
-                (payload, context) -> context.enqueueWork(() -> galacticwars.clonewars.client.ForceClientState.update(payload)));
     }
 
     @SubscribeEvent

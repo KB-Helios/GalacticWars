@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import galacticwars.clonewars.Config;
@@ -29,7 +30,6 @@ import galacticwars.clonewars.conquest.ConquestControlState;
 import galacticwars.clonewars.conquest.ConquestSavedData;
 import galacticwars.clonewars.entity.RecruitSpawnEggItem;
 import galacticwars.clonewars.entity.RecruitLifecycleService;
-import galacticwars.clonewars.entity.ai.RecruitRangedCombatGoal;
 import galacticwars.clonewars.faction.FactionAlignmentSavedData;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.FactionRelation;
@@ -117,9 +117,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.DispenserBlockEntity;
 import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -132,10 +134,12 @@ import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent;
 import net.neoforged.neoforge.gametest.GameTestHooks;
 import net.neoforged.neoforge.registries.RegisterEvent;
+import net.tslat.smartbrainlib.util.BrainUtil;
 
 public final class ModGameTests {
     private static final Identifier ENVIRONMENT = id("gameplay");
     private static final Identifier EMPTY_STRUCTURE = Identifier.withDefaultNamespace("empty");
+    private static final int SMART_BRAIN_TEST_SETUP_INTERVAL = 300;
     private static final Map<Identifier, Consumer<GameTestHelper>> TESTS = createTests();
 
     private ModGameTests() {
@@ -152,13 +156,61 @@ public final class ModGameTests {
         Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(
                 ENVIRONMENT,
                 new TestEnvironmentDefinition.AllOf(List.of()));
+        Map<Identifier, Holder<TestEnvironmentDefinition<?>>> isolatedEnvironments = Map.of(
+                id("ungrouped_recruit_ranged_brain"), event.registerEnvironment(
+                        id("ungrouped_recruit_ranged_brain_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("ungrouped_recruit_melee_brain"), event.registerEnvironment(
+                        id("ungrouped_recruit_melee_brain_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("smart_brain_follow_and_sit"), event.registerEnvironment(
+                        id("smart_brain_follow_and_sit_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("smart_brain_move_command"), event.registerEnvironment(
+                        id("smart_brain_move_command_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("smart_brain_move_stall_recovery"), event.registerEnvironment(
+                        id("smart_brain_move_stall_recovery_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("natural_civilian_brain_runtime"), event.registerEnvironment(
+                        id("natural_civilian_brain_runtime_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("grouped_brain_authority"), event.registerEnvironment(
+                        id("grouped_brain_authority_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())));
+        List<Identifier> smartBrainRuntimeTests = List.of(
+                id("ungrouped_recruit_ranged_brain"),
+                id("ungrouped_recruit_melee_brain"),
+                id("smart_brain_follow_and_sit"),
+                id("smart_brain_move_command"),
+                id("smart_brain_move_stall_recovery"),
+                id("natural_civilian_brain_runtime"),
+                id("grouped_brain_authority"));
         for (Identifier testId : TESTS.keySet()) {
+            int timeoutTicks = Set.of(
+                    id("smart_brain_move_command"),
+                    id("smart_brain_move_stall_recovery")).contains(testId)
+                    ? 260
+                    : Set.of(
+                            id("smart_brain_follow_and_sit"),
+                            id("natural_civilian_brain_runtime")).contains(testId)
+                            ? 160
+                            : 100;
+            int runtimeTestIndex = smartBrainRuntimeTests.indexOf(testId);
             TestData<Holder<TestEnvironmentDefinition<?>>> data = new TestData<>(
-                    environment,
+                    isolatedEnvironments.getOrDefault(testId, environment),
                     EMPTY_STRUCTURE,
-                    100,
-                    0,
-                    true);
+                    timeoutTicks,
+                    runtimeTestIndex < 0
+                            ? 0
+                            : runtimeTestIndex * SMART_BRAIN_TEST_SETUP_INTERVAL,
+                    true,
+                    Rotation.NONE,
+                    false,
+                    1,
+                    1,
+                    false,
+                    0);
             event.registerTest(testId, new FunctionGameTestInstance(
                     ResourceKey.create(Registries.TEST_FUNCTION, testId),
                     data));
@@ -191,7 +243,14 @@ public final class ModGameTests {
         tests.put(id("lightsaber_bolt_deflection"), ModGameTests::lightsaberBoltDeflection);
         tests.put(id("recruit_blaster_projectile"), ModGameTests::recruitBlasterProjectile);
         tests.put(id("player_blaster_heat"), ModGameTests::playerBlasterHeat);
-        tests.put(id("ungrouped_recruit_ranged_goal"), ModGameTests::ungroupedRecruitRangedGoal);
+        tests.put(id("ungrouped_recruit_ranged_brain"), ModGameTests::ungroupedRecruitRangedBrain);
+        tests.put(id("ungrouped_recruit_melee_brain"), ModGameTests::ungroupedRecruitMeleeBrain);
+        tests.put(id("smart_brain_follow_and_sit"), ModGameTests::smartBrainFollowAndSit);
+        tests.put(id("smart_brain_move_command"), ModGameTests::smartBrainMoveCommand);
+        tests.put(id("smart_brain_move_stall_recovery"), ModGameTests::smartBrainMoveStallRecovery);
+        tests.put(id("natural_civilian_brain_runtime"), ModGameTests::naturalCivilianBrainRuntime);
+        tests.put(id("grouped_brain_authority"), ModGameTests::groupedBrainAuthority);
+        tests.put(id("external_library_runtime"), ModGameTests::externalLibraryRuntime);
         tests.put(id("planet_travel_failure_atomicity"), ModGameTests::planetTravelFailureAtomicity);
         tests.put(id("planet_arrival_runtime"), ModGameTests::planetArrivalRuntime);
         tests.put(id("army_planet_transfer_transaction"), ModGameTests::armyPlanetTransferTransaction);
@@ -550,32 +609,394 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    private static void ungroupedRecruitRangedGoal(GameTestHelper helper) {
-        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
-        GalacticRecruitEntity shooter = helper.spawn(
-                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
-        GalacticRecruitEntity target = helper.spawn(
-                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(12, 1, 2));
-        shooter.setNoAi(true);
+    private static void ungroupedRecruitRangedBrain(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, -2, 6, -2, 6);
+        GalacticRecruitEntity shooter = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
+        GalacticRecruitEntity target = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(4, 1, 1));
         target.setNoAi(true);
-        shooter.tame(owner);
+        target.getAttribute(Attributes.MAX_HEALTH).setBaseValue(1024.0D);
+        target.setHealth(target.getMaxHealth());
+        float initialTargetHealth = target.getHealth();
+        shooter.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
         shooter.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.DC15_BLASTER.get()));
-        shooter.setTarget(target);
-
-        RecruitRangedCombatGoal goal = new RecruitRangedCombatGoal(shooter);
-        if (!goal.canUse()) {
-            helper.fail("Ungrouped ranged recruit goal rejected a valid local attack target");
+        if (!(shooter.getBrain() instanceof net.tslat.smartbrainlib.api.internal.SmartBrain<?>)) {
+            helper.fail("Recruit did not receive a SmartBrainLib brain");
             return;
         }
         AABB shotArea = shooter.getBoundingBox().inflate(20.0D);
-        goal.tick();
         helper.succeedWhen(() -> {
             List<BlasterBoltEntity> bolts = helper.getLevel().getEntitiesOfClass(
                     BlasterBoltEntity.class, shotArea, bolt -> bolt.getOwner() == shooter);
-            if (bolts.size() != 1 || !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
-                helper.fail("Ungrouped ranged recruit goal did not fire one weapon-tagged bolt");
+            if (bolts.isEmpty() && target.getHealth() >= initialTargetHealth) {
+                helper.fail("Ungrouped ranged recruit brain did not acquire and attack its enemy: nearest="
+                        + BrainUtil.getMemory(shooter,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.NEAREST_ATTACKABLE)
+                        + ", attack=" + BrainUtil.getMemory(shooter,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET)
+                        + ", target=" + shooter.getTarget()
+                        + ", tickCount=" + shooter.tickCount
+                        + ", running=" + shooter.getBrain().getRunningBehaviors());
+                return;
+            }
+            if (!bolts.isEmpty()
+                    && !bolts.getFirst().getWeaponItem().is(ModItems.DC15_BLASTER.get())) {
+                helper.fail("Ungrouped ranged recruit brain fired a bolt without its weapon identity");
+                return;
+            }
+            shooter.discard();
+            target.discard();
+            bolts.forEach(BlasterBoltEntity::discard);
+        });
+    }
+
+    private static void ungroupedRecruitMeleeBrain(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, 0, 6, 0, 4);
+        GalacticRecruitEntity attacker = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
+        GalacticRecruitEntity target = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(3, 1, 1));
+        target.setNoAi(true);
+        target.getAttribute(Attributes.MAX_HEALTH).setBaseValue(1024.0D);
+        target.setHealth(target.getMaxHealth());
+        attacker.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
+        attacker.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_SWORD));
+        helper.succeedWhen(() -> {
+            if (attacker.getLastHurtMob() == null) {
+                helper.fail("Ungrouped melee recruit brain did not acquire and strike its enemy");
+                return;
+            }
+            attacker.discard();
+            target.discard();
+        });
+    }
+
+    private static void smartBrainFollowAndSit(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, 0, 5, 0, 4);
+        ServerPlayer owner = area.player();
+        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 2));
+        recruit.setInvulnerable(true);
+        recruit.tame(owner);
+        BlockPos ownerPos = area.at(8, 1, 2);
+        owner.setPos(ownerPos.getX() + 0.5D, ownerPos.getY(), ownerPos.getZ() + 0.5D);
+        owner.setNoGravity(true);
+        owner.setYRot(-90.0F);
+        invokeRecruitCommand(recruit, RecruitmentAction.FOLLOW_OWNER);
+        Vec3 startingPosition = recruit.position();
+        double startingDistance = recruit.distanceToSqr(owner);
+
+        helper.runAfterDelay(80, () -> {
+            boolean approachedOwner = recruit.distanceToSqr(owner) < startingDistance - 4.0D;
+            boolean followedAnchor = recruit.position().distanceToSqr(startingPosition) > 4.0D
+                    && BrainUtil.hasMemory(recruit,
+                    net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+            if (!approachedOwner && !followedAnchor) {
+                helper.fail("SmartBrain companion behaviour did not follow its owner: position="
+                        + recruit.position() + ", owner=" + owner.position()
+                        + ", start=" + startingPosition
+                        + ", command=" + recruit.getRecruitCommand()
+                        + ", shouldFollow=" + recruit.shouldUseCompanionAi()
+                        + ", walkMemory=" + BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                        + ", pathMemory=" + BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
+                        + ", navigationDone=" + recruit.getNavigation().isDone()
+                        + ", path=" + pathState(recruit, owner.blockPosition()));
+                return;
+            }
+            recruit.setWorkerProfession(WorkerProfession.FARMER);
+            invokeRecruitCommand(recruit, RecruitmentAction.HOLD_POSITION);
+            Vec3 heldPosition = recruit.position();
+            helper.runAfterDelay(20, () -> {
+                double heldDeltaX = recruit.getX() - heldPosition.x();
+                double heldDeltaZ = recruit.getZ() - heldPosition.z();
+                if (!recruit.isOrderedToSit()
+                        || heldDeltaX * heldDeltaX + heldDeltaZ * heldDeltaZ > 0.25D) {
+                    helper.fail("SmartBrain sit behaviour did not hold the recruit in place: position="
+                            + recruit.position() + ", held=" + heldPosition
+                            + ", command=" + recruit.getRecruitCommand()
+                            + ", orderedSit=" + recruit.isOrderedToSit()
+                            + ", group=" + recruit.getArmyGroupId()
+                            + ", velocity=" + recruit.getDeltaMovement()
+                            + ", running=" + recruit.getBrain().getRunningBehaviors());
+                    return;
+                }
+                recruit.discard();
+                helper.succeed();
+            });
+        });
+    }
+
+    private static void smartBrainMoveCommand(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, -2, 6, -2, 6);
+        ServerPlayer owner = area.player();
+        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 2));
+        recruit.setInvulnerable(true);
+        recruit.tame(owner);
+        BlockPos target = area.at(3, 1, 4);
+        setRecruitField(recruit, "moveTarget", target);
+        invokeRecruitCommand(recruit, RecruitmentAction.MOVE_TO_POSITION);
+        helper.succeedWhen(() -> {
+            if (recruit.distanceToMoveTargetSqr() > 4.0D) {
+                helper.fail("SmartBrain move command did not reach its explicit target: position="
+                        + recruit.position() + ", target=" + target
+                        + ", shouldMove=" + recruit.shouldMoveToCommandTarget()
+                        + ", walkMemory=" + BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                        + ", navigationDone=" + recruit.getNavigation().isDone()
+                        + ", pathMemory=" + BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
+                        + ", pathRegistered=" + recruit.getBrain().checkMemory(
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH,
+                        net.minecraft.world.entity.ai.memory.MemoryStatus.REGISTERED)
+                        + ", running=" + recruit.getBrain().getRunningBehaviors()
+                        + ", path=" + pathState(recruit, target));
+                return;
+            }
+            recruit.discard();
+        });
+    }
+
+    private static void smartBrainMoveStallRecovery(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, -2, 4, -2, 4);
+        ServerPlayer owner = area.player();
+        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
+        recruit.setInvulnerable(true);
+        recruit.tame(owner);
+        BlockPos unreachable = area.at(1, 20, 1);
+        setRecruitField(recruit, "moveTarget", unreachable);
+        invokeRecruitCommand(recruit, RecruitmentAction.MOVE_TO_POSITION);
+        boolean[] backoffObserved = {false};
+        helper.onEachTick(() -> {
+            if (recruit.tickCount >= 200
+                    && recruit.isAlive()
+                    && recruit.distanceToMoveTargetSqr() > 4.0D
+                    && recruit.getNavigation().isDone()
+                    && !BrainUtil.hasMemory(recruit,
+                    net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)) {
+                backoffObserved[0] = true;
             }
         });
+        helper.runAfterDelay(250, () -> {
+            if (!backoffObserved[0]) {
+                helper.fail("Unreachable move command did not enter bounded retry backoff: tickCount="
+                        + recruit.tickCount + ", walkMemory="
+                        + BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                        + ", navigationDone=" + recruit.getNavigation().isDone()
+                        + ", running=" + recruit.getBrain().getRunningBehaviors());
+                return;
+            }
+            recruit.discard();
+            helper.succeed();
+        });
+    }
+
+    private static void naturalCivilianBrainRuntime(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, -4, 8, -4, 8);
+
+        BlockPos shelterHome = area.at(4, 1, 4);
+        GalacticRecruitEntity sheltering = spawnRecruitAt(
+                helper, ModEntityTypes.REPUBLIC_CIVILIAN.get(), area.at(1, 1, 1));
+        sheltering.setInvulnerable(true);
+        sheltering.initializeNaturalFactionNpc(
+                UUID.randomUUID(), NpcServiceBranch.CIVILIAN, shelterHome, 32);
+        double initialShelterDistance = sheltering.distanceToSqr(Vec3.atCenterOf(shelterHome));
+        GalacticRecruitEntity threat = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(1, 1, 2));
+        threat.setInvulnerable(true);
+        threat.setNoAi(true);
+        threat.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
+        if (!sheltering.isHostileFactionRecruit(threat)) {
+            helper.fail("Natural civilian test threat is not hostile: relation="
+                    + sheltering.factionRelationTo(threat)
+                    + ", civilianFaction=" + sheltering.getRecruitFactionId()
+                    + ", threatFaction=" + threat.getRecruitFactionId()
+                    + ", threatDuty=" + threat.getRecruitDuty());
+            return;
+        }
+
+        BlockPos workHome = area.at(3, 1, 0);
+        BlockPos storage = workHome.offset(1, 0, 0);
+        helper.getLevel().setBlockAndUpdate(storage, Blocks.CHEST.defaultBlockState());
+        boolean[] shelterVerified = {false};
+        GalacticRecruitEntity[] worker = {null};
+        helper.onEachTick(() -> {
+            if (!shelterVerified[0]
+                    && sheltering.distanceToSqr(Vec3.atCenterOf(shelterHome))
+                    < initialShelterDistance - 4.0D) {
+                shelterVerified[0] = true;
+                threat.discard();
+                worker[0] = spawnRecruitAt(
+                        helper, ModEntityTypes.HUTT_CIVILIAN.get(), area.at(1, 1, 1));
+                worker[0].setInvulnerable(true);
+                worker[0].initializeNaturalFactionNpc(
+                        UUID.randomUUID(), NpcServiceBranch.CIVILIAN, workHome, 32);
+                helper.runAfterDelay(2, () -> {
+                    worker[0].setWorkerProfession(WorkerProfession.FARMER);
+                    setRecruitField(worker[0], "nextNaturalProductionGameTime", 0L);
+                    BlockPos workstation = worker[0].naturalWorkstationPosition();
+                    worker[0].setPos(
+                            workstation.getX() + 0.5D,
+                            workstation.getY(),
+                            workstation.getZ() + 0.5D);
+                    worker[0].getNavigation().stop();
+                    helper.runAfterDelay(30, () -> verifyNaturalCivilianWork(
+                            helper, sheltering, worker[0], storage));
+                });
+            }
+        });
+
+        helper.runAfterDelay(120, () -> {
+            if (!shelterVerified[0]) {
+                helper.fail("Natural civilian shelter behaviour did not retreat from a hostile soldier: position="
+                        + sheltering.position() + ", home=" + shelterHome
+                        + ", orderedSit=" + sheltering.isOrderedToSit()
+                        + ", tickCount=" + sheltering.tickCount
+                        + ", branch=" + sheltering.getServiceBranch()
+                        + ", outpost=" + sheltering.getFactionOutpostId()
+                        + ", group=" + sheltering.getArmyGroupId()
+                        + ", threatAlive=" + threat.isAlive()
+                        + ", threatDistance=" + sheltering.distanceToSqr(threat)
+                        + ", hostile=" + sheltering.isHostileFactionRecruit(threat)
+                        + ", walkMemory=" + BrainUtil.hasMemory(sheltering,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                        + ", navigationDone=" + sheltering.getNavigation().isDone()
+                        + ", pathMemory=" + BrainUtil.hasMemory(sheltering,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
+                        + ", running=" + sheltering.getBrain().getRunningBehaviors()
+                        + ", path=" + pathState(sheltering, shelterHome));
+            }
+        });
+    }
+
+    private static void verifyNaturalCivilianWork(
+            GameTestHelper helper,
+            GalacticRecruitEntity sheltering,
+            GalacticRecruitEntity workingCivilian,
+            BlockPos storage
+    ) {
+        if (!(helper.getLevel().getBlockEntity(storage) instanceof Container container)
+                || countContainerItems(container) == 0) {
+            helper.fail("Natural civilian work behaviour did not deliver settlement supplies: position="
+                    + workingCivilian.position() + ", workstation="
+                    + workingCivilian.naturalWorkstationPosition() + ", profession="
+                    + workingCivilian.getWorkerProfession() + ", natural="
+                    + workingCivilian.isNaturalFactionCivilian() + ", home="
+                    + workingCivilian.hasHome() + ", orderedSit="
+                    + workingCivilian.isOrderedToSit() + ", bright="
+                    + workingCivilian.level().isBrightOutside() + ", tickCount="
+                    + workingCivilian.tickCount + ", walkMemory="
+                    + BrainUtil.hasMemory(workingCivilian,
+                    net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                    + ", navigationDone=" + workingCivilian.getNavigation().isDone()
+                    + ", productionAt="
+                    + getRecruitField(workingCivilian, "nextNaturalProductionGameTime")
+                    + ", gameTime=" + workingCivilian.level().getGameTime()
+                    + ", running=" + workingCivilian.getBrain().getRunningBehaviors());
+            return;
+        }
+        sheltering.discard();
+        workingCivilian.discard();
+        helper.succeed();
+    }
+
+    private static void groupedBrainAuthority(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, 0, 4, 0, 4);
+        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
+        GalacticRecruitEntity target = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(2, 1, 1));
+        setRecruitField(recruit, "armyGroupId", UUID.randomUUID());
+        BrainUtil.setTargetOfEntity(recruit, target);
+        BrainUtil.setMemory(recruit, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET,
+                new net.minecraft.world.entity.ai.memory.WalkTarget(target, 1.0F, 1));
+        helper.runAfterDelay(80, () -> {
+            if (BrainUtil.hasMemory(recruit,
+                    net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET)
+                    || BrainUtil.hasMemory(recruit,
+                    net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)) {
+                helper.fail("Grouped recruit retained stale local SmartBrain targets: tickCount="
+                        + recruit.tickCount + ", running="
+                        + recruit.getBrain().getRunningBehaviors());
+                return;
+            }
+            recruit.discard();
+            target.discard();
+            helper.succeed();
+        });
+    }
+
+    private static void externalLibraryRuntime(GameTestHelper helper) {
+        GalacticRecruitEntity recruit = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
+        if (!net.neoforged.fml.ModList.get().isLoaded("smartbrainlib")
+                || !net.neoforged.fml.ModList.get().isLoaded("framework")) {
+            helper.fail("Required SmartBrainLib or Framework runtime was not discovered");
+            return;
+        }
+        if (!(recruit.getBrain() instanceof net.tslat.smartbrainlib.api.internal.SmartBrain<?>)) {
+            helper.fail("Recruit did not receive SmartBrainLib's runtime brain");
+            return;
+        }
+        if (!recruit.getBrain().checkMemory(
+                net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET,
+                net.minecraft.world.entity.ai.memory.MemoryStatus.REGISTERED)
+                || !recruit.getBrain().checkMemory(
+                net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH,
+                net.minecraft.world.entity.ai.memory.MemoryStatus.REGISTERED)) {
+            helper.fail("SmartBrain movement memories were not registered");
+            return;
+        }
+        Identifier expectedChannel = Identifier.fromNamespaceAndPath("galacticwars", "main");
+        if (!galacticwars.clonewars.network.GalacticNetwork.CHANNEL.id().equals(expectedChannel)) {
+            helper.fail("Framework channel was not built with the galacticwars:main identifier");
+            return;
+        }
+        if (!codecRoundTrips(
+                        new galacticwars.clonewars.network.ForceActivatePayload(UUID.randomUUID(), 2),
+                        galacticwars.clonewars.network.ForceActivatePayload.STREAM_CODEC)
+                || !codecRoundTrips(
+                        new galacticwars.clonewars.network.VehicleInputPayload(
+                                UUID.randomUUID(), 42, 0.75F, -0.5F, true, false, true),
+                        galacticwars.clonewars.network.VehicleInputPayload.STREAM_CODEC)
+                || !codecRoundTrips(
+                        new galacticwars.clonewars.network.MenuActionPayload(
+                                UUID.randomUUID(), 7, 255),
+                        galacticwars.clonewars.network.MenuActionPayload.STREAM_CODEC)
+                || !codecRoundTrips(
+                        new galacticwars.clonewars.network.ForceHudPayload(81, 4, 17, 0),
+                        galacticwars.clonewars.network.ForceHudPayload.STREAM_CODEC)) {
+            helper.fail("A Framework message codec did not round-trip cleanly");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static <T> boolean codecRoundTrips(
+            T expected,
+            net.minecraft.network.codec.StreamCodec<net.minecraft.network.RegistryFriendlyByteBuf, T> codec
+    ) {
+        net.minecraft.network.RegistryFriendlyByteBuf buffer =
+                new net.minecraft.network.RegistryFriendlyByteBuf(
+                        io.netty.buffer.Unpooled.buffer(), net.minecraft.core.RegistryAccess.EMPTY);
+        try {
+            codec.encode(buffer, expected);
+            return expected.equals(codec.decode(buffer)) && !buffer.isReadable();
+        } finally {
+            buffer.release();
+        }
     }
 
     private static void blasterFriendlyFire(GameTestHelper helper) {
@@ -725,6 +1146,8 @@ public final class ModGameTests {
             }
             GalacticRecruitEntity recruit = spawned.getFirst();
             spawnedRecruitIds.add(recruit.getUUID());
+            // GameTests share a server batch; isolate this lifecycle assertion from nearby combat tests.
+            recruit.setInvulnerable(true);
             if (!recruit.isPersistenceRequired()) {
                 helper.fail("Spawn egg recruit was not marked persistent: " + testCase.type());
             }
@@ -809,6 +1232,8 @@ public final class ModGameTests {
         }
         GalacticRecruitEntity dispenserRecruit = dispenserRecruits.getFirst();
         spawnedRecruitIds.add(dispenserRecruit.getUUID());
+        // Keep the dispenser case subject to normal AI ticking without allowing cross-test damage.
+        dispenserRecruit.setInvulnerable(true);
         if (!dispenserRecruit.isPersistenceRequired()
                 || dispenserRecruit.getServiceBranch() != NpcServiceBranch.MILITARY
                 || dispenserRecruit.getMainHandItem().isEmpty()) {
@@ -2166,6 +2591,100 @@ public final class ModGameTests {
         return count;
     }
 
+    private static int countContainerItems(Container container) {
+        int count = 0;
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            count += container.getItem(slot).getCount();
+        }
+        return count;
+    }
+
+    private static SmartBrainTestArea prepareSmartBrainTestArea(
+            GameTestHelper helper,
+            GameType playerGameType,
+            int minX,
+            int maxX,
+            int minZ,
+            int maxZ
+    ) {
+        BlockPos base = helper.absolutePos(BlockPos.ZERO);
+        int minChunkX = Math.min(base.getX() + minX, base.getX() + maxX) >> 4;
+        int maxChunkX = Math.max(base.getX() + minX, base.getX() + maxX) >> 4;
+        int minChunkZ = Math.min(base.getZ() + minZ, base.getZ() + maxZ) >> 4;
+        int maxChunkZ = Math.max(base.getZ() + minZ, base.getZ() + maxZ) >> 4;
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                ChunkPos chunk = new ChunkPos(chunkX, chunkZ);
+                helper.getLevel().getChunkSource().updateChunkForced(chunk, true);
+                helper.getLevel().getChunk(chunkX, chunkZ);
+            }
+        }
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                helper.getLevel().setBlockAndUpdate(base.offset(x, 0, z), Blocks.STONE.defaultBlockState());
+            }
+        }
+        ServerPlayer player = makeConnectedMockPlayer(helper, playerGameType);
+        if (!player.teleportTo(
+                helper.getLevel(),
+                base.getX() + 0.5D,
+                base.getY() + 1.0D,
+                base.getZ() + 0.5D,
+                Set.of(),
+                0.0F,
+                0.0F,
+                true)) {
+            throw new IllegalStateException("Could not load SmartBrain GameTest area");
+        }
+        return new SmartBrainTestArea(base, player);
+    }
+
+    private static GalacticRecruitEntity spawnRecruitAt(
+            GameTestHelper helper,
+            EntityType<GalacticRecruitEntity> type,
+            BlockPos position
+    ) {
+        GalacticRecruitEntity recruit = type.create(
+                helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        if (recruit == null) {
+            throw new IllegalStateException("Could not create SmartBrain GameTest recruit");
+        }
+        recruit.setPos(
+                position.getX() + 0.5D,
+                position.getY(),
+                position.getZ() + 0.5D);
+        if (!helper.getLevel().addFreshEntity(recruit)) {
+            throw new IllegalStateException("Could not register SmartBrain GameTest recruit");
+        }
+        recruit.setDeltaMovement(Vec3.ZERO);
+        recruit.getNavigation().stop();
+        return recruit;
+    }
+
+    private static void fillTestFloor(
+            GameTestHelper helper,
+            int minX,
+            int maxX,
+            int minZ,
+            int maxZ
+    ) {
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+    }
+
+    private static String pathState(GalacticRecruitEntity recruit, BlockPos target) {
+        net.minecraft.world.level.pathfinder.Path path = recruit.getNavigation().createPath(target, 0);
+        if (path == null) {
+            return "none";
+        }
+        return "nodes=" + path.getNodeCount()
+                + ", canReach=" + path.canReach()
+                + ", target=" + path.getTarget();
+    }
+
     @SuppressWarnings("unchecked")
     private static int workerInventoryCount(GalacticRecruitEntity recruit) {
         return ((NonNullList<ItemStack>) getRecruitField(recruit, "workerInventory")).stream()
@@ -2244,6 +2763,12 @@ public final class ModGameTests {
                 EntityType<GalacticRecruitEntity> type
         ) {
             this(item, type, false);
+        }
+    }
+
+    private record SmartBrainTestArea(BlockPos base, ServerPlayer player) {
+        private BlockPos at(int x, int y, int z) {
+            return base.offset(x, y, z);
         }
     }
 

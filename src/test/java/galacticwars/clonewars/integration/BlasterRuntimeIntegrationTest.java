@@ -28,12 +28,13 @@ public final class BlasterRuntimeIntegrationTest {
     }
 
     private static void ungroupedRangedRecruitsUseTheirWeapons() throws IOException {
-        String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
-        String goal = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitRangedCombatGoal.java");
-        assertContains(entity, "new RecruitRangedCombatGoal(this)", "ranged goal registration");
-        assertContains(goal, "!recruit.hasAuthoritativeArmyGroup()", "group-controller exclusion");
-        assertContains(goal, "blaster.fireAt", "autonomous blaster execution");
-        assertContains(goal, "fireNightsisterBow", "autonomous bow execution");
+        String brain = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitBrain.java");
+        String behaviour = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/RecruitRangedCombatBehaviour.java");
+        assertContains(brain, "new RecruitRangedCombatBehaviour()", "ranged brain registration");
+        assertContains(behaviour, "!recruit.hasAuthoritativeArmyGroup()", "group-controller exclusion");
+        assertContains(behaviour, "blaster.fireAt", "autonomous blaster execution");
+        assertContains(behaviour, "fireNightsisterBow", "autonomous bow execution");
     }
 
     private static String read(String path) throws IOException {

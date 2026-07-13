@@ -12,8 +12,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import java.util.UUID;
+import galacticwars.clonewars.network.GalacticNetwork;
 import galacticwars.clonewars.network.MenuActionPayload;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 public final class MerchantTradeScreen extends Screen implements MenuAccess<MerchantTradeMenu> {
     private final MerchantTradeMenu menu;
@@ -38,7 +38,7 @@ public final class MerchantTradeScreen extends Screen implements MenuAccess<Merc
                             trade.itemCount(), trade.price());
             int buttonId = index;
             this.addRenderableWidget(Button.builder(label, button -> {
-                        ClientPacketDistributor.sendToServer(new MenuActionPayload(
+                        GalacticNetwork.CHANNEL.sendToServer(new MenuActionPayload(
                                 UUID.randomUUID(), menu.containerId, buttonId));
                     }).bounds(x, y + index * 22, width, 20).build());
         }

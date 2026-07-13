@@ -94,6 +94,22 @@ config="${mod_id}.mixins.json"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
+    modId="smartbrainlib"
+    type="required"
+    reason="Galactic Wars recruit AI is scheduled by SmartBrainLib."
+    versionRange="[${smartbrainlib_version},3.0.0)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="framework"
+    type="required"
+    reason="Galactic Wars gameplay networking uses MrCrayfish's Framework."
+    versionRange="[${framework_version},0.14.0)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
     modId="yet_another_config_lib_v3"
     type="required"
     reason="Galactic Wars uses YACL for its in-game configuration screen."

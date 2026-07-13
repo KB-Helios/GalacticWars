@@ -3,11 +3,12 @@ package galacticwars.clonewars.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.network.ForceActivatePayload;
+import galacticwars.clonewars.network.GalacticNetwork;
+import galacticwars.clonewars.network.VehicleInputPayload;
 import java.util.UUID;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.lwjgl.glfw.GLFW;
 
@@ -37,7 +38,7 @@ public final class ForceKeyMappings {
     public static void tick(ClientTickEvent.Post event) {
         for (int slot = 0; slot < KEYS.length; slot++) {
             while (KEYS[slot].consumeClick()) {
-                ClientPacketDistributor.sendToServer(new ForceActivatePayload(UUID.randomUUID(), slot));
+                GalacticNetwork.CHANNEL.sendToServer(new ForceActivatePayload(UUID.randomUUID(), slot));
             }
         }
         net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
@@ -48,7 +49,7 @@ public final class ForceKeyMappings {
             float strafe = (minecraft.options.keyLeft.isDown() ? 1.0F : 0.0F)
                     - (minecraft.options.keyRight.isDown() ? 1.0F : 0.0F);
             boolean fire = VEHICLE_FIRE.consumeClick();
-            ClientPacketDistributor.sendToServer(new galacticwars.clonewars.network.VehicleInputPayload(
+            GalacticNetwork.CHANNEL.sendToServer(new VehicleInputPayload(
                     UUID.randomUUID(), vehicle.getId(), forward, strafe,
                     minecraft.options.keyJump.isDown(), minecraft.options.keyShift.isDown(), fire));
         }

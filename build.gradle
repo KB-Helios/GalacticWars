@@ -35,6 +35,20 @@ repositories {
         }
     }
     maven {
+        name = "SmartBrainLib"
+        url = "https://dl.cloudsmith.io/public/tslat/sbl/maven/"
+        content {
+            includeGroup("net.tslat")
+        }
+    }
+    maven {
+        name = "CurseMaven"
+        url = "https://cursemaven.com"
+        content {
+            includeGroup("curse.maven")
+        }
+    }
+    maven {
         name = "Xander Maven"
         url = "https://maven.isxander.dev/releases"
         content {
@@ -127,6 +141,10 @@ configurations {
 
 dependencies {
     implementation "com.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
+    implementation "net.tslat:smartbrainlib-neoforge-${minecraft_version}:${smartbrainlib_version}"
+    implementation("curse.maven:framework-549225:${framework_curse_file}") {
+        transitive = false
+    }
     // YACL supplies the client config screen. It remains an external mod dependency,
     // so it is compile-only for published consumers and present in local dev runs.
     compileOnly("dev.isxander:yet-another-config-lib:${yacl_version}") {
@@ -168,6 +186,8 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             neo_version            : neo_version,
             geckolib_version       : geckolib_version,
             yacl_version           : yacl_version,
+            smartbrainlib_version  : smartbrainlib_version,
+            framework_version      : framework_version,
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,

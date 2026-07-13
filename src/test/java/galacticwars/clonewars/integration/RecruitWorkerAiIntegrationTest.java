@@ -9,22 +9,23 @@ public final class RecruitWorkerAiIntegrationTest {
     }
 
     public static void main(String[] args) throws IOException {
-        recruitRegistersWorkerGoal();
+        recruitRegistersWorkerBehaviour();
         recruitPersistsWorkerStateMachine();
         recruitUsesRealLootAndInventoryTransactions();
         recruitRequiresReachableClaimedTargets();
         recruitImplementsEnabledProfessionHandlers();
         builderNormalizesProgressionSubject();
-        workerGoalDelegatesToRecruitCycle();
+        workerBehaviourDelegatesToRecruitCycle();
 
         System.out.println("RecruitWorkerAiIntegrationTest passed");
     }
 
-    private static void recruitRegistersWorkerGoal() throws IOException {
+    private static void recruitRegistersWorkerBehaviour() throws IOException {
         String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
+        String brain = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitBrain.java");
 
-        assertContains(entity, "RecruitWorkerGoal", "worker goal import/use");
-        assertContains(entity, "this.goalSelector.addGoal(4, new RecruitWorkerGoal(this));", "worker goal registration");
+        assertContains(entity, "SmartBrainOwner<GalacticRecruitEntity>", "SmartBrain owner contract");
+        assertContains(brain, "new RecruitWorkerBehaviour()", "worker behaviour registration");
     }
 
     private static void recruitPersistsWorkerStateMachine() throws IOException {
@@ -82,13 +83,15 @@ public final class RecruitWorkerAiIntegrationTest {
         assertContains(entity, "placeCurrentBuildBlock", "builder placement handler");
     }
 
-    private static void workerGoalDelegatesToRecruitCycle() throws IOException {
-        String goal = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitWorkerGoal.java");
+    private static void workerBehaviourDelegatesToRecruitCycle() throws IOException {
+        String behaviour = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/RecruitWorkerBehaviour.java");
 
-        assertContains(goal, "class RecruitWorkerGoal extends Goal", "worker goal class");
-        assertContains(goal, "shouldRunWorkerCycle", "worker cycle guard");
-        assertContains(goal, "tickWorkerController", "worker controller tick");
-        assertContains(goal, "pauseWorkerNavigation", "worker navigation cleanup");
+        assertContains(behaviour, "extends ExtendedBehaviour<GalacticRecruitEntity>",
+                "worker SmartBrainLib behaviour class");
+        assertContains(behaviour, "shouldRunWorkerCycle", "worker cycle guard");
+        assertContains(behaviour, "tickWorkerController", "worker controller tick");
+        assertContains(behaviour, "pauseWorkerNavigation", "worker navigation cleanup");
     }
 
     private static String read(String path) throws IOException {

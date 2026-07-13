@@ -27,12 +27,7 @@ import galacticwars.clonewars.classes.ClassProgressCodecs;
 import galacticwars.clonewars.classes.ClassProgressState;
 import galacticwars.clonewars.classes.UnitClassDefinition;
 import galacticwars.clonewars.data.GameplayDataManager;
-import galacticwars.clonewars.entity.ai.RecruitWorkerGoal;
-import galacticwars.clonewars.entity.ai.RecruitRangedCombatGoal;
-import galacticwars.clonewars.entity.ai.RecruitCompanionGoal;
-import galacticwars.clonewars.entity.ai.RecruitMoveToCommandGoal;
-import galacticwars.clonewars.entity.ai.CivilianShelterGoal;
-import galacticwars.clonewars.entity.ai.NaturalCivilianWorkGoal;
+import galacticwars.clonewars.entity.ai.RecruitBrain;
 import galacticwars.clonewars.combat.FactionRangedWeaponService;
 import galacticwars.clonewars.faction.FactionAlignment;
 import galacticwars.clonewars.faction.FactionAlignmentSavedData;
@@ -126,13 +121,6 @@ import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.goal.FloatGoal;
-import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
-import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
-import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
-import net.minecraft.world.entity.ai.goal.SitWhenOrderedToGoal;
-import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
@@ -157,6 +145,8 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
+import net.tslat.smartbrainlib.api.SmartBrainBuilder;
+import net.tslat.smartbrainlib.api.SmartBrainOwner;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -166,7 +156,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
+public class GalacticRecruitEntity extends TamableAnimal
+        implements GeoEntity, SmartBrainOwner<GalacticRecruitEntity> {
     private static final int DEFAULT_WORK_RADIUS = 8;
     private static final int MIN_WORK_RADIUS = 2;
     private static final int MAX_WORK_RADIUS = 32;
@@ -258,50 +249,19 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
 
     @Override
     protected void registerGoals() {
-        this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new RecruitRangedCombatGoal(this));
-        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.05, true) {
-            @Override
-            public boolean canUse() {
-                return !GalacticRecruitEntity.this.hasAuthoritativeArmyGroup()
-                        && !FactionRangedWeaponService.supportsRecruitRangedCombat(
-                                GalacticRecruitEntity.this.getMainHandItem())
-                        && super.canUse();
-            }
+        // SmartBrainLib owns all recruit scheduling; vanilla selectors must stay empty.
+    }
 
-            @Override
-            public boolean canContinueToUse() {
-                return !GalacticRecruitEntity.this.hasAuthoritativeArmyGroup()
-                        && !FactionRangedWeaponService.supportsRecruitRangedCombat(
-                                GalacticRecruitEntity.this.getMainHandItem())
-                        && super.canContinueToUse();
-            }
-        });
-        this.goalSelector.addGoal(2, new SitWhenOrderedToGoal(this));
-        this.goalSelector.addGoal(2, new CivilianShelterGoal(this));
-        this.goalSelector.addGoal(3, new NaturalCivilianWorkGoal(this));
-        this.goalSelector.addGoal(4, new RecruitWorkerGoal(this));
-        this.goalSelector.addGoal(5, new RecruitMoveToCommandGoal(this, 1.05));
-        this.goalSelector.addGoal(6, new RecruitCompanionGoal(this, 1.0));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(
-                this, GalacticRecruitEntity.class, 10, true, false,
-                (target, level) -> this.canNaturallyEngage(target)));
-        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(
-                this, Player.class, 20, true, false,
-                (target, level) -> target instanceof Player player && this.canNaturallyEngagePlayer(player)));
-        this.goalSelector.addGoal(7, new WaterAvoidingRandomStrollGoal(this, 0.8) {
-            @Override
-            public boolean canUse() {
-                return !GalacticRecruitEntity.this.hasAuthoritativeArmyGroup() && super.canUse();
-            }
+    @Override
+    public SmartBrainBuilder<GalacticRecruitEntity> getBrainBuilder() {
+        return RecruitBrain.INSTANCE;
+    }
 
-            @Override
-            public boolean canContinueToUse() {
-                return !GalacticRecruitEntity.this.hasAuthoritativeArmyGroup() && super.canContinueToUse();
-            }
-        });
-        this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
+    @Override
+    public List<? extends net.tslat.smartbrainlib.api.core.sensor.ExtendedSensor<?>> getSensors(
+            GalacticRecruitEntity owner
+    ) {
+        return RecruitBrain.INSTANCE.getSensors(owner);
     }
 
     @Override
@@ -525,10 +485,6 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         if (!this.level().isClientSide() && this.tickCount % 100 == 0
                 && this.level() instanceof ServerLevel serverLevel) {
             this.syncArmySnapshot(serverLevel);
-        }
-        if (!this.level().isClientSide() && this.level() instanceof ServerLevel serverLevel) {
-            this.tickLocalOwnerProtection();
-            this.armyRuntimeController.tick(this, serverLevel);
         }
     }
 
@@ -1289,17 +1245,38 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                 && this.getRecruitOwner().isPresent();
     }
 
-    private void tickLocalOwnerProtection() {
-        if (!this.shouldProtectOwnerLocally()) {
-            return;
+    public boolean canUseLocalAttackTarget(@Nullable LivingEntity target) {
+        if (target == null || this.hasAuthoritativeArmyGroup() || !this.canAttackTarget(target)) {
+            return false;
+        }
+        if (!this.isTame()) {
+            return this.canNaturallyEngage(target);
+        }
+        if (this.getRecruitCommand() == RecruitmentAction.ATTACK_TARGET
+                && target == this.getTarget()) {
+            return true;
         }
         LivingEntity owner = this.getRecruitOwner().orElse(null);
-        LivingEntity attacker = owner == null ? null : owner.getLastHurtByMob();
-        if (attacker != null
-                && this.canAttack(attacker)
-                && this.wantsToAttack(attacker, owner)) {
-            this.setTarget(attacker);
+        return this.shouldProtectOwnerLocally()
+                && owner != null
+                && target == owner.getLastHurtByMob();
+    }
+
+    public @Nullable LivingEntity selectLocalAttackTarget(@Nullable LivingEntity sensedTarget) {
+        LivingEntity currentTarget = this.getTarget();
+        if (this.canUseLocalAttackTarget(currentTarget)) {
+            return currentTarget;
         }
+        LivingEntity owner = this.getRecruitOwner().orElse(null);
+        LivingEntity ownerAttacker = owner == null ? null : owner.getLastHurtByMob();
+        if (this.canUseLocalAttackTarget(ownerAttacker)) {
+            return ownerAttacker;
+        }
+        return this.canUseLocalAttackTarget(sensedTarget) ? sensedTarget : null;
+    }
+
+    public void tickArmyRuntimeController(ServerLevel level) {
+        this.armyRuntimeController.tick(this, level);
     }
 
     @Override
@@ -4129,7 +4106,8 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
 
     private void setRecruitCommand(RecruitmentAction command) {
         this.entityData.set(DATA_COMMAND, command.ordinal());
-        this.setOrderedToSit(command == RecruitmentAction.HOLD_POSITION || command == RecruitmentAction.CLEAR_TARGET);
+        this.setOrderedToSit(this.isTame()
+                && (command == RecruitmentAction.HOLD_POSITION || command == RecruitmentAction.CLEAR_TARGET));
         if (command != RecruitmentAction.MOVE_TO_POSITION
                 && command != RecruitmentAction.WORK_AT_SITE
                 && command != RecruitmentAction.HOLD_POSITION

@@ -22,7 +22,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import galacticwars.clonewars.network.ForceHudPayload;
-import net.neoforged.neoforge.network.PacketDistributor;
+import galacticwars.clonewars.network.GalacticNetwork;
 
 public final class ForceWorldEffectService {
     private ForceWorldEffectService() {
@@ -72,7 +72,7 @@ public final class ForceWorldEffectService {
             cooldowns[index] = (int) Math.max(0L,
                     Math.min(Integer.MAX_VALUE, state.cooldownEnds().getOrDefault(abilities[index], 0L) - gameTime));
         }
-        PacketDistributor.sendToPlayer(player,
+        GalacticNetwork.CHANNEL.sendToPlayer(() -> player,
                 new ForceHudPayload(state.energy(), cooldowns[0], cooldowns[1], cooldowns[2]));
     }
 

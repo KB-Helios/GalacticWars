@@ -25,22 +25,26 @@ public final class RecruitCompanionAiIntegrationTest {
 
     private static void recruitSeparatesGroupedAndLocalRuntimeControl() throws IOException {
         String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
+        String brain = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitBrain.java");
+        String armyBehaviour = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/RecruitArmyRuntimeBehaviour.java");
 
         assertContains(entity, "ArmyRecruitRuntimeController", "army runtime controller");
-        assertContains(entity, "this.armyRuntimeController.tick(this, serverLevel)", "army runtime invocation");
-        assertContains(entity, "this.goalSelector.addGoal(5, new RecruitMoveToCommandGoal(this, 1.05));",
-                "local move goal registration");
-        assertContains(entity, "this.goalSelector.addGoal(6, new RecruitCompanionGoal(this, 1.0));",
-                "local companion goal registration");
-        assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/RecruitCompanionGoal.java"),
+        assertContains(entity, "this.armyRuntimeController.tick(this, level)", "army runtime invocation");
+        assertContains(brain, "new RecruitMoveToCommandBehaviour(1.05D)",
+                "local move behaviour registration");
+        assertContains(brain, "new RecruitCompanionBehaviour(1.0D)",
+                "local companion behaviour registration");
+        assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/RecruitCompanionBehaviour.java"),
                 "shouldUseCompanionAi", "companion ownership guard");
-        assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/RecruitMoveToCommandGoal.java"),
+        assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/RecruitMoveToCommandBehaviour.java"),
                 "shouldMoveToCommandTarget", "move command guard");
-        assertTrue(count(entity, "&& !this.hasAuthoritativeArmyGroup()") >= 2,
-                "local movement goals yield to authoritative group control");
+        assertContains(armyBehaviour, "BrainUtil.clearMemories", "grouped local-memory cleanup");
+        assertContains(armyBehaviour, "recruit.tickArmyRuntimeController(level)",
+                "grouped controller behaviour");
         assertNotContains(entity, "FollowOwnerGoal", "vanilla dog-like follow goal");
-        assertTrue(count(entity, "!GalacticRecruitEntity.this.hasAuthoritativeArmyGroup()") >= 4,
-                "grouped melee and random-stroll goals are disabled");
+        assertNotContains(entity, "goalSelector.addGoal", "vanilla goal scheduling");
+        assertContains(entity, "SmartBrainOwner<GalacticRecruitEntity>", "SmartBrain owner contract");
     }
 
     private static void controllerIntegratesExistingPlannerPipeline() throws IOException {
@@ -146,13 +150,14 @@ public final class RecruitCompanionAiIntegrationTest {
     }
 
     private static void localCommandNavigationRecoversFromStalls() throws IOException {
-        String goal = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitMoveToCommandGoal.java");
+        String behaviour = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/RecruitMoveToCommandBehaviour.java");
 
-        assertContains(goal, "REPATH_INTERVAL = 20", "bounded local command repathing");
-        assertContains(goal, "STALL_TIMEOUT = 200", "local command navigation timeout");
-        assertContains(goal, "RETRY_BACKOFF = 40", "failed path retry backoff");
-        assertContains(goal, "this.recruit.getNavigation().isDone()", "failed path restart");
-        assertContains(goal, "this.stalledTicks >= STALL_TIMEOUT", "no-progress recovery");
+        assertContains(behaviour, "REPATH_INTERVAL = 20", "bounded local command repathing");
+        assertContains(behaviour, "STALL_TIMEOUT = 200", "local command navigation timeout");
+        assertContains(behaviour, "RETRY_BACKOFF = 40", "failed path retry backoff");
+        assertContains(behaviour, "recruit.getNavigation().isDone()", "failed path restart");
+        assertContains(behaviour, "stalledTicks >= STALL_TIMEOUT", "no-progress recovery");
     }
 
     private static String read(String relativePath) throws IOException {

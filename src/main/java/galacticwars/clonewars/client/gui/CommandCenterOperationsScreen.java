@@ -8,8 +8,8 @@ import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import java.util.UUID;
+import galacticwars.clonewars.network.GalacticNetwork;
 import galacticwars.clonewars.network.MenuActionPayload;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 public final class CommandCenterOperationsScreen extends Screen
         implements MenuAccess<CommandCenterOperationsMenu> {
@@ -79,7 +79,7 @@ public final class CommandCenterOperationsScreen extends Screen
 
     private void addAction(int x, int y, String key, int id) {
         addRenderableWidget(Button.builder(Component.translatable(key), button -> {
-            ClientPacketDistributor.sendToServer(
+            GalacticNetwork.CHANNEL.sendToServer(
                     new MenuActionPayload(UUID.randomUUID(), menu.containerId, id));
         }).bounds(x, y, 220, 20).build());
     }
