@@ -85,12 +85,16 @@ public final class RecruitRangedCombatBehaviour
     }
 
     @Override
+    @Override
     protected void stop(GalacticRecruitEntity recruit) {
         BrainUtil.clearMemories(recruit,
                 MemoryModuleType.WALK_TARGET,
                 MemoryModuleType.LOOK_TARGET);
         recruit.getNavigation().stop();
         recruit.setAggressive(false);
+        heat = BlasterHeatPolicy.BlasterHeatState.ready();
+        bowCooldownTicks = 0;
+    }
     }
 
     private static boolean canFight(GalacticRecruitEntity recruit) {
