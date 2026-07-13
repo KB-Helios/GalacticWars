@@ -540,13 +540,13 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             @Nullable SpawnGroupData spawnGroupData
     ) {
         SpawnGroupData finalized = super.finalizeSpawn(level, difficulty, reason, spawnGroupData);
-        if (reason == EntitySpawnReason.SPAWN_ITEM_USE) {
+        if (reason == EntitySpawnReason.SPAWN_ITEM_USE || reason == EntitySpawnReason.DISPENSER) {
             this.initializeFromSpawnEgg();
         }
         return finalized;
     }
 
-    /** Finalizes data-driven stats and prevents a player-placed recruit from despawning. */
+    /** Finalizes data-driven stats and prevents a spawn-egg recruit from despawning. */
     public void initializeFromSpawnEgg() {
         if (this.level().isClientSide() || this.spawnEggInitialized) {
             return;

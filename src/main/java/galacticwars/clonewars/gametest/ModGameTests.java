@@ -88,6 +88,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.dispenser.BlockSource;
+import net.minecraft.core.dispenser.SpawnEggItemBehavior;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.FunctionGameTestInstance;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -117,6 +119,8 @@ import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.block.entity.DispenserBlockEntity;
 import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
@@ -781,6 +785,34 @@ public final class ModGameTests {
                 || spawnerDisplay == null
                 || spawnerDisplay.getType() != ModEntityTypes.CLONE_TROOPER.get()) {
             helper.fail("Recruit spawn egg did not preserve vanilla spawner configuration behavior");
+        }
+
+        BlockPos relativeDispenser = new BlockPos(10, 1, 15);
+        BlockPos dispenserPos = helper.absolutePos(relativeDispenser);
+        var dispenserState = Blocks.DISPENSER.defaultBlockState()
+                .setValue(DispenserBlock.FACING, Direction.EAST);
+        helper.getLevel().setBlockAndUpdate(dispenserPos, dispenserState);
+        DispenserBlockEntity dispenser = helper.getBlockEntity(
+                relativeDispenser, DispenserBlockEntity.class);
+        ItemStack dispenserEgg = new ItemStack(ModItems.B1_BATTLE_DROID_SPAWN_EGG.get());
+        dispenser.setItem(0, dispenserEgg);
+        dispenser.setItem(0, SpawnEggItemBehavior.INSTANCE.dispense(
+                new BlockSource(helper.getLevel(), dispenserPos, dispenserState, dispenser),
+                dispenserEgg));
+        BlockPos dispenserSpawnPos = dispenserPos.relative(Direction.EAST);
+        List<GalacticRecruitEntity> dispenserRecruits = helper.getLevel().getEntitiesOfClass(
+                GalacticRecruitEntity.class,
+                new AABB(dispenserSpawnPos).inflate(1.0D),
+                recruit -> recruit.getType() == ModEntityTypes.B1_BATTLE_DROID.get());
+        if (dispenserRecruits.size() != 1) {
+            helper.fail("Dispenser spawn egg did not create its recruit");
+        }
+        GalacticRecruitEntity dispenserRecruit = dispenserRecruits.getFirst();
+        spawnedRecruitIds.add(dispenserRecruit.getUUID());
+        if (!dispenserRecruit.isPersistenceRequired()
+                || dispenserRecruit.getServiceBranch() != NpcServiceBranch.MILITARY
+                || dispenserRecruit.getMainHandItem().isEmpty()) {
+            helper.fail("Dispenser spawn egg did not initialize recruit persistence and loadout");
         }
 
         BlockPos relativeFurnace = new BlockPos(15, 1, 15);
