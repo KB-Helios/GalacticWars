@@ -31,7 +31,7 @@ public final class MerchantTradeScreen extends Screen implements MenuAccess<Merc
             Component label = trade == null
                     ? Component.literal(tradeId)
                     : Component.translatable("screen.galacticwars.trade.offer",
-                            Component.translatable("item." + trade.itemId().replace(':', '.')),
+                            Component.translatable(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.Identifier.parse(trade.itemId())).getDescriptionId()),
                             trade.itemCount(), trade.price());
             int buttonId = index;
             this.addRenderableWidget(Button.builder(label, button -> {
