@@ -95,7 +95,7 @@ public final class RecruitWalkTargetBehaviour
             WalkTarget walkTarget,
             BlockPos targetPos
     ) {
-        Path path = recruit.getNavigation().createPath(targetPos, 0);
+        Path path = recruit.getNavigation().createPath(targetPos, walkTarget.getCloseEnoughDist());
         lastTargetPos = targetPos.immutable();
         nextRepathTick = recruit.tickCount + REPATH_INTERVAL;
         if (path == null) {
