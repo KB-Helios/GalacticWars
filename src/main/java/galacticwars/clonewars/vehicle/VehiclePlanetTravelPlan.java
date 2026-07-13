@@ -106,7 +106,7 @@ public final class VehiclePlanetTravelPlan {
         vehicle.teleportTo(source, sourceX, sourceY, sourceZ, Set.<Relative>of(),
                 vehicle.getYRot(), vehicle.getXRot(), false);
         passengers.forEach(this::rollbackPlayer);
-        passengers.forEach(passenger -> passenger.startRiding(vehicle, true, true));
+        passengers.forEach(passenger -> passenger.startRiding(vehicle, true));
     }
 
     private void rollbackPlayer(ServerPlayer player) {
