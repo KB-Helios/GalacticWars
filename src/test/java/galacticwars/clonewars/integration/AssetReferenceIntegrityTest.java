@@ -22,8 +22,10 @@ public final class AssetReferenceIntegrityTest {
     private static final Path MOD_DATA_ROOT = RESOURCE_ROOT.resolve("data/galacticwars");
     private static final Path BUILT_JAR = Path.of("build/libs/galacticwars-1.0.0.jar");
     private static final Pattern MOD_REFERENCE = Pattern.compile("\"(galacticwars:(?:block|item)/[^\"]+)\"");
+    private static final Pattern TEXTURES_OBJECT = Pattern.compile(
+            "\"textures\"\\s*:\\s*\\{([^}]*)}", Pattern.DOTALL);
     private static final Pattern MOD_TEXTURE_REFERENCE = Pattern.compile(
-            "\"(?:all|side|top|bottom|front|back|particle|hilt|blade|core|layer\\d+)\"\\s*:\\s*\"(galacticwars:(?:block|item)/[^\"]+)\"");
+            "\"[^\"]+\"\\s*:\\s*\"(galacticwars:(?:block|item)/[^\"]+)\"");
 
     private AssetReferenceIntegrityTest() {
     }
@@ -174,10 +176,13 @@ public final class AssetReferenceIntegrityTest {
     }
 
     private static Set<String> textureReferencesIn(Path file) throws IOException {
-        Matcher matcher = MOD_TEXTURE_REFERENCE.matcher(Files.readString(file));
         HashSet<String> references = new HashSet<>();
-        while (matcher.find()) {
-            references.add(matcher.group(1));
+        Matcher textures = TEXTURES_OBJECT.matcher(Files.readString(file));
+        while (textures.find()) {
+            Matcher reference = MOD_TEXTURE_REFERENCE.matcher(textures.group(1));
+            while (reference.find()) {
+                references.add(reference.group(1));
+            }
         }
         return references;
     }

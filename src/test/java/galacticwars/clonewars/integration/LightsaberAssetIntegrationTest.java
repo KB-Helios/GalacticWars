@@ -61,8 +61,9 @@ public final class LightsaberAssetIntegrationTest {
                 clientExtensions.contains("applyForgeHandTransform"),
                 "first-person lightsaber wield animation");
         require(clientExtensions.contains("swingProgress"), "lightsaber slash must follow swing progress");
+        String handTransform = methodBody(clientExtensions, "boolean applyForgeHandTransform");
         require(
-                clientExtensions.contains("return false;"),
+                handTransform.contains("return false;") && !handTransform.contains("return true;"),
                 "first-person extension must preserve Minecraft's normal hand transform");
 
         System.out.println("LightsaberAssetIntegrationTest passed");
@@ -83,6 +84,23 @@ public final class LightsaberAssetIntegrationTest {
             offset += needle.length();
         }
         return count;
+    }
+
+    private static String methodBody(String source, String signature) {
+        int signatureStart = source.indexOf(signature);
+        require(signatureStart >= 0, "missing method " + signature);
+        int bodyStart = source.indexOf('{', signatureStart);
+        require(bodyStart >= 0, "missing method body " + signature);
+        int depth = 0;
+        for (int index = bodyStart; index < source.length(); index++) {
+            char character = source.charAt(index);
+            if (character == '{') {
+                depth++;
+            } else if (character == '}' && --depth == 0) {
+                return source.substring(bodyStart + 1, index);
+            }
+        }
+        throw new AssertionError("unterminated method body " + signature);
     }
 
     private static void image(
