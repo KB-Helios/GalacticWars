@@ -43,7 +43,7 @@ public final class ClassAbilityEffectRegistry {
         Vec3 direction = target.getEyePosition().subtract(actor.getEyePosition());
         if (direction.lengthSqr() < 0.01D) return false;
         BlasterBoltEntity bolt = new BlasterBoltEntity(level, actor,
-                actor.getMainHandItem().isEmpty() ? ItemStack.EMPTY : actor.getMainHandItem(),
+                actor.getMainHandItem(),
                 path(ability.id().toString()).contains("heavy") || path(ability.id().toString()).contains("barrage")
                         ? 8.0D : 5.0D);
         bolt.setPos(actor.getEyePosition().add(direction.normalize().scale(0.7D)));
