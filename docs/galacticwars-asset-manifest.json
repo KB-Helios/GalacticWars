@@ -53,7 +53,20 @@
       "transparent": true,
       "uv_template": "explicit six-face UV mappings at six texels per model unit",
       "ids": ["republic_plastoid","separatist_alloy","mandalorian_alloy","nightsister_weave","beskar"],
-      "path_template": "textures/armor/{id}.png"
+      "path_template": "textures/armor/{id}.png",
+      "cube_counts": {"republic_plastoid":60,"separatist_alloy":51,"mandalorian_alloy":54,"nightsister_weave":55,"beskar":54},
+      "inventory_icon_policy": "preserve existing 16x16 armor item icons for inventory and item frames"
+    },
+    {
+      "id": "recruit_spawn_capsules",
+      "kind": "geckolib_animated_3d_item",
+      "ids": ["clone_trooper","arc_trooper","jedi_knight","b1_battle_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute","republic_civilian","separatist_technician","mandalorian_clansperson","hutt_civilian","nightsister_civilian"],
+      "model": "geckolib/models/item/spawn_capsule.geo.json",
+      "animation": "geckolib/animations/item/spawn_capsule.animation.json",
+      "size": "512x512",
+      "texture_path_template": "textures/item/spawn_capsule/{id}.png",
+      "glowmask_path_template": "textures/item/spawn_capsule/{id}_glowmask.png",
+      "fallback_icon_path_template": "textures/item/{id}_spawn_egg.png"
     },
     {
       "id": "combat_and_tools",
@@ -65,13 +78,15 @@
     },
     {
       "id": "lightsaber_models",
-      "kind": "animated_3d_item_materials",
+      "kind": "geckolib_animated_3d_item",
       "ids": ["blue","green","red","purple","yellow","white"],
-      "hilt_size": "16x16",
-      "hilt_path_template": "textures/item/lightsaber/{id}_hilt.png",
-      "blade_size": "16x64",
-      "blade_path_template": "textures/item/lightsaber/{id}_blade.png",
-      "animation_path_template": "textures/item/lightsaber/{id}_blade.png.mcmeta"
+      "model": "geckolib/models/item/lightsaber.geo.json",
+      "animation": "geckolib/animations/item/lightsaber.animation.json",
+      "frame_size": "256x256",
+      "animated_texture_size": "256x1024",
+      "texture_path_template": "textures/item/lightsaber/{id}.png",
+      "glowmask_path_template": "textures/item/lightsaber/{id}_glowmask.png",
+      "animation_path_template": "textures/item/lightsaber/{id}.png.mcmeta"
     },
     {
       "id": "planets",

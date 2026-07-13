@@ -1,6 +1,9 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "galacticwars:item/clone_trooper_spawn_egg"
+    "type": "minecraft:special",
+    "base": "galacticwars:item/clone_trooper_spawn_egg",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
   }
 }

@@ -96,7 +96,7 @@ public final class RecruitTextureAtlasTest {
                 geometry,
                 image,
                 ARMOR_BONES,
-                32,
+                50,
                 ARMOR_TEXEL_DENSITY
         );
         assertMinimumOpaqueColors(image, 48, family + " high-detail material variation");
@@ -108,11 +108,40 @@ public final class RecruitTextureAtlasTest {
         assertArmorBoneParent(geometry, "armorRightBoot", "bipedRightLeg", family);
         assertArmorBoneParent(geometry, "armorLeftLeg", "bipedLeftLeg", family);
         assertArmorBoneParent(geometry, "armorLeftBoot", "bipedLeftLeg", family);
+        validatesArmorIdentity(family, geometry);
         String animation = Files.readString(ASSET_ROOT.resolve(
                 "geckolib/animations/armor/" + family + ".animation.json"));
         assertContains(animation, "\"armor.pose\"", family + " valid no-op armor animation");
         if (animation.matches("(?s).*\"animations\"\\s*:\\s*\\{\\s*}.*")) {
             throw new AssertionError(family + " armor animation table must not be empty");
+        }
+    }
+
+    private static void validatesArmorIdentity(String family, String geometry) throws IOException {
+        String generator = Files.readString(Path.of("tools/generate_character_models.py"));
+        assertContains(geometry, "\"name\": \"armorHead\"",
+                family + " equipped helmet bone");
+        List<String> requiredParts = switch (family) {
+            case "republic_plastoid" -> List.of(
+                    "helmet_fin", "visor_bar", "visor_nose", "right_cheek_plate",
+                    "mouth_grille", "right_ear_module", "rear_filter", "chest_command_stripe");
+            case "separatist_alloy" -> List.of(
+                    "crown_reinforcement", "sensor_visor", "face_guard", "chin_filter",
+                    "right_sensor_pod", "rear_power_node", "rear_reactor");
+            case "mandalorian_alloy" -> List.of(
+                    "visor_bar", "vertical_visor", "right_cheek_plate", "rangefinder_stem",
+                    "rangefinder_sensor", "rear_filter", "compact_pack");
+            case "nightsister_weave" -> List.of(
+                    "mask_brow", "mask_visor", "mask_spine", "hood_crown",
+                    "hood_back", "hood_right", "ritual_sash", "front_tabard");
+            case "beskar" -> List.of(
+                    "visor_bar", "vertical_visor", "right_cheek_plate", "rear_filter",
+                    "heavy_collar", "right_heavy_pauldron");
+            default -> throw new AssertionError("unmapped armor family " + family);
+        };
+        for (String part : requiredParts) {
+            assertContains(generator, "\"" + part + "\"",
+                    family + " reproducible authored armor component " + part);
         }
     }
 

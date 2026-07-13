@@ -7,6 +7,7 @@ import galacticwars.clonewars.combat.BlasterHeatPolicy;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.IdentityChipItem;
 import galacticwars.clonewars.item.GalacticArmorItem;
+import galacticwars.clonewars.item.LightsaberItem;
 import galacticwars.clonewars.world.HyperspaceNavigatorItem;
 import galacticwars.clonewars.vehicle.VehicleDeploymentKitItem;
 import galacticwars.clonewars.kingdom.ClaimTransponderItem;
@@ -74,18 +75,12 @@ public final class ModItems {
             ITEMS.registerItem("scatter_blaster", properties -> new BlasterItem(blaster(properties, 650), 7.0D, 2.8F, 1.4F));
     public static final DeferredItem<BowItem> NIGHTSISTER_BOW =
             ITEMS.registerItem("nightsister_bow", properties -> new BowItem(properties.durability(600)));
-    public static final DeferredItem<Item> BLUE_LIGHTSABER =
-            ITEMS.registerSimpleItem("blue_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
-    public static final DeferredItem<Item> GREEN_LIGHTSABER =
-            ITEMS.registerSimpleItem("green_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
-    public static final DeferredItem<Item> RED_LIGHTSABER =
-            ITEMS.registerSimpleItem("red_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
-    public static final DeferredItem<Item> PURPLE_LIGHTSABER =
-            ITEMS.registerSimpleItem("purple_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
-    public static final DeferredItem<Item> YELLOW_LIGHTSABER =
-            ITEMS.registerSimpleItem("yellow_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
-    public static final DeferredItem<Item> WHITE_LIGHTSABER =
-            ITEMS.registerSimpleItem("white_lightsaber", properties -> properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F));
+    public static final DeferredItem<LightsaberItem> BLUE_LIGHTSABER = lightsaber("blue");
+    public static final DeferredItem<LightsaberItem> GREEN_LIGHTSABER = lightsaber("green");
+    public static final DeferredItem<LightsaberItem> RED_LIGHTSABER = lightsaber("red");
+    public static final DeferredItem<LightsaberItem> PURPLE_LIGHTSABER = lightsaber("purple");
+    public static final DeferredItem<LightsaberItem> YELLOW_LIGHTSABER = lightsaber("yellow");
+    public static final DeferredItem<LightsaberItem> WHITE_LIGHTSABER = lightsaber("white");
     public static final DeferredItem<Item> VIBROBLADE =
             ITEMS.registerSimpleItem("vibroblade", properties -> properties.sword(ModEquipmentMaterials.MANDALORIAN.tool(), 3.0F, -2.4F));
     public static final DeferredItem<Item> POWER_DRILL =
@@ -116,64 +111,84 @@ public final class ModItems {
     public static final DeferredItem<IdentityChipItem> NIGHTSISTER_FACTION_TOKEN = factionToken("nightsister");
     public static final DeferredItem<RecruitSpawnEggItem> CLONE_TROOPER_SPAWN_EGG =
             ITEMS.registerItem("clone_trooper_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.CLONE_TROOPER.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.CLONE_TROOPER.get(), "clone_trooper", properties));
     public static final DeferredItem<RecruitSpawnEggItem> ARC_TROOPER_SPAWN_EGG =
             ITEMS.registerItem("arc_trooper_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.ARC_TROOPER.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.ARC_TROOPER.get(), "arc_trooper", properties));
     public static final DeferredItem<RecruitSpawnEggItem> JEDI_KNIGHT_SPAWN_EGG =
             ITEMS.registerItem("jedi_knight_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.JEDI_KNIGHT.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.JEDI_KNIGHT.get(), "jedi_knight", properties));
     public static final DeferredItem<RecruitSpawnEggItem> MANDALORIAN_WARRIOR_SPAWN_EGG =
             ITEMS.registerItem("mandalorian_warrior_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.MANDALORIAN_WARRIOR.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.MANDALORIAN_WARRIOR.get(), "mandalorian_warrior", properties));
     public static final DeferredItem<RecruitSpawnEggItem> MANDALORIAN_MARKSMAN_SPAWN_EGG =
             ITEMS.registerItem("mandalorian_marksman_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.MANDALORIAN_MARKSMAN.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.MANDALORIAN_MARKSMAN.get(), "mandalorian_marksman", properties));
     public static final DeferredItem<RecruitSpawnEggItem> MANDALORIAN_HEAVY_SPAWN_EGG =
             ITEMS.registerItem("mandalorian_heavy_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.MANDALORIAN_HEAVY.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.MANDALORIAN_HEAVY.get(), "mandalorian_heavy", properties));
     public static final DeferredItem<RecruitSpawnEggItem> B1_BATTLE_DROID_SPAWN_EGG =
             ITEMS.registerItem("b1_battle_droid_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.B1_BATTLE_DROID.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.B1_BATTLE_DROID.get(), "b1_battle_droid", properties));
     public static final DeferredItem<RecruitSpawnEggItem> B2_SUPER_BATTLE_DROID_SPAWN_EGG =
             ITEMS.registerItem("b2_super_battle_droid_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.B2_SUPER_BATTLE_DROID.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.B2_SUPER_BATTLE_DROID.get(), "b2_super_battle_droid", properties));
     public static final DeferredItem<RecruitSpawnEggItem> COMMANDO_DROID_SPAWN_EGG =
             ITEMS.registerItem("commando_droid_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.COMMANDO_DROID.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.COMMANDO_DROID.get(), "commando_droid", properties));
     public static final DeferredItem<RecruitSpawnEggItem> HUTT_ENFORCER_SPAWN_EGG =
             ITEMS.registerItem("hutt_enforcer_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.HUTT_ENFORCER.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.HUTT_ENFORCER.get(), "hutt_enforcer", properties));
     public static final DeferredItem<RecruitSpawnEggItem> BOUNTY_HUNTER_SPAWN_EGG =
             ITEMS.registerItem("bounty_hunter_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.BOUNTY_HUNTER.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.BOUNTY_HUNTER.get(), "bounty_hunter", properties));
     public static final DeferredItem<RecruitSpawnEggItem> SMUGGLER_SPAWN_EGG =
             ITEMS.registerItem("smuggler_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.SMUGGLER.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.SMUGGLER.get(), "smuggler", properties));
     public static final DeferredItem<RecruitSpawnEggItem> NIGHTSISTER_ACOLYTE_SPAWN_EGG =
             ITEMS.registerItem("nightsister_acolyte_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.NIGHTSISTER_ACOLYTE.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.NIGHTSISTER_ACOLYTE.get(), "nightsister_acolyte", properties));
     public static final DeferredItem<RecruitSpawnEggItem> NIGHTSISTER_ARCHER_SPAWN_EGG =
             ITEMS.registerItem("nightsister_archer_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.NIGHTSISTER_ARCHER.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.NIGHTSISTER_ARCHER.get(), "nightsister_archer", properties));
     public static final DeferredItem<RecruitSpawnEggItem> NIGHTBROTHER_BRUTE_SPAWN_EGG =
             ITEMS.registerItem("nightbrother_brute_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.NIGHTBROTHER_BRUTE.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.NIGHTBROTHER_BRUTE.get(), "nightbrother_brute", properties));
     public static final DeferredItem<RecruitSpawnEggItem> REPUBLIC_CIVILIAN_SPAWN_EGG =
             ITEMS.registerItem("republic_civilian_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.REPUBLIC_CIVILIAN.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.REPUBLIC_CIVILIAN.get(), "republic_civilian", properties));
     public static final DeferredItem<RecruitSpawnEggItem> SEPARATIST_TECHNICIAN_SPAWN_EGG =
             ITEMS.registerItem("separatist_technician_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.SEPARATIST_TECHNICIAN.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.SEPARATIST_TECHNICIAN.get(), "separatist_technician", properties));
     public static final DeferredItem<RecruitSpawnEggItem> MANDALORIAN_CLANSPERSON_SPAWN_EGG =
             ITEMS.registerItem("mandalorian_clansperson_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.MANDALORIAN_CLANSPERSON.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.MANDALORIAN_CLANSPERSON.get(), "mandalorian_clansperson", properties));
     public static final DeferredItem<RecruitSpawnEggItem> HUTT_CIVILIAN_SPAWN_EGG =
             ITEMS.registerItem("hutt_civilian_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.HUTT_CIVILIAN.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.HUTT_CIVILIAN.get(), "hutt_civilian", properties));
     public static final DeferredItem<RecruitSpawnEggItem> NIGHTSISTER_CIVILIAN_SPAWN_EGG =
             ITEMS.registerItem("nightsister_civilian_spawn_egg",
-                    properties -> new RecruitSpawnEggItem(ModEntityTypes.NIGHTSISTER_CIVILIAN.get(), properties));
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.NIGHTSISTER_CIVILIAN.get(), "nightsister_civilian", properties));
 
     private ModItems() {
     }
@@ -181,6 +196,12 @@ public final class ModItems {
     private static Item.Properties blaster(Item.Properties properties, int durability) {
         return properties.durability(durability).component(
                 ModDataComponents.BLASTER_HEAT.get(), BlasterHeatPolicy.BlasterHeatState.ready());
+    }
+
+    private static DeferredItem<LightsaberItem> lightsaber(String colorId) {
+        return ITEMS.registerItem(colorId + "_lightsaber", properties -> new LightsaberItem(
+                colorId,
+                properties.sword(ModEquipmentMaterials.BESKAR.tool(), 5.0F, -2.1F)));
     }
 
     public static void register(IEventBus modEventBus) {

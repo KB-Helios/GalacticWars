@@ -31,14 +31,17 @@ public final class ModRegistryCompatibilityTest {
                 "ITEMS.registerItem(\"clone_trooper_spawn_egg\"",
                 "spawn egg registration must use DeferredRegister.Items#registerItem");
         assertContains(modItems,
-                "new RecruitSpawnEggItem(ModEntityTypes.CLONE_TROOPER.get(), properties)",
-                "spawn egg registration must retain an explicit recruit type fallback");
+                "ModEntityTypes.CLONE_TROOPER.get(), \"clone_trooper\", properties)",
+                "spawn egg registration must retain its recruit type and visual material id");
         assertNotContains(modItems,
                 "new SpawnEggItem(new Item.Properties()",
                 "spawn egg registration must not bypass Item.Properties#setId");
         assertContains(spawnEgg,
                 "super(properties.spawnEgg(recruitType))",
                 "spawn egg must bind its recruit type through the vanilla item component");
+        assertContains(spawnEgg,
+                "implements GeoItem",
+                "spawn egg must expose the GeckoLib item renderer contract");
         assertDoesNotMatch(spawnEgg,
                 USE_ON_OVERRIDE,
                 "spawn egg must not replace vanilla world interaction and spawning semantics");
@@ -55,17 +58,26 @@ public final class ModRegistryCompatibilityTest {
     private static void spawnEggModelUsesCurrentItemModelFormat() throws IOException {
         String model = Files.readString(Path.of(
                 "src/main/resources/assets/galacticwars/models/item/clone_trooper_spawn_egg.json"));
+        String definition = Files.readString(Path.of(
+                "src/main/resources/assets/galacticwars/items/clone_trooper_spawn_egg.json"));
 
         assertContains(model,
-                "\"parent\": \"minecraft:item/generated\"",
-                "spawn egg model should use an existing generated item parent in 26.2");
-        assertContains(model,
-                "\"layer0\": \"galacticwars:item/clone_trooper_spawn_egg\"",
-                "spawn egg model should point at the modded egg texture");
+                "\"parent\": \"galacticwars:item/spawn_capsule_base\"",
+                "spawn egg display model should inherit the shared 3D capsule transforms");
+        assertContains(definition,
+                "\"type\": \"minecraft:special\"",
+                "spawn egg item definition should delegate to a special renderer");
+        assertContains(definition,
+                "\"type\": \"geckolib:geckolib\"",
+                "spawn egg item definition should select GeckoLib's item renderer");
         assertNotContains(model,
                 "template_spawn_egg",
                 "spawn egg model must not point at removed template_spawn_egg parent");
         assertRegularFile("src/main/resources/assets/galacticwars/textures/item/clone_trooper_spawn_egg.png");
+        assertRegularFile("src/main/resources/assets/galacticwars/models/item/spawn_capsule_base.json");
+        assertRegularFile("src/main/resources/assets/galacticwars/geckolib/models/item/spawn_capsule.geo.json");
+        assertRegularFile("src/main/resources/assets/galacticwars/textures/item/spawn_capsule/clone_trooper.png");
+        assertRegularFile("src/main/resources/assets/galacticwars/textures/item/spawn_capsule/clone_trooper_glowmask.png");
     }
 
     private static void recruitRendererUsesGeckoLibRenderer() throws IOException {

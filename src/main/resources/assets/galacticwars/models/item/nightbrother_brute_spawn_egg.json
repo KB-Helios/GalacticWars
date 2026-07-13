@@ -1,6 +1,3 @@
 {
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "galacticwars:item/nightbrother_brute_spawn_egg"
-  }
+  "parent": "galacticwars:item/spawn_capsule_base"
 }

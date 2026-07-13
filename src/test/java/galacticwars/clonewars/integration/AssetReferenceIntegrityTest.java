@@ -74,7 +74,7 @@ public final class AssetReferenceIntegrityTest {
         try (Stream<Path> files = Files.walk(models)) {
             for (Path model : files.filter(Files::isRegularFile).toList()) {
                 String name = model.getFileName().toString();
-                if (name.equals("lightsaber_base.json")) {
+                if (name.equals("lightsaber_base.json") || name.equals("spawn_capsule_base.json")) {
                     continue;
                 }
                 assertRegularFile(definitions.resolve(name), "modern item definition for " + name);

@@ -1,1 +1,3 @@
-{"parent":"galacticwars:item/lightsaber_base","textures":{"hilt":"galacticwars:item/lightsaber/blue_hilt","blade":"galacticwars:item/lightsaber/blue_blade"}}
+{
+  "parent": "galacticwars:item/lightsaber_base"
+}
