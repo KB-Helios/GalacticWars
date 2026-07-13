@@ -4,6 +4,8 @@ import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
 import galacticwars.clonewars.menu.CommandCenterNavigationMenu;
 import galacticwars.clonewars.menu.FactionSelectionMenu;
+import galacticwars.clonewars.menu.MerchantTradeMenu;
+import galacticwars.clonewars.menu.CommandCenterOperationsMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
@@ -23,6 +25,12 @@ public final class ModMenuTypes {
     public static final DeferredHolder<MenuType<?>, MenuType<FactionSelectionMenu>> FACTION_SELECTION =
             MENU_TYPES.register("faction_selection",
                     () -> IMenuTypeExtension.create(FactionSelectionMenu::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<MerchantTradeMenu>> MERCHANT_TRADE =
+            MENU_TYPES.register("merchant_trade",
+                    () -> IMenuTypeExtension.create(MerchantTradeMenu::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<CommandCenterOperationsMenu>> COMMAND_CENTER_OPERATIONS =
+            MENU_TYPES.register("command_center_operations",
+                    () -> IMenuTypeExtension.create(CommandCenterOperationsMenu::new));
 
     private ModMenuTypes() {
     }

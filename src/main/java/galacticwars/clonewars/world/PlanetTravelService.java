@@ -26,6 +26,7 @@ import net.minecraft.world.level.storage.LevelData;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import galacticwars.clonewars.vehicle.VehiclePlanetTravelPlan;
 
 public final class PlanetTravelService {
     private PlanetTravelService() {
@@ -57,6 +58,14 @@ public final class PlanetTravelService {
             return TravelResult.rejected("safe_arrival_unavailable");
         }
         BlockPos target = arrival.orElseThrow();
+        if (!galacticwars.clonewars.conquest.ConquestRuntimeEvents
+                .arrivalClear(destination, player, target)) {
+            return TravelResult.rejected("hostile_arrival_blocked");
+        }
+        VehiclePlanetTravelPlan vehicleTravel = VehiclePlanetTravelPlan.prepare(player, destination, target);
+        if (!vehicleTravel.accepted()) {
+            return TravelResult.rejected(vehicleTravel.reason());
+        }
         ArmyTravelService.TravelPlan squadTravel = ArmyTravelService.prepare(
                 kingdoms, player, destination, target);
         if (!squadTravel.accepted()) {
@@ -65,7 +74,7 @@ public final class PlanetTravelService {
         if (!squadTravel.reserve()) {
             return TravelResult.rejected("squad_transfer_conflict");
         }
-        boolean teleported = player.teleportTo(
+        boolean teleported = vehicleTravel.transfersVehicle() ? vehicleTravel.transfer() : player.teleportTo(
                 destination,
                 target.getX() + 0.5D,
                 target.getY(),

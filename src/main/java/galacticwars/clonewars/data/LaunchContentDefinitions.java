@@ -55,18 +55,86 @@ public record LaunchContentDefinitions(
         }
     }
 
-    public record VehicleDefinition(String id, String movement, int seats, int maxHealth, int fuelCapacity, String requiredUnlock) {
+    public record VehicleDefinition(
+            String id,
+            String movement,
+            int seats,
+            int maxHealth,
+            int fuelCapacity,
+            String requiredUnlock,
+            double maxSpeed,
+            double strafeMultiplier,
+            double verticalSpeed,
+            int fuelRateTicks,
+            String weaponEffect,
+            List<String> seatRoles,
+            int fabricationCredits,
+            Map<String, Integer> fabricationInputs,
+            Set<String> deploymentRequirements
+    ) {
         public VehicleDefinition {
-            requireIds(id, movement, requiredUnlock);
-            if (seats < 1 || maxHealth < 1 || fuelCapacity < 1) throw new IllegalArgumentException("Invalid vehicle " + id);
+            requireIds(id, movement, requiredUnlock, weaponEffect);
+            seatRoles = List.copyOf(Objects.requireNonNull(seatRoles, "seatRoles for " + id));
+            fabricationInputs = Map.copyOf(Objects.requireNonNull(
+                    fabricationInputs, "fabricationInputs for " + id));
+            deploymentRequirements = Set.copyOf(Objects.requireNonNull(
+                    deploymentRequirements, "deploymentRequirements for " + id));
+            if (seats < 1 || maxHealth < 1 || fuelCapacity < 1
+                    || !Double.isFinite(maxSpeed) || maxSpeed <= 0.0D
+                    || !Double.isFinite(strafeMultiplier) || strafeMultiplier < 0.0D
+                    || !Double.isFinite(verticalSpeed) || verticalSpeed < 0.0D
+                    || fuelRateTicks < 1 || fabricationCredits < 1
+                    || seatRoles.size() != seats || !seatRoles.getFirst().equals("driver")
+                    || fabricationInputs.isEmpty()
+                    || fabricationInputs.entrySet().stream().anyMatch(entry -> entry.getKey().isBlank()
+                            || entry.getValue() == null || entry.getValue() < 1)
+                    || deploymentRequirements.stream().anyMatch(String::isBlank)) {
+                throw new IllegalArgumentException("Invalid vehicle " + id);
+            }
+        }
+
+        public VehicleDefinition(
+                String id, String movement, int seats, int maxHealth,
+                int fuelCapacity, String requiredUnlock
+        ) {
+            this(id, movement, seats, maxHealth, fuelCapacity, requiredUnlock,
+                    movement.equals("walker") ? 0.18D : movement.equals("flight") ? 0.48D : 0.38D,
+                    0.65D, movement.equals("flight") ? 0.28D : 0.0D, 5,
+                    "blaster", java.util.stream.IntStream.range(0, seats)
+                            .mapToObj(index -> index == 0 ? "driver" : "passenger").toList(),
+                    1, Map.of("minecraft:iron_ingot", 1), Set.of("vehicle_crafting"));
         }
     }
 
-    public record ForceAbilityDefinition(String id, String path, int energy, int cooldownTicks, String requiredQuest, boolean enabled) {
+    public record ForceAbilityDefinition(
+            String id,
+            String path,
+            int energy,
+            int cooldownTicks,
+            String requiredQuest,
+            boolean enabled,
+            String effect,
+            double range,
+            int durationTicks,
+            String activeUnlock
+    ) {
         public ForceAbilityDefinition {
-            requireIds(id, path, requiredQuest);
-            if (energy < 0 || cooldownTicks < 0) throw new IllegalArgumentException("Invalid Force ability " + id);
-            if (enabled) throw new IllegalArgumentException("Force runtime must remain disabled for " + id);
+            requireIds(id, path, requiredQuest, effect, activeUnlock);
+            if (energy < 0 || cooldownTicks < 0 || !Double.isFinite(range)
+                    || range < 0.0D || durationTicks < 0) {
+                throw new IllegalArgumentException("Invalid Force ability " + id);
+            }
+            if (!path.equals("light") && !path.equals("dark")) {
+                throw new IllegalArgumentException("Invalid Force path for " + id);
+            }
+        }
+
+        public ForceAbilityDefinition(
+                String id, String path, int energy, int cooldownTicks,
+                String requiredQuest, boolean enabled
+        ) {
+            this(id, path, energy, cooldownTicks, requiredQuest, enabled,
+                    id, 16.0D, 20, requiredQuest);
         }
     }
 
@@ -81,17 +149,46 @@ public record LaunchContentDefinitions(
         }
     }
 
-    public record TradeDefinition(String id, String factionId, int price, String itemId, int itemCount, String requiredUnlock) {
+    public record TradeDefinition(
+            String id, String factionId, int price, String itemId, int itemCount,
+            String requiredUnlock, int stockTier, String regionalPrerequisite
+    ) {
         public TradeDefinition {
             requireIds(id, factionId, itemId, requiredUnlock);
-            if (price <= 0 || itemCount <= 0) throw new IllegalArgumentException("Invalid trade " + id);
+            regionalPrerequisite = regionalPrerequisite == null ? "" : regionalPrerequisite;
+            if (price <= 0 || itemCount <= 0 || stockTier < 1) throw new IllegalArgumentException("Invalid trade " + id);
+        }
+
+        public TradeDefinition(
+                String id, String factionId, int price, String itemId, int itemCount, String requiredUnlock
+        ) {
+            this(id, factionId, price, itemId, itemCount, requiredUnlock, 1, "");
         }
     }
 
-    public record ConquestRegionDefinition(String id, String planetId, int protectedRadius, int captureTicks, int rewardCredits) {
+    public record ConquestRegionDefinition(
+            String id,
+            String planetId,
+            int protectedRadius,
+            int captureTicks,
+            int rewardCredits,
+            int landmarkX,
+            int landmarkZ,
+            int captureRadius,
+            String defenderFaction
+    ) {
         public ConquestRegionDefinition {
-            requireIds(id, planetId);
-            if (protectedRadius < 1 || captureTicks < 1 || rewardCredits < 0) throw new IllegalArgumentException("Invalid region " + id);
+            requireIds(id, planetId, defenderFaction);
+            if (protectedRadius < 1 || captureTicks < 1 || rewardCredits < 0 || captureRadius < 4) {
+                throw new IllegalArgumentException("Invalid region " + id);
+            }
+        }
+
+        public ConquestRegionDefinition(
+                String id, String planetId, int protectedRadius, int captureTicks, int rewardCredits
+        ) {
+            this(id, planetId, protectedRadius, captureTicks, rewardCredits,
+                    0, 0, Math.max(8, protectedRadius / 2), "neutral");
         }
     }
 

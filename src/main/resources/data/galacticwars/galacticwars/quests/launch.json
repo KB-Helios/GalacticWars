@@ -1,7 +1,7 @@
 {"schema_version":1,"quests":[
   {"id":"republic_chapter_1","objectives":["faction_pledged","command_center","clone_trooper"],"reward_credits":40,"unlocks":["workforce"]},
   {"id":"republic_chapter_2","objectives":["delivery_completed","forward_base","kamino"],"reward_credits":70,"unlocks":["barc_speeder","force_path"]},
-  {"id":"republic_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery"]},
+  {"id":"republic_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery","force_mastery"]},
   {"id":"separatist_chapter_1","objectives":["faction_pledged","command_center","b1_battle_droid"],"reward_credits":40,"unlocks":["workforce"]},
   {"id":"separatist_chapter_2","objectives":["delivery_completed","forward_base","geonosis"],"reward_credits":70,"unlocks":["stap"]},
   {"id":"separatist_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery"]},
@@ -13,5 +13,5 @@
   {"id":"hutt_cartel_chapter_3","objectives":["vehicle_acquired","smuggler","region_captured"],"reward_credits":130,"unlocks":["conquest","vehicle_mastery"]},
   {"id":"nightsister_chapter_1","objectives":["faction_pledged","command_center","nightsister_acolyte"],"reward_credits":40,"unlocks":["workforce"]},
   {"id":"nightsister_chapter_2","objectives":["delivery_completed","forward_base","coruscant"],"reward_credits":70,"unlocks":["force_path"]},
-  {"id":"nightsister_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery"]}
+  {"id":"nightsister_chapter_3","objectives":["vehicle_acquired","trade_completed","region_captured"],"reward_credits":120,"unlocks":["conquest","vehicle_mastery","force_mastery"]}
 ]}

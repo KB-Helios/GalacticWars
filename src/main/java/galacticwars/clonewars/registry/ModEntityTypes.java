@@ -3,6 +3,7 @@ package galacticwars.clonewars.registry;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.combat.BlasterBoltEntity;
+import galacticwars.clonewars.vehicle.GalacticVehicleEntity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.neoforged.bus.api.IEventBus;
@@ -23,6 +24,19 @@ public final class ModEntityTypes {
                     builder -> builder.sized(0.18F, 0.18F)
                             .clientTrackingRange(8)
                             .updateInterval(1));
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>> BARC_SPEEDER =
+            registerVehicle("barc_speeder", 1.4F, 1.2F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>> AT_RT =
+            registerVehicle("at_rt", 1.2F, 2.7F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>> STAP =
+            registerVehicle("stap", 1.1F, 1.5F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>> AAT =
+            registerVehicle("aat", 3.2F, 2.5F);
+    public static final DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>> LAAT_GUNSHIP =
+            registerVehicle("laat_gunship", 5.4F, 3.0F);
+
+    private static final List<DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>>> VEHICLES =
+            List.of(BARC_SPEEDER, AT_RT, STAP, AAT, LAAT_GUNSHIP);
 
     public static final DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> CLONE_TROOPER =
             registerRecruit("clone_trooper", 0.60F, 1.95F);
@@ -83,6 +97,17 @@ public final class ModEntityTypes {
 
     public static List<DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>>> recruits() {
         return RECRUITS;
+    }
+
+    public static List<DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>>> vehicles() {
+        return VEHICLES;
+    }
+
+    private static DeferredHolder<EntityType<?>, EntityType<GalacticVehicleEntity>> registerVehicle(
+            String name, float width, float height
+    ) {
+        return ENTITY_TYPES.registerEntityType(name, GalacticVehicleEntity::new, MobCategory.MISC,
+                builder -> builder.sized(width, height).clientTrackingRange(12).updateInterval(1));
     }
 
     private static DeferredHolder<EntityType<?>, EntityType<GalacticRecruitEntity>> registerRecruit(

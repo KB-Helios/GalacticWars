@@ -44,6 +44,10 @@ public final class ModBlocks {
     public static final DeferredBlock<CommandCenterBlock> COMMAND_CENTER =
             BLOCKS.registerBlock("command_center", properties -> new CommandCenterBlock(
                     properties.mapColor(MapColor.STONE).strength(4.0F, 1200.0F).sound(SoundType.STONE)));
+    public static final DeferredBlock<Block> CONTROL_BEACON =
+            BLOCKS.registerSimpleBlock("control_beacon", properties -> properties
+                    .mapColor(MapColor.METAL).strength(6.0F, 1200.0F).lightLevel(state -> 10)
+                    .sound(SoundType.METAL));
 
     private ModBlocks() {
     }

@@ -8,6 +8,8 @@ import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.IdentityChipItem;
 import galacticwars.clonewars.item.GalacticArmorItem;
 import galacticwars.clonewars.world.HyperspaceNavigatorItem;
+import galacticwars.clonewars.vehicle.VehicleDeploymentKitItem;
+import galacticwars.clonewars.kingdom.ClaimTransponderItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BowItem;
@@ -36,6 +38,8 @@ public final class ModItems {
             ITEMS.registerSimpleBlockItem("nightsister_weave_sapling", ModBlocks.NIGHTSISTER_WEAVE_SAPLING);
     public static final DeferredItem<BlockItem> COMMAND_CENTER =
             ITEMS.registerSimpleBlockItem("command_center", ModBlocks.COMMAND_CENTER);
+    public static final DeferredItem<BlockItem> CONTROL_BEACON =
+            ITEMS.registerSimpleBlockItem("control_beacon", ModBlocks.CONTROL_BEACON);
     public static final DeferredItem<Item> BESKAR_INGOT =
             ITEMS.registerSimpleItem("beskar_ingot", properties -> properties);
     public static final DeferredItem<Item> RAW_BESKAR =
@@ -44,10 +48,22 @@ public final class ModItems {
             ITEMS.registerSimpleItem("credit_chip", properties -> properties.stacksTo(64));
     public static final DeferredItem<Item> ENERGY_CELL =
             ITEMS.registerSimpleItem("energy_cell", properties -> properties.stacksTo(64));
+    public static final DeferredItem<VehicleDeploymentKitItem> BARC_SPEEDER_DEPLOYMENT_KIT =
+            vehicleKit("barc_speeder", ModEntityTypes.BARC_SPEEDER);
+    public static final DeferredItem<VehicleDeploymentKitItem> AT_RT_DEPLOYMENT_KIT =
+            vehicleKit("at_rt", ModEntityTypes.AT_RT);
+    public static final DeferredItem<VehicleDeploymentKitItem> STAP_DEPLOYMENT_KIT =
+            vehicleKit("stap", ModEntityTypes.STAP);
+    public static final DeferredItem<VehicleDeploymentKitItem> AAT_DEPLOYMENT_KIT =
+            vehicleKit("aat", ModEntityTypes.AAT);
+    public static final DeferredItem<VehicleDeploymentKitItem> LAAT_GUNSHIP_DEPLOYMENT_KIT =
+            vehicleKit("laat_gunship", ModEntityTypes.LAAT_GUNSHIP);
     public static final DeferredItem<Item> BLASTER_BOLT =
             ITEMS.registerSimpleItem("blaster_bolt", properties -> properties.stacksTo(1));
     public static final DeferredItem<HyperspaceNavigatorItem> HYPERSPACE_NAVIGATOR =
             ITEMS.registerItem("hyperspace_navigator", HyperspaceNavigatorItem::new);
+    public static final DeferredItem<ClaimTransponderItem> CLAIM_TRANSPONDER =
+            ITEMS.registerItem("claim_transponder", ClaimTransponderItem::new);
     public static final DeferredItem<BlasterItem> DC15_BLASTER =
             ITEMS.registerItem("dc15_blaster", properties -> new BlasterItem(blaster(properties, 850), 6.0D, 3.4F, 0.7F));
     public static final DeferredItem<BlasterItem> E5_BLASTER =
@@ -175,6 +191,16 @@ public final class ModItems {
         return ITEMS.registerItem(
                 factionPath + "_identity_chip",
                 properties -> new IdentityChipItem(FactionId.of(factionPath), properties.stacksTo(16)));
+    }
+
+    private static DeferredItem<VehicleDeploymentKitItem> vehicleKit(
+            String vehicleId,
+            net.neoforged.neoforge.registries.DeferredHolder<
+                    net.minecraft.world.entity.EntityType<?>,
+                    net.minecraft.world.entity.EntityType<galacticwars.clonewars.vehicle.GalacticVehicleEntity>> type
+    ) {
+        return ITEMS.registerItem(vehicleId + "_deployment_kit",
+                properties -> new VehicleDeploymentKitItem(type::get, vehicleId, properties));
     }
 
     private static java.util.Map<String, DeferredItem<Item>> registerFactionEquipment() {

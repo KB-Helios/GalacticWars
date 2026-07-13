@@ -18,15 +18,10 @@ public final class GalacticProgressionCoordinatorTest {
         assertTrue(!repeatedPledge.accepted()
                         && repeatedPledge.reason().equals("faction_already_pledged"),
                 "a new pledge event cannot re-grant the same faction pledge");
-        state = accepted(state, event(player, ProgressionEventType.CREDIT_TRANSACTION, "quest_reward", 50));
-        ProgressionEvent purchase = event(player, ProgressionEventType.CREDIT_TRANSACTION, "recruit_purchase", -25);
-        state = accepted(state, purchase);
-        assertEquals(25, state.credits(), "credit balance");
-        ProgressionState duplicate = accepted(state, purchase);
-        assertTrue(duplicate == state, "duplicate event is idempotent");
-        ProgressionDecision overspend = GalacticProgressionCoordinator.apply(
-                state, event(player, ProgressionEventType.CREDIT_TRANSACTION, "invalid_purchase", -26));
-        assertTrue(!overspend.accepted() && state.credits() == 25, "overspend is atomic");
+        ProgressionDecision abstractCredit = GalacticProgressionCoordinator.apply(
+                state, event(player, ProgressionEventType.CREDIT_TRANSACTION, "legacy_purchase", -25));
+        assertTrue(!abstractCredit.accepted() && abstractCredit.reason().equals("physical_currency_required"),
+                "abstract currency transactions are retired");
         state = accepted(state, event(player, ProgressionEventType.BUILDING_COMPLETED, "command_center", 1));
         state = accepted(state, event(player, ProgressionEventType.BUILDING_COMPLETED, "galacticwars:forward_base", 1));
         state = accepted(state, event(player, ProgressionEventType.BUILDING_COMPLETED, "galacticwars:supply_depot", 1));
@@ -46,7 +41,7 @@ public final class GalacticProgressionCoordinatorTest {
         state = accepted(state, event(player, ProgressionEventType.RECRUIT_HIRED,
                 "galacticwars:clone_trooper", 1));
         state = accepted(state, event(player, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_1", 1));
-        assertEquals(65, state.credits(), "chapter 1 configured credit reward");
+        assertEquals(40, state.pendingCreditRewards(), "chapter 1 physical reward pending");
         state = accepted(state, event(player, ProgressionEventType.DELIVERY_COMPLETED, "starter_delivery", 1));
         state = accepted(state, event(player, ProgressionEventType.PLANET_VISITED, "kamino", 1));
         state = accepted(state, event(player, ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2", 1));

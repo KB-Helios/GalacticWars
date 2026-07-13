@@ -22,6 +22,7 @@ import galacticwars.clonewars.army.ArmySnapshotEquipment;
 import galacticwars.clonewars.army.ArmyUnitDefinition;
 import galacticwars.clonewars.army.RecruitVitals;
 import galacticwars.clonewars.classes.ClassAbilityRuntimeService;
+import galacticwars.clonewars.classes.ClassAbilityEffectRegistry;
 import galacticwars.clonewars.classes.ClassProgressCodecs;
 import galacticwars.clonewars.classes.ClassProgressState;
 import galacticwars.clonewars.classes.UnitClassDefinition;
@@ -58,6 +59,7 @@ import galacticwars.clonewars.kingdom.WorksiteRecord;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
 import galacticwars.clonewars.menu.RecruitCommandAction;
 import galacticwars.clonewars.menu.RecruitCommandMenuProvider;
+import galacticwars.clonewars.menu.MerchantTradeMenuProvider;
 import galacticwars.clonewars.recruitment.RecruitmentAction;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
@@ -506,6 +508,8 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             this.applyUnitDefinition();
         }
         if (!this.level().isClientSide() && this.tickCount % 20 == 0) {
+            this.classProgressState = this.classProgressState.regenerate(2);
+            this.tickClassAbilities();
             this.migrateLegacyKingdomLink();
             if (this.level() instanceof ServerLevel serverLevel) {
                 this.reconcileWorkerAuthority(serverLevel);
@@ -595,6 +599,10 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             return InteractionResult.SUCCESS;
         }
         if (player instanceof ServerPlayer serverPlayer) {
+            if (this.isMerchant() && !player.isShiftKeyDown()) {
+                serverPlayer.openMenu(new MerchantTradeMenuProvider(this));
+                return InteractionResult.SUCCESS_SERVER;
+            }
             serverPlayer.openMenu(new RecruitCommandMenuProvider(this));
             return InteractionResult.SUCCESS_SERVER;
         }
@@ -1297,6 +1305,37 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
         return Optional.of(values[profession]);
     }
 
+    private void tickClassAbilities() {
+        if (!(this.level() instanceof ServerLevel serverLevel)) return;
+        UnitClassDefinition unitClass = this.unitClassDefinition().orElse(null);
+        if (unitClass == null) return;
+        LivingEntity target = this.getTarget();
+        for (var abilityId : unitClass.abilityIds()) {
+            var ability = GameplayDataManager.snapshot().ability(abilityId.toString()).orElse(null);
+            if (ability == null || !ability.enabled()
+                    || !ClassAbilityEffectRegistry.registered(ability.id().toString())) continue;
+            if (ability.activation() == galacticwars.clonewars.ability.AbilityActivation.PASSIVE) {
+                ClassAbilityEffectRegistry.execute(serverLevel, this, ability, null);
+                continue;
+            }
+            if (!ClassAbilityRuntimeService.shouldEvaluateNpc(ability, this.getUUID().hashCode(),
+                    serverLevel.getGameTime())) continue;
+            boolean targetPresent = target != null && target.isAlive();
+            double distance = targetPresent ? this.distanceTo(target) : 0.0D;
+            var decision = this.activateClassAbility(ability.id().toString(), serverLevel.getGameTime(),
+                    targetPresent, distance, target instanceof Player);
+            if (decision.accepted()
+                    && ClassAbilityEffectRegistry.execute(serverLevel, this, ability, target)) {
+                break;
+            }
+        }
+    }
+
+    public boolean isMerchant() {
+        return this.serviceBranch == NpcServiceBranch.CIVILIAN
+                && this.getWorkerProfession().filter(profession -> profession == WorkerProfession.MERCHANT).isPresent();
+    }
+
     public void setWorkerProfession(WorkerProfession profession) {
         this.serviceBranch = NpcServiceBranch.CIVILIAN;
         this.entityData.set(DATA_WORKER_PROFESSION, profession.ordinal());
@@ -1814,6 +1853,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             return false;
         }
         if (progressed.state() == WorkOrderState.COMPLETED) {
+            this.grantClassExperience(10L);
             if (progressed.type() == WorkOrderType.COURIER) {
                 KingdomGameplayRuntimeService.applyProgression(
                         ProgressionSavedData.get(serverLevel),
@@ -1862,6 +1902,7 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
             return false;
         }
         if (progressed.state() == WorkOrderState.COMPLETED) {
+            this.grantClassExperience(15L);
             this.workOrderId = null;
         }
         return true;
@@ -3392,6 +3433,10 @@ public class GalacticRecruitEntity extends TamableAnimal implements GeoEntity {
                 .map(definition -> definition.factionId().toString())
                 .or(() -> this.currentCivilianArchetype().map(CivilianArchetypeDefinition::factionId))
                 .orElse("galacticwars:republic");
+    }
+
+    public String factionIdForGameplay() {
+        return this.recruitFactionId();
     }
 
     private Optional<BuildProject> activeBuildProject() {

@@ -24,6 +24,9 @@ import galacticwars.clonewars.economy.CreditTransactionService;
 import galacticwars.clonewars.economy.PhysicalTradeService;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
+import galacticwars.clonewars.vehicle.GalacticVehicleEntity;
+import galacticwars.clonewars.conquest.ConquestControlState;
+import galacticwars.clonewars.conquest.ConquestSavedData;
 import galacticwars.clonewars.entity.RecruitSpawnEggItem;
 import galacticwars.clonewars.entity.RecruitLifecycleService;
 import galacticwars.clonewars.entity.ai.RecruitRangedCombatGoal;
@@ -167,6 +170,8 @@ public final class ModGameTests {
         tests.put(id("faction_selection_transaction"), ModGameTests::factionSelectionTransaction);
         tests.put(id("progression_runtime_adapter"), ModGameTests::progressionRuntimeAdapter);
         tests.put(id("class_ability_runtime_data"), ModGameTests::classAbilityRuntimeData);
+        tests.put(id("vehicle_runtime_contract"), ModGameTests::vehicleRuntimeContract);
+        tests.put(id("conquest_control_authority"), ModGameTests::conquestControlAuthority);
         tests.put(id("recruit_entity_contract"), ModGameTests::recruitEntityContract);
         tests.put(id("worker_tags_and_loot"), ModGameTests::workerTagsAndLoot);
         tests.put(id("recruit_contract_lifecycle"), ModGameTests::recruitContractLifecycle);
@@ -200,7 +205,7 @@ public final class ModGameTests {
                 || snapshot.launchContent().trades().size() != 5
                 || snapshot.launchContent().conquestRegions().size() != 4
                 || snapshot.launchContent().forceAbilities().values().stream()
-                        .anyMatch(galacticwars.clonewars.data.LaunchContentDefinitions.ForceAbilityDefinition::enabled)) {
+                        .anyMatch(ability -> !ability.enabled())) {
             helper.fail("Atomic gameplay snapshot did not load the launch class catalogs");
             return;
         }
@@ -222,6 +227,41 @@ public final class ModGameTests {
                 || replay.accepted()
                 || !replay.reason().equals("ability_cooldown")) {
             helper.fail("Recruit class activation was not server-authoritative and cooldown-safe");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void vehicleRuntimeContract(GameTestHelper helper) {
+        UUID owner = UUID.randomUUID();
+        int lane = 1;
+        for (var holder : ModEntityTypes.vehicles()) {
+            GalacticVehicleEntity vehicle = helper.spawn(holder.get(), new BlockPos(lane++, 1, 2));
+            vehicle.deploy(owner, "galacticwars:republic");
+            var definition = GameplayDataManager.snapshot().launchContent().vehicles()
+                    .get(vehicle.vehicleId());
+            if (definition == null || vehicle.ownerId().filter(owner::equals).isEmpty()
+                    || vehicle.fuel() != definition.fuelCapacity()
+                    || vehicle.health() != definition.maxHealth()
+                    || definition.seatRoles().size() != definition.seats()
+                    || definition.fabricationInputs().isEmpty()) {
+                helper.fail("Vehicle did not load its authoritative deployment contract: "
+                        + vehicle.vehicleId());
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    private static void conquestControlAuthority(GameTestHelper helper) {
+        String region = "gametest_" + UUID.randomUUID();
+        ConquestControlState state = new ConquestControlState(region,
+                helper.getLevel().dimension().identifier().toString(), 4, 2, 4,
+                "galacticwars:republic", UUID.randomUUID().toString(), "", 120, 3L);
+        ConquestSavedData data = ConquestSavedData.get(helper.getLevel());
+        data.put(state);
+        if (!data.state(region).filter(state::equals).isPresent()) {
+            helper.fail("Conquest control was not retained by authoritative saved data");
             return;
         }
         helper.succeed();

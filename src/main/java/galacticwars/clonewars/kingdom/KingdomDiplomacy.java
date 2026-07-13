@@ -65,6 +65,11 @@ public record KingdomDiplomacy(
                 treatyExpiresGameTime, cooldownUntilGameTime, embargo);
     }
 
+    public KingdomDiplomacy withEmbargo(boolean embargo, long cooldownUntil) {
+        return new KingdomDiplomacy(firstKingdomId, secondKingdomId, relation,
+                treatyExpiresGameTime, cooldownUntil, embargo);
+    }
+
     private static int compare(UUID first, UUID second) {
         int high = Long.compareUnsigned(first.getMostSignificantBits(), second.getMostSignificantBits());
         return high != 0 ? high

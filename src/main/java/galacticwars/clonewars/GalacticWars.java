@@ -14,6 +14,7 @@ import galacticwars.clonewars.registry.ModDataComponents;
 import galacticwars.clonewars.registry.ModEntityTypes;
 import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.registry.ModMenuTypes;
+import galacticwars.clonewars.network.GalacticNetwork;
 import galacticwars.clonewars.world.FactionNaturalSpawnRules;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.SpawnPlacementTypes;
@@ -38,6 +39,7 @@ public class GalacticWars {
         modEventBus.addListener(this::registerSpawnPlacements);
         modEventBus.addListener(ModGameTests::registerTestFunctions);
         modEventBus.addListener(ModGameTests::registerGameTests);
+        modEventBus.addListener(GalacticNetwork::register);
 
         ModBlocks.register(modEventBus);
         ModBlockEntityTypes.register(modEventBus);

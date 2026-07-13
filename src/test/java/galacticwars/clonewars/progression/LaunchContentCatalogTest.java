@@ -15,14 +15,12 @@ public final class LaunchContentCatalogTest {
         assertEquals(Set.of("barc_speeder", "force_path"),
                 definitions.questUnlocks("republic_chapter_2"), "datapack quest unlocks");
         assertEquals(70, definitions.questRewardCredits("republic_chapter_2"), "datapack quest reward");
-        boolean rejected = false;
-        try {
-            new LaunchContentDefinitions.ForceAbilityDefinition(
-                    "light_push", "light", 20, 60, "republic_chapter_2", true);
-        } catch (IllegalArgumentException expected) {
-            rejected = true;
-        }
-        assertEquals(true, rejected, "Force runtime remains disabled");
+        var force = new LaunchContentDefinitions.ForceAbilityDefinition(
+                "light_push", "light", 20, 60, "republic_chapter_2", true);
+        assertEquals(true, force.enabled(), "Force runtime enabled by launch content");
+        assertThrows(() -> new LaunchContentDefinitions.ForceAbilityDefinition(
+                "broken", "neutral", 20, 60, "republic_chapter_2", true),
+                "unknown Force path rejected");
         assertNullQuestCollectionRejected(null, Set.of(), "objectives for quest broken");
         assertNullQuestCollectionRejected(List.of("command_center"), null, "unlocks for quest broken");
         assertThrows(() -> new LaunchContentDefinitions.PlanetDefinition(

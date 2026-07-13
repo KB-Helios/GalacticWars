@@ -4,9 +4,11 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.data.SavedDataSchemaPolicy;
+import galacticwars.clonewars.economy.CreditTransactionService;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
@@ -76,7 +78,7 @@ public final class ProgressionSavedData extends SavedData {
 
     public ProgressionDecision apply(ProgressionEvent event) {
         ProgressionState before = state(event.playerId());
-        ProgressionDecision decision = GalacticProgressionCoordinator.apply(before, event);
+        ProgressionDecision decision = CampaignRuntimeService.record(before, event);
         if (decision.accepted() && decision.changed()) {
             states.put(event.playerId(), decision.state());
             this.setDirty();
@@ -99,8 +101,27 @@ public final class ProgressionSavedData extends SavedData {
             throw new IllegalArgumentException("invalid evaluated progression decision");
         }
         states.put(event.playerId(), evaluated.state());
+        ProgressionState completed = CampaignRuntimeService.completeEligibleQuests(evaluated.state());
+        states.put(event.playerId(), completed);
         this.setDirty();
-        return evaluated;
+        return new ProgressionDecision(true, true, "accepted", completed);
+    }
+
+    public int pendingCreditRewards(UUID playerId) {
+        return state(playerId).pendingCreditRewards();
+    }
+
+    /** Atomically retires pending numeric rewards and materializes them as Credit Chip items. */
+    public int claimCreditRewards(ServerPlayer player) {
+        ProgressionState current = state(player.getUUID());
+        int amount = current.pendingCreditRewards();
+        if (amount <= 0) {
+            return 0;
+        }
+        states.put(player.getUUID(), current.clearPendingCreditRewards());
+        this.setDirty();
+        CreditTransactionService.refundPlayer(player, amount);
+        return amount;
     }
 
     private List<PlayerState> serialized() {

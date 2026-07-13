@@ -24,7 +24,7 @@ public final class LaunchDataIntegrityTest {
     private static final Map<String, Set<String>> EXPECTED_QUEST_UNLOCKS = Map.ofEntries(
             Map.entry("republic_chapter_1", Set.of("workforce")),
             Map.entry("republic_chapter_2", Set.of("barc_speeder", "force_path")),
-            Map.entry("republic_chapter_3", Set.of("conquest", "vehicle_mastery")),
+            Map.entry("republic_chapter_3", Set.of("conquest", "vehicle_mastery", "force_mastery")),
             Map.entry("separatist_chapter_1", Set.of("workforce")),
             Map.entry("separatist_chapter_2", Set.of("stap")),
             Map.entry("separatist_chapter_3", Set.of("conquest", "vehicle_mastery")),
@@ -36,7 +36,7 @@ public final class LaunchDataIntegrityTest {
             Map.entry("hutt_cartel_chapter_3", Set.of("conquest", "vehicle_mastery")),
             Map.entry("nightsister_chapter_1", Set.of("workforce")),
             Map.entry("nightsister_chapter_2", Set.of("force_path")),
-            Map.entry("nightsister_chapter_3", Set.of("conquest", "vehicle_mastery")));
+            Map.entry("nightsister_chapter_3", Set.of("conquest", "vehicle_mastery", "force_mastery")));
 
     public static void main(String[] args) throws Exception {
         assertJsonCount(GAMEPLAY.resolve("factions"), 5, "factions");
@@ -60,7 +60,7 @@ public final class LaunchDataIntegrityTest {
             String questId = string(quest, "id");
             List<String> objectives = strings(quest, "objectives");
             assertTrue(!objectives.contains("force_ability_unlocked"),
-                    questId + " cannot require disabled Force runtime");
+                    questId + " cannot require a pre-unlock Force activation");
             List<String> unlockList = strings(quest, "unlocks");
             Set<String> unlocks = Set.copyOf(unlockList);
             assertTrue(unlocks.size() == unlockList.size(), questId + " duplicate unlock");

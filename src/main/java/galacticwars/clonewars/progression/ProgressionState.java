@@ -17,7 +17,7 @@ public record ProgressionState(
         Map<ProgressionEventType, Set<String>> eventSubjects,
         Set<String> unlocks
 ) {
-    public static final int CURRENT_SCHEMA_VERSION = 2;
+    public static final int CURRENT_SCHEMA_VERSION = 3;
 
     public ProgressionState {
         if (schemaVersion != CURRENT_SCHEMA_VERSION) {
@@ -45,6 +45,19 @@ public record ProgressionState(
         return processedEventIds.contains(eventId);
     }
 
+    /** Pending physical Credit Chips earned by campaign rewards. */
+    public int pendingCreditRewards() {
+        return credits;
+    }
+
+    ProgressionState clearPendingCreditRewards() {
+        if (credits == 0) {
+            return this;
+        }
+        return new ProgressionState(schemaVersion, playerId, factionId, 0,
+                processedEventIds, eventTotals, eventSubjects, unlocks);
+    }
+
     public int total(ProgressionEventType type) {
         return eventTotals.getOrDefault(type, 0);
     }
@@ -68,7 +81,7 @@ public record ProgressionState(
             return this;
         }
         int creditDelta = switch (event.type()) {
-            case CREDIT_TRANSACTION -> event.amount();
+            case CREDIT_TRANSACTION -> 0;
             case QUEST_ADVANCED -> LaunchContentCatalog.questRewardCredits(event.subjectId());
             case REGION_CAPTURED -> LaunchContentCatalog.regionRewardCredits(event.subjectId());
             default -> 0;

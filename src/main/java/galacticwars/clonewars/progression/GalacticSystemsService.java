@@ -2,7 +2,6 @@ package galacticwars.clonewars.progression;
 
 import galacticwars.clonewars.data.LaunchContentDefinitions;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -54,53 +53,24 @@ public final class GalacticSystemsService {
         if (ability == null) {
             return SystemDecision.rejected("unknown_force_ability", state);
         }
-        return SystemDecision.rejected("force_runtime_disabled", state);
-    }
-
-    /** @deprecated Runtime purchases must use physical Credit Chips through PhysicalTradeService. */
-    @Deprecated
-    public static SystemDecision purchase(
-            ProgressionState state,
-            UUID eventId,
-            String tradeId
-    ) {
-        return purchase(state, eventId, tradeId, LaunchContentCatalog.data());
-    }
-
-    static SystemDecision purchase(
-            ProgressionState state,
-            UUID eventId,
-            String tradeId,
-            LaunchContentDefinitions content
-    ) {
-        LaunchContentDefinitions.TradeDefinition trade = content.trades().get(tradeId);
-        if (trade == null) {
-            return SystemDecision.rejected("unknown_trade", state);
+        if (!ability.enabled()) {
+            return SystemDecision.rejected("force_ability_disabled", state);
         }
-        if (!state.factionId().equals("galacticwars:" + trade.factionId())) {
-            return SystemDecision.rejected("hostile_merchant", state);
+        if (!state.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.requiredQuest())) {
+            return SystemDecision.rejected("force_quest_locked", state);
         }
-        if (!state.unlocks().contains(trade.requiredUnlock())) {
-            return SystemDecision.rejected("trade_locked", state);
+        if (!state.unlocks().contains(ability.activeUnlock())
+                && !state.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.activeUnlock())) {
+            return SystemDecision.rejected("force_unlock_missing", state);
         }
-        ProgressionDecision payment = GalacticProgressionCoordinator.apply(state,
-                new ProgressionEvent(eventId, state.playerId(), ProgressionEventType.CREDIT_TRANSACTION,
-                        "trade:" + tradeId, -trade.price()));
-        if (!payment.accepted()) {
-            return SystemDecision.rejected(payment.reason(), state);
+        String faction = state.factionId().contains(":")
+                ? state.factionId().substring(state.factionId().indexOf(':') + 1) : state.factionId();
+        String path = faction.equals("republic") ? "light" : faction.equals("nightsister") ? "dark" : "";
+        if (!path.equals(ability.path())) {
+            return SystemDecision.rejected("force_path_unavailable", state);
         }
-        if (!payment.changed()) {
-            return SystemDecision.duplicate(payment.state());
-        }
-        UUID completionId = derived(eventId, "trade");
-        ProgressionDecision completion = GalacticProgressionCoordinator.apply(payment.state(),
-                new ProgressionEvent(completionId, state.playerId(), ProgressionEventType.TRADE_COMPLETED,
-                        tradeId, 1));
-        if (!completion.accepted()) {
-            return SystemDecision.rejected(completion.reason(), state);
-        }
-        return new SystemDecision(true, completion.changed(), completion.reason(), completion.state(),
-                completion.changed() ? trade.itemId() : "", completion.changed() ? trade.itemCount() : 0);
+        return apply(state, new ProgressionEvent(eventId, state.playerId(),
+                ProgressionEventType.FORCE_ABILITY_UNLOCKED, abilityId, 1));
     }
 
     public static SystemDecision captureRegion(
@@ -136,10 +106,6 @@ public final class GalacticSystemsService {
         ProgressionDecision decision = GalacticProgressionCoordinator.apply(state, event);
         return new SystemDecision(decision.accepted(), decision.changed(), decision.reason(), decision.state(),
                 decision.changed() ? event.subjectId() : "", decision.changed() ? 1 : 0);
-    }
-
-    private static UUID derived(UUID id, String suffix) {
-        return UUID.nameUUIDFromBytes((id + ":" + suffix).getBytes(StandardCharsets.UTF_8));
     }
 
     private static boolean requirementSatisfied(ProgressionState state, String requirement) {

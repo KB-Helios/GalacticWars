@@ -38,6 +38,27 @@ final class KingdomCodecs {
                     .fieldOf("role").forGetter(KingdomMember::role)
     ).apply(instance, KingdomMember::new));
 
+    static final Codec<KingdomInvite> KINGDOM_INVITE = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("id").forGetter(KingdomInvite::id),
+            UUIDUtil.CODEC.fieldOf("kingdom_id").forGetter(KingdomInvite::kingdomId),
+            UUIDUtil.CODEC.fieldOf("inviter_id").forGetter(KingdomInvite::inviterId),
+            UUIDUtil.CODEC.fieldOf("target_player_id").forGetter(KingdomInvite::targetPlayerId),
+            Codec.STRING.xmap(KingdomMemberRole::byId, KingdomMemberRole::id)
+                    .fieldOf("offered_role").forGetter(KingdomInvite::offeredRole),
+            Codec.LONG.fieldOf("expires_game_time").forGetter(KingdomInvite::expiresGameTime)
+    ).apply(instance, KingdomInvite::new));
+
+    static final Codec<DiplomacyProposal> DIPLOMACY_PROPOSAL = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("id").forGetter(DiplomacyProposal::id),
+            UUIDUtil.CODEC.fieldOf("proposer_kingdom_id").forGetter(DiplomacyProposal::proposerKingdomId),
+            UUIDUtil.CODEC.fieldOf("target_kingdom_id").forGetter(DiplomacyProposal::targetKingdomId),
+            Codec.STRING.xmap(KingdomRelation::byId, KingdomRelation::id)
+                    .fieldOf("relation").forGetter(DiplomacyProposal::relation),
+            Codec.LONG.fieldOf("treaty_duration_ticks").forGetter(DiplomacyProposal::treatyDurationTicks),
+            Codec.LONG.fieldOf("created_game_time").forGetter(DiplomacyProposal::createdGameTime),
+            Codec.LONG.fieldOf("expires_game_time").forGetter(DiplomacyProposal::expiresGameTime)
+    ).apply(instance, DiplomacyProposal::new));
+
     static final Codec<ClaimedChunk> CLAIMED_CHUNK = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.fieldOf("x").forGetter(ClaimedChunk::x),
             Codec.INT.fieldOf("z").forGetter(ClaimedChunk::z)

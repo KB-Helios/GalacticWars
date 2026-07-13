@@ -32,7 +32,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 public final class KingdomSavedData extends SavedData {
-    public static final int CURRENT_SCHEMA_VERSION = 6;
+    public static final int CURRENT_SCHEMA_VERSION = 7;
     public static final Codec<KingdomSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("schema_version", CURRENT_SCHEMA_VERSION).forGetter(KingdomSavedData::schemaVersion),
             KingdomCodecs.KINGDOM_RECORD.listOf().optionalFieldOf("kingdoms", List.of()).forGetter(KingdomSavedData::kingdoms),
@@ -43,7 +43,11 @@ public final class KingdomSavedData extends SavedData {
             KingdomCodecs.KINGDOM_DIPLOMACY.listOf().optionalFieldOf("diplomacy", List.of())
                     .forGetter(KingdomSavedData::diplomacy),
             KingdomCodecs.KINGDOM_SIEGE.listOf().optionalFieldOf("sieges", List.of())
-                    .forGetter(KingdomSavedData::sieges)
+                    .forGetter(KingdomSavedData::sieges),
+            KingdomCodecs.KINGDOM_INVITE.listOf().optionalFieldOf("pending_invites", List.of())
+                    .forGetter(KingdomSavedData::pendingInvites),
+            KingdomCodecs.DIPLOMACY_PROPOSAL.listOf().optionalFieldOf("pending_diplomacy", List.of())
+                    .forGetter(KingdomSavedData::pendingDiplomacy)
     ).apply(instance, KingdomSavedData::new));
     public static final SavedDataType<KingdomSavedData> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath(GalacticWars.MODID, "kingdoms"),
@@ -62,9 +66,11 @@ public final class KingdomSavedData extends SavedData {
     private final Map<UUID, ArmyGroupRecord> armyGroupsById = new LinkedHashMap<>();
     private final Map<DiplomacyKey, KingdomDiplomacy> diplomacyByPair = new LinkedHashMap<>();
     private final Map<UUID, KingdomSiege> siegesById = new LinkedHashMap<>();
+    private final Map<UUID, KingdomInvite> invitesById = new LinkedHashMap<>();
+    private final Map<UUID, DiplomacyProposal> proposalsById = new LinkedHashMap<>();
 
     public KingdomSavedData() {
-        this(CURRENT_SCHEMA_VERSION, List.of(), List.of(), List.of(), List.of(), List.of());
+        this(CURRENT_SCHEMA_VERSION, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     private KingdomSavedData(
@@ -73,7 +79,9 @@ public final class KingdomSavedData extends SavedData {
             List<UUID> inactiveHallOwners,
             List<ArmyGroupRecord> armyGroups,
             List<KingdomDiplomacy> diplomacy,
-            List<KingdomSiege> sieges
+            List<KingdomSiege> sieges,
+            List<KingdomInvite> invites,
+            List<DiplomacyProposal> proposals
     ) {
         this.schemaVersion = SavedDataSchemaPolicy.migrate(
                 schemaVersion, CURRENT_SCHEMA_VERSION, "kingdom");
@@ -108,6 +116,18 @@ public final class KingdomSavedData extends SavedData {
                 siegesById.putIfAbsent(siege.id(), siege);
             }
         }
+        for (KingdomInvite invite : invites) {
+            if (kingdomsById.containsKey(invite.kingdomId())
+                    && !kingdomIdsByMember.containsKey(invite.targetPlayerId())) {
+                invitesById.putIfAbsent(invite.id(), invite);
+            }
+        }
+        for (DiplomacyProposal proposal : proposals) {
+            if (kingdomsById.containsKey(proposal.proposerKingdomId())
+                    && kingdomsById.containsKey(proposal.targetKingdomId())) {
+                proposalsById.putIfAbsent(proposal.id(), proposal);
+            }
+        }
     }
 
     public static KingdomSavedData get(ServerLevel level) {
@@ -132,6 +152,95 @@ public final class KingdomSavedData extends SavedData {
 
     public List<KingdomSiege> sieges() {
         return List.copyOf(siegesById.values());
+    }
+
+    public List<KingdomInvite> pendingInvites() {
+        return List.copyOf(invitesById.values());
+    }
+
+    public List<DiplomacyProposal> pendingDiplomacy() {
+        return List.copyOf(proposalsById.values());
+    }
+
+    public Optional<KingdomInvite> inviteMember(
+            UUID actorId, UUID targetPlayerId, KingdomMemberRole role, long expiresGameTime
+    ) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_MEMBERS)
+                || kingdomIdsByMember.containsKey(targetPlayerId) || role == KingdomMemberRole.OWNER
+                || expiresGameTime <= 0L
+                || invitesById.values().stream().anyMatch(invite ->
+                invite.targetPlayerId().equals(targetPlayerId) && invite.kingdomId().equals(kingdom.id()))) {
+            return Optional.empty();
+        }
+        UUID id = UUID.randomUUID();
+        KingdomInvite invite = new KingdomInvite(id, kingdom.id(), actorId, targetPlayerId, role, expiresGameTime);
+        invitesById.put(id, invite);
+        setDirty();
+        return Optional.of(invite);
+    }
+
+    public boolean respondToInvite(
+            UUID targetPlayerId, UUID inviteId, boolean accept,
+            String pledgedFactionId, long gameTime
+    ) {
+        KingdomInvite invite = invitesById.get(inviteId);
+        if (invite == null || !invite.targetPlayerId().equals(targetPlayerId)) return false;
+        invitesById.remove(inviteId);
+        if (!accept || invite.expiresGameTime() < gameTime) {
+            setDirty();
+            return !accept;
+        }
+        KingdomRecord kingdom = kingdomsById.get(invite.kingdomId());
+        if (kingdom == null || kingdomIdsByMember.containsKey(targetPlayerId)
+                || (pledgedFactionId != null && !pledgedFactionId.isBlank()
+                && !kingdom.factionId().equals(pledgedFactionId))) {
+            setDirty();
+            return false;
+        }
+        storeKingdom(kingdom.withMember(targetPlayerId, invite.offeredRole()));
+        setDirty();
+        return true;
+    }
+
+    public Optional<DiplomacyProposal> proposeAlliance(
+            UUID actorId, UUID targetKingdomId, long gameTime,
+            long treatyDurationTicks, long proposalLifetimeTicks
+    ) {
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)
+                || !kingdomsById.containsKey(targetKingdomId) || kingdom.id().equals(targetKingdomId)
+                || treatyDurationTicks <= 0L || proposalLifetimeTicks <= 0L
+                || relation(kingdom.id(), targetKingdomId).cooldownUntilGameTime() > gameTime) {
+            return Optional.empty();
+        }
+        DiplomacyProposal proposal = new DiplomacyProposal(UUID.randomUUID(), kingdom.id(), targetKingdomId,
+                KingdomRelation.ALLY, treatyDurationTicks, gameTime,
+                Math.addExact(gameTime, proposalLifetimeTicks));
+        proposalsById.put(proposal.id(), proposal);
+        setDirty();
+        return Optional.of(proposal);
+    }
+
+    public boolean respondToDiplomacy(
+            UUID actorId, UUID proposalId, boolean accept, long gameTime, long cooldownTicks
+    ) {
+        DiplomacyProposal proposal = proposalsById.get(proposalId);
+        KingdomRecord responder = kingdomForPlayer(actorId).orElse(null);
+        if (proposal == null || responder == null
+                || !responder.id().equals(proposal.targetKingdomId())
+                || !responder.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)) return false;
+        proposalsById.remove(proposalId);
+        if (!accept || proposal.expiresGameTime() < gameTime) {
+            setDirty();
+            return !accept;
+        }
+        KingdomDiplomacy updated = relation(proposal.proposerKingdomId(), proposal.targetKingdomId())
+                .withTreaty(Math.addExact(gameTime, proposal.treatyDurationTicks()),
+                        Math.addExact(gameTime, Math.max(0L, cooldownTicks)));
+        diplomacyByPair.put(DiplomacyKey.of(proposal.proposerKingdomId(), proposal.targetKingdomId()), updated);
+        setDirty();
+        return true;
     }
 
     public Optional<ArmyGroupRecord> armyGroup(UUID groupId) {
@@ -1356,13 +1465,23 @@ public final class KingdomSavedData extends SavedData {
     }
 
     public boolean setEmbargo(UUID actorId, UUID otherKingdomId, boolean embargo) {
+        return setEmbargo(actorId, otherKingdomId, embargo, 0L, 0L);
+    }
+
+    public boolean setEmbargo(
+            UUID actorId, UUID otherKingdomId, boolean embargo,
+            long gameTime, long cooldownTicks
+    ) {
         KingdomRecord ownKingdom = kingdomForPlayer(actorId).orElse(null);
         if (ownKingdom == null || !ownKingdom.allows(actorId, KingdomPermission.MANAGE_DIPLOMACY)
                 || ownKingdom.id().equals(otherKingdomId)
                 || !kingdomsById.containsKey(otherKingdomId)) {
             return false;
         }
-        KingdomDiplomacy updated = relation(ownKingdom.id(), otherKingdomId).withEmbargo(embargo);
+        KingdomDiplomacy current = relation(ownKingdom.id(), otherKingdomId);
+        if (current.cooldownUntilGameTime() > gameTime) return false;
+        KingdomDiplomacy updated = current.withEmbargo(embargo,
+                Math.addExact(gameTime, Math.max(0L, cooldownTicks)));
         diplomacyByPair.put(DiplomacyKey.of(ownKingdom.id(), otherKingdomId), updated);
         this.setDirty();
         return true;

@@ -26,11 +26,18 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.NIGHTSISTER_WEAVE_LEAVES.get());
                         output.accept(ModItems.NIGHTSISTER_WEAVE_SAPLING.get());
                         output.accept(ModItems.COMMAND_CENTER.get());
+                        output.accept(ModItems.CONTROL_BEACON.get());
                         output.accept(ModItems.BESKAR_INGOT.get());
                         output.accept(ModItems.RAW_BESKAR.get());
                         output.accept(ModItems.CREDIT_CHIP.get());
                         output.accept(ModItems.ENERGY_CELL.get());
+                        output.accept(ModItems.BARC_SPEEDER_DEPLOYMENT_KIT.get());
+                        output.accept(ModItems.AT_RT_DEPLOYMENT_KIT.get());
+                        output.accept(ModItems.STAP_DEPLOYMENT_KIT.get());
+                        output.accept(ModItems.AAT_DEPLOYMENT_KIT.get());
+                        output.accept(ModItems.LAAT_GUNSHIP_DEPLOYMENT_KIT.get());
                         output.accept(ModItems.HYPERSPACE_NAVIGATOR.get());
+                        output.accept(ModItems.CLAIM_TRANSPONDER.get());
                         output.accept(ModItems.REPUBLIC_PLASTOID_INGOT.get());
                         output.accept(ModItems.MANDALORIAN_FIBER.get());
                         output.accept(ModItems.MANDALORIAN_ALLOY_INGOT.get());

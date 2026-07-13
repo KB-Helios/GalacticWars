@@ -15,12 +15,22 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import galacticwars.clonewars.entity.GalacticRecruitEntity;
+import galacticwars.clonewars.faction.FactionRelation;
+import galacticwars.clonewars.kingdom.KingdomSavedData;
+import galacticwars.clonewars.conquest.ConquestSavedData;
 
 public final class PhysicalTradeService {
     private PhysicalTradeService() {
     }
 
     public static TradeResult purchase(ServerPlayer player, UUID eventId, String tradeId) {
+        return purchase(player, eventId, tradeId, null);
+    }
+
+    public static TradeResult purchase(
+            ServerPlayer player, UUID eventId, String tradeId, GalacticRecruitEntity merchant
+    ) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(eventId, "eventId");
         if (tradeId == null) {
@@ -38,11 +48,31 @@ public final class PhysicalTradeService {
         if (state.processed(eventId)) {
             return TradeResult.duplicate();
         }
-        if (!state.factionId().equals("galacticwars:" + trade.factionId())) {
+        if (merchant != null && (!merchant.factionIdForGameplay().equals("galacticwars:" + trade.factionId())
+                || merchant.factionRelationTo(player) == FactionRelation.ENEMY)) {
             return TradeResult.rejected("hostile_merchant");
+        }
+        if (merchant == null && !state.factionId().equals("galacticwars:" + trade.factionId())) {
+            return TradeResult.rejected("hostile_merchant");
+        }
+        KingdomSavedData kingdoms = KingdomSavedData.get(level);
+        var playerKingdom = kingdoms.kingdomForPlayer(player.getUUID()).orElse(null);
+        var merchantKingdom = kingdoms.kingdoms().stream()
+                .filter(kingdom -> kingdom.factionId().equals("galacticwars:" + trade.factionId()))
+                .findFirst().orElse(null);
+        if (playerKingdom != null && merchantKingdom != null
+                && !playerKingdom.id().equals(merchantKingdom.id())
+                && kingdoms.relation(playerKingdom.id(), merchantKingdom.id()).embargo()) {
+            return TradeResult.rejected("trade_embargoed");
         }
         if (!state.unlocks().contains(trade.requiredUnlock())) {
             return TradeResult.rejected("trade_locked");
+        }
+        if (!trade.regionalPrerequisite().isEmpty()) {
+            var control = ConquestSavedData.get(level).state(trade.regionalPrerequisite()).orElse(null);
+            if (control == null || !control.controllingFaction().equals(state.factionId())) {
+                return TradeResult.rejected("regional_control_required");
+            }
         }
         Identifier resultId;
         try {

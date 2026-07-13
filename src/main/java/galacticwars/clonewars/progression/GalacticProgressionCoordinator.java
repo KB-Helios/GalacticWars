@@ -17,6 +17,9 @@ public final class GalacticProgressionCoordinator {
         if (state.processed(event.id())) {
             return ProgressionDecision.accepted(state, state);
         }
+        if (event.type() == ProgressionEventType.CREDIT_TRANSACTION) {
+            return ProgressionDecision.rejected("physical_currency_required", state);
+        }
         String faction = state.factionId();
         if (event.type() == ProgressionEventType.FACTION_PLEDGED) {
             if (!LaunchContentCatalog.factions().contains(event.subjectId())) {

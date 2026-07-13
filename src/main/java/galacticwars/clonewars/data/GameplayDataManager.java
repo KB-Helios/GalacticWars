@@ -120,6 +120,20 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 requireRegistered(BuiltInRegistries.ITEM, trade.itemId(),
                         "stock item for trade " + trade.id());
             }
+            for (LaunchContentDefinitions.VehicleDefinition vehicle : launchContent.vehicles().values()) {
+                for (String itemId : vehicle.fabricationInputs().keySet()) {
+                    requireRegistered(BuiltInRegistries.ITEM, itemId,
+                            "fabrication input for vehicle " + vehicle.id());
+                }
+            }
+            for (LaunchContentDefinitions.ForceAbilityDefinition ability
+                    : launchContent.forceAbilities().values()) {
+                if (ability.enabled() && !galacticwars.clonewars.force.ForceEffectExecutorCatalog
+                        .supports(ability.effect())) {
+                    throw new IllegalArgumentException(
+                            "Enabled Force ability has no executor: " + ability.id());
+                }
+            }
             for (KingdomBaseBlueprint blueprint : blueprints.values()) {
                 for (BaseBlockPlacement placement : blueprint.placements()) {
                     requireRegistered(BuiltInRegistries.BLOCK, placement.blockId(),
@@ -289,6 +303,12 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 if (definitions.putIfAbsent(definition.id(), definition) != null) {
                     throw new IllegalArgumentException("Duplicate ability id " + definition.id()
                             + " in " + resource.id());
+                }
+                if (definition.enabled()
+                        && !galacticwars.clonewars.classes.ClassAbilityEffectRegistry.registered(
+                        definition.id().toString())) {
+                    throw new IllegalArgumentException("Enabled ability lacks runtime executor "
+                            + definition.id() + " in " + resource.id());
                 }
             }
         }

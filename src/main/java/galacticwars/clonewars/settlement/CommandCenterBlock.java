@@ -10,6 +10,7 @@ import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.menu.CommandCenterNavigationMenuProvider;
 import galacticwars.clonewars.menu.FactionSelectionMenuProvider;
+import galacticwars.clonewars.menu.CommandCenterOperationsMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -142,7 +143,16 @@ public final class CommandCenterBlock extends BaseEntityBlock {
 
         KingdomRecord kingdom = activated.orElseThrow();
         hall.settlePendingCampaignRefunds(serverLevel);
-        player.openMenu(hall);
+        if (player instanceof ServerPlayer serverPlayer) {
+            int claimed = ProgressionSavedData.get(serverLevel).claimCreditRewards(serverPlayer);
+            if (claimed > 0) {
+                player.sendSystemMessage(Component.translatable(
+                        "message.galacticwars.campaign.reward_claimed", claimed));
+            }
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            serverPlayer.openMenu(new CommandCenterOperationsMenuProvider(pos));
+        }
         player.sendSystemMessage(Component.translatable(
                 "message.galacticwars.command_center.overview",
                 Component.literal(kingdom.factionId()),

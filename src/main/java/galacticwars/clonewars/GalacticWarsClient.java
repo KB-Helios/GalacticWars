@@ -5,8 +5,11 @@ import galacticwars.clonewars.client.gui.CommandCenterNavigationScreen;
 import galacticwars.clonewars.client.gui.FactionSelectionScreen;
 import galacticwars.clonewars.client.gui.BlasterHeatHud;
 import galacticwars.clonewars.client.gui.GalacticWarsConfigScreen;
+import galacticwars.clonewars.client.gui.MerchantTradeScreen;
+import galacticwars.clonewars.client.gui.CommandCenterOperationsScreen;
 import galacticwars.clonewars.client.render.GalacticRecruitRenderer;
 import galacticwars.clonewars.client.render.LightsaberClientExtensions;
+import galacticwars.clonewars.client.render.GalacticVehicleRenderer;
 import galacticwars.clonewars.registry.ModEntityTypes;
 import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.registry.ModMenuTypes;
@@ -15,6 +18,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.minecraft.resources.Identifier;
 import net.minecraft.client.renderer.entity.ThrownItemRenderer;
@@ -34,6 +40,18 @@ public class GalacticWarsClient {
         container.registerExtensionPoint(
                 IConfigScreenFactory.class,
                 (ignored, parent) -> GalacticWarsConfigScreen.create(parent));
+        NeoForge.EVENT_BUS.addListener(galacticwars.clonewars.client.ForceKeyMappings::tick);
+    }
+
+    @SubscribeEvent
+    static void registerKeyMappings(RegisterKeyMappingsEvent event) {
+        galacticwars.clonewars.client.ForceKeyMappings.register(event);
+    }
+
+    @SubscribeEvent
+    static void registerClientPayloads(RegisterClientPayloadHandlersEvent event) {
+        event.register(galacticwars.clonewars.network.ForceHudPayload.TYPE,
+                (payload, context) -> galacticwars.clonewars.client.ForceClientState.update(payload));
     }
 
     @SubscribeEvent
@@ -49,6 +67,8 @@ public class GalacticWarsClient {
         ModEntityTypes.recruits().forEach(holder -> event.registerEntityRenderer(
                 holder.get(), context -> new GalacticRecruitRenderer<>(
                         context, holder.get())));
+        ModEntityTypes.vehicles().forEach(holder -> event.registerEntityRenderer(
+                holder.get(), context -> new GalacticVehicleRenderer<>(context, holder.get())));
     }
 
     @SubscribeEvent
@@ -68,6 +88,8 @@ public class GalacticWarsClient {
         event.register(ModMenuTypes.RECRUIT_COMMAND.get(), RecruitCommandScreen::new);
         event.register(ModMenuTypes.COMMAND_CENTER_NAVIGATION.get(), CommandCenterNavigationScreen::new);
         event.register(ModMenuTypes.FACTION_SELECTION.get(), FactionSelectionScreen::new);
+        event.register(ModMenuTypes.MERCHANT_TRADE.get(), MerchantTradeScreen::new);
+        event.register(ModMenuTypes.COMMAND_CENTER_OPERATIONS.get(), CommandCenterOperationsScreen::new);
     }
 
     @SubscribeEvent
@@ -76,5 +98,11 @@ public class GalacticWarsClient {
                 VanillaGuiLayers.HOTBAR,
                 Identifier.fromNamespaceAndPath(GalacticWars.MODID, "blaster_heat"),
                 (graphics, deltaTracker) -> BlasterHeatHud.render(graphics));
+        event.registerAbove(VanillaGuiLayers.HOTBAR,
+                Identifier.fromNamespaceAndPath(GalacticWars.MODID, "force_hud"),
+                (graphics, deltaTracker) -> galacticwars.clonewars.client.gui.ForceHud.render(graphics));
+        event.registerAbove(VanillaGuiLayers.HOTBAR,
+                Identifier.fromNamespaceAndPath(GalacticWars.MODID, "vehicle_hud"),
+                (graphics, deltaTracker) -> galacticwars.clonewars.client.gui.VehicleHud.render(graphics));
     }
 }

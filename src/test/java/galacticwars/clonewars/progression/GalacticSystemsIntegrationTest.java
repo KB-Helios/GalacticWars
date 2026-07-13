@@ -15,7 +15,6 @@ public final class GalacticSystemsIntegrationTest {
         UUID player = UUID.randomUUID();
         ProgressionState state = ProgressionState.create(player);
         state = event(state, ProgressionEventType.FACTION_PLEDGED, "galacticwars:republic", 1);
-        state = event(state, ProgressionEventType.CREDIT_TRANSACTION, "starter_reward", 100);
         state = event(state, ProgressionEventType.BUILDING_COMPLETED, "command_center", 1);
         state = event(state, ProgressionEventType.BUILDING_COMPLETED, "forward_base", 1);
         state = event(state, ProgressionEventType.RECRUIT_HIRED, "galacticwars:clone_trooper", 1);
@@ -40,26 +39,13 @@ public final class GalacticSystemsIntegrationTest {
         state = vehicle.state();
         assertTrue(state.unlocks().contains("vehicle_control"), "vehicle acquisition connects to controls");
 
-        UUID tradeEventId = UUID.randomUUID();
-        GalacticSystemsService.SystemDecision trade = GalacticSystemsService.purchase(
-                state, tradeEventId, "republic_quartermaster", CONTENT);
-        assertTrue(trade.accepted() && trade.changed() && trade.state().credits() == 198,
-                "trade charges exactly once");
-        assertTrue(trade.resultId().equals("galacticwars:energy_cell") && trade.resultCount() == 8,
-                "trade returns the namespaced item and configured stack count");
-        ProgressionState afterTrade = trade.state();
-        GalacticSystemsService.SystemDecision replayedTrade = GalacticSystemsService.purchase(
-                afterTrade, tradeEventId, "republic_quartermaster", CONTENT);
-        assertTrue(replayedTrade.accepted() && !replayedTrade.changed()
-                        && replayedTrade.resultId().isEmpty() && replayedTrade.state().credits() == 198,
-                "duplicate trade cannot charge or grant twice");
-
-        state = afterTrade;
+        state = event(state, ProgressionEventType.TRADE_COMPLETED, "republic_quartermaster", 1);
         GalacticSystemsService.SystemDecision force = GalacticSystemsService.unlockForceAbility(
                 state, UUID.randomUUID(), "light_push", CONTENT);
-        assertTrue(!force.accepted() && force.reason().equals("force_runtime_disabled")
-                        && force.state() == state,
-                "Force definitions remain reserved but cannot unlock in this release");
+        assertTrue(force.accepted() && force.changed()
+                        && force.state().hasSubject(ProgressionEventType.FORCE_ABILITY_UNLOCKED, "light_push"),
+                "chapter-unlocked Force ability is connected to progression");
+        state = force.state();
 
         GalacticSystemsService.SystemDecision conquest = GalacticSystemsService.captureRegion(
                 state, UUID.randomUUID(), "kamino_platform", CONTENT);
@@ -95,7 +81,7 @@ public final class GalacticSystemsIntegrationTest {
                         "laat_gunship", "flight", 8, 220, 5000, "vehicle_mastery"));
         Map<String, LaunchContentDefinitions.ForceAbilityDefinition> force = Map.of(
                 "light_push", new LaunchContentDefinitions.ForceAbilityDefinition(
-                        "light_push", "light", 20, 60, "republic_chapter_2", false));
+                        "light_push", "light", 20, 60, "republic_chapter_2", true));
         Map<String, LaunchContentDefinitions.TradeDefinition> trades = Map.of(
                 "republic_quartermaster", new LaunchContentDefinitions.TradeDefinition(
                         "republic_quartermaster", "republic", 12, "galacticwars:energy_cell", 8,

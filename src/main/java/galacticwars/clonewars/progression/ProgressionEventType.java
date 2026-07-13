@@ -1,6 +1,7 @@
 package galacticwars.clonewars.progression;
 
 public enum ProgressionEventType {
+    CAMPAIGN_RECHECK,
     FACTION_PLEDGED,
     CREDIT_TRANSACTION,
     RECRUIT_HIRED,

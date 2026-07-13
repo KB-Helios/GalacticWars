@@ -73,7 +73,9 @@ public final class CommandCenterIntegrationTest {
         assertContains(block, "KingdomSavedData.get(serverLevel)", "overworld saved data access");
         assertContains(block, "activateHall", "kingdom founding and relocation");
         assertContains(block, "FactionSelectionMenuProvider", "explicit faction selection");
-        assertContains(block, "player.openMenu(hall)", "hall treasury menu");
+        assertContains(block, "CommandCenterOperationsMenuProvider", "operations hub menu");
+        String operations = read("src/main/java/galacticwars/clonewars/menu/CommandCenterOperationsMenu.java");
+        assertContains(operations, "serverPlayer.openMenu(hall)", "storage tab treasury menu");
         assertContains(block, "onExplosionHit", "explosion-resistant owner removal path");
         assertContains(block, "playerWillDestroy", "pre-removal lifecycle transaction");
         assertContains(block, "dropHallContents", "exactly-once inventory drops");
