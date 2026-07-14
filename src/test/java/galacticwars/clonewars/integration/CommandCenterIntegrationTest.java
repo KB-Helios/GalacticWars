@@ -14,6 +14,7 @@ public final class CommandCenterIntegrationTest {
         hallRequiresExplicitFactionSelection();
         hallAssetsAreComplete();
         hallOpensPlanetNavigationAfterPledge();
+        hallSynchronizesTruthfulTargetedOperations();
         System.out.println("CommandCenterIntegrationTest passed");
     }
 
@@ -38,7 +39,40 @@ public final class CommandCenterIntegrationTest {
         String block = read("src/main/java/galacticwars/clonewars/settlement/CommandCenterBlock.java");
         String menus = read("src/main/java/galacticwars/clonewars/registry/ModMenuTypes.java");
         assertContains(block, "CommandCenterNavigationMenuProvider", "navigation console provider");
+        assertContains(block, "KingdomPermission.TRAVEL", "navigation travel permission");
         assertContains(menus, "COMMAND_CENTER_NAVIGATION", "navigation menu registration");
+    }
+
+    private static void hallSynchronizesTruthfulTargetedOperations() throws IOException {
+        String provider = read("src/main/java/galacticwars/clonewars/menu/CommandCenterOperationsMenuProvider.java");
+        String menu = read("src/main/java/galacticwars/clonewars/menu/CommandCenterOperationsMenu.java");
+        String network = read("src/main/java/galacticwars/clonewars/network/GalacticNetwork.java");
+        String payload = read("src/main/java/galacticwars/clonewars/network/MenuActionPayload.java");
+        String screen = read("src/main/java/galacticwars/clonewars/client/gui/CommandCenterOperationsScreen.java");
+        String plan = read("docs/gameplay-completion-plan.md");
+        assertContains(provider, "CommandCenterDashboardCodec.write", "initial dashboard snapshot");
+        assertContains(menu, "CommandCenterDashboardState.capture", "server dashboard authority");
+        assertContains(menu, "CommandTargetResolver.resolve", "explicit operation target resolution");
+        assertContains(menu, "ATTACK_SQUAD_TARGET", "explicit squad attack action");
+        assertContains(menu, "nearbyCombatTargets", "server-revalidated nearby hostile targets");
+        assertContains(network, "command_center_state", "Framework dashboard refresh message");
+        assertContains(payload, "primaryTargetId", "primary operation target payload");
+        assertContains(payload, "secondaryTargetId", "secondary operation target payload");
+        assertContains(screen, "construction", "construction dashboard surface");
+        assertContains(screen, "workforce", "workforce dashboard surface");
+        assertContains(screen, "commandCandidateIndex", "explicit commander selector");
+        assertContains(screen, "combatTargetIndex", "explicit combat-target selector");
+        assertContains(screen, "HOLD_SQUAD", "complete squad order controls");
+        assertContains(screen, "workerIndex", "explicit live-worker selector");
+        assertContains(screen, "RESUME_WORKER", "workforce resume control");
+        assertContains(screen, "RECALL_WORKER", "workforce recall control");
+        assertContains(screen, "PAUSE_WORKER", "workforce pause control");
+        assertContains(screen, "overview.next_objective", "overview next-objective guidance");
+        assertContains(screen, "objectiveInstruction", "actionable campaign objective guidance");
+        assertContains(screen, "new MenuActionPayload(", "targeted operation dispatch");
+        assertContains(screen, "KingdomPermissionPolicy.allows", "role-aware client controls");
+        assertContains(plan, "fresh survival player", "player-facing completion criterion");
+        assertContains(plan, "Green catalogs", "runtime proof boundary");
     }
 
     private static void hallIsRegisteredAsPhysicalOwnedStorage() throws IOException {
@@ -74,6 +108,8 @@ public final class CommandCenterIntegrationTest {
         assertContains(block, "activateHall", "kingdom founding and relocation");
         assertContains(block, "FactionSelectionMenuProvider", "explicit faction selection");
         assertContains(block, "CommandCenterOperationsMenuProvider", "operations hub menu");
+        assertContains(block, "BlockStateProperties.HORIZONTAL_FACING", "directional console state");
+        assertNotContains(block, "claimCreditRewards", "silent reward claim on open");
         String operations = read("src/main/java/galacticwars/clonewars/menu/CommandCenterOperationsMenu.java");
         assertContains(operations, "serverPlayer.openMenu(hall)", "storage tab treasury menu");
         assertContains(block, "onExplosionHit", "explosion-resistant owner removal path");
@@ -106,6 +142,12 @@ public final class CommandCenterIntegrationTest {
     private static void assertContains(String value, String expected, String label) {
         if (!value.contains(expected)) {
             throw new AssertionError(label + " missing <" + expected + ">");
+        }
+    }
+
+    private static void assertNotContains(String value, String unexpected, String label) {
+        if (value.contains(unexpected)) {
+            throw new AssertionError(label + " unexpectedly contained <" + unexpected + ">");
         }
     }
 }

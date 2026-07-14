@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.LinkedHashSet;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -36,6 +37,7 @@ import galacticwars.clonewars.combat.BlasterBoltEntity;
 
 /** Server-driven vehicle shared by the five launch chassis. */
 public final class GalacticVehicleEntity extends Entity implements GeoEntity {
+    private static final int DURACRETE_REPAIR_AMOUNT = 12;
     private static final EntityDataAccessor<String> OWNER = SynchedEntityData.defineId(
             GalacticVehicleEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> FACTION = SynchedEntityData.defineId(
@@ -99,8 +101,7 @@ public final class GalacticVehicleEntity extends Entity implements GeoEntity {
             return;
         }
         if (health() <= 0) {
-            ejectPassengers();
-            discard();
+            destroyVehicle();
             return;
         }
         Entity controlling = getFirstPassenger();
@@ -131,6 +132,7 @@ public final class GalacticVehicleEntity extends Entity implements GeoEntity {
         move(MoverType.SELF, motion);
         if (horizontalCollision && motion.horizontalDistanceSqr() > 0.08D) {
             damageVehicle(1);
+            if (isRemoved()) return;
         }
         int fuelRate = definition == null ? 5 : definition.fuelRateTicks();
         if (motion.horizontalDistanceSqr() > 0.0001D && tickCount % fuelRate == 0) {
@@ -152,9 +154,23 @@ public final class GalacticVehicleEntity extends Entity implements GeoEntity {
         if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
         ItemStack held = player.getItemInHand(hand);
         if (held.is(ModItems.ENERGY_CELL.get()) && fuel() < fuelCapacity()) {
+            if (!canBoard(player)) return InteractionResult.FAIL;
             if (!level().isClientSide()) {
                 entityData.set(FUEL, Math.min(fuelCapacity(), fuel() + 250));
                 if (!player.hasInfiniteMaterials()) held.shrink(1);
+                player.sendOverlayMessage(Component.translatable(
+                        "message.galacticwars.vehicle.refueled", fuel(), fuelCapacity()));
+            }
+            return InteractionResult.SUCCESS;
+        }
+        if (held.is(ModItems.DURACRETE.get()) && health() < maxVehicleHealth()) {
+            if (!canBoard(player)) return InteractionResult.FAIL;
+            if (!level().isClientSide()) {
+                entityData.set(HEALTH, Math.min(
+                        maxVehicleHealth(), health() + DURACRETE_REPAIR_AMOUNT));
+                if (!player.hasInfiniteMaterials()) held.shrink(1);
+                player.sendOverlayMessage(Component.translatable(
+                        "message.galacticwars.vehicle.repaired", health(), maxVehicleHealth()));
             }
             return InteractionResult.SUCCESS;
         }
@@ -199,7 +215,16 @@ public final class GalacticVehicleEntity extends Entity implements GeoEntity {
     public String vehicleId() { return BuiltInRegistries.ENTITY_TYPE.getKey(getType()).getPath(); }
 
     public void damageVehicle(int amount) {
-        if (amount > 0) entityData.set(HEALTH, Math.max(0, health() - amount));
+        if (amount <= 0 || isRemoved()) return;
+        entityData.set(HEALTH, Math.max(0, health() - amount));
+        if (health() <= 0 && !level().isClientSide()) {
+            destroyVehicle();
+        }
+    }
+
+    private void destroyVehicle() {
+        ejectPassengers();
+        discard();
     }
 
     public boolean applyInput(
@@ -236,14 +261,23 @@ public final class GalacticVehicleEntity extends Entity implements GeoEntity {
         String weapon = definition() == null ? "light_blaster" : definition().weaponEffect();
         double damage = weapon.equals("heavy_blaster") || weapon.equals("gunship_blaster") ? 10.0D
                 : weapon.equals("medium_blaster") ? 8.0D : 6.0D;
-        BlasterBoltEntity bolt = new BlasterBoltEntity(serverLevel, driver,
-                driver.getMainHandItem(), damage);
+        BlasterBoltEntity bolt = new BlasterBoltEntity(
+                serverLevel, driver, mountedWeaponItem(), damage);
         bolt.setPos(driver.getEyePosition().add(direction.scale(1.2D)));
         bolt.shoot(direction.x, direction.y, direction.z, 3.8F, 0.25F);
         if (serverLevel.addFreshEntity(bolt)) {
             entityData.set(FUEL, fuel() - 5);
             weaponReadyGameTime = level().getGameTime() + (weapon.equals("heavy_blaster") ? 16L : 8L);
         }
+    }
+
+    private ItemStack mountedWeaponItem() {
+        return new ItemStack(switch (factionId()) {
+            case "galacticwars:separatist" -> ModItems.E5_BLASTER.get();
+            case "galacticwars:mandalorian" -> ModItems.WESTAR_BLASTER.get();
+            case "galacticwars:hutt_cartel" -> ModItems.SCATTER_BLASTER.get();
+            default -> ModItems.DC15_BLASTER.get();
+        });
     }
 
     private boolean canBoard(Player player) {

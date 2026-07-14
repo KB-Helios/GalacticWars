@@ -31,7 +31,9 @@ public final class GameplayDataRoadmapTest {
             for (Path path : paths.filter(value -> value.toString().endsWith(".json")).toList()) {
                 String faction = Files.readString(path);
                 factions.put(stringValue(faction, "id"), faction);
-                assertEquals(10, intValue(faction, "direct_delta"), "direct pledge delta");
+                assertTrue(intValue(faction, "direct_delta")
+                                >= intValue(faction, "minimum_hiring_alignment"),
+                        "pledge must unlock direct hiring for " + path.getFileName());
                 assertEquals(2, intValue(faction, "ally_delta"), "ally pledge delta");
                 assertEquals(-5, intValue(faction, "enemy_delta"), "enemy pledge delta");
                 assertTrue(faction.contains("\"selection_order\""), "selection order");
@@ -80,6 +82,7 @@ public final class GameplayDataRoadmapTest {
         assertContains(manager, "mandalorian_warrior", "Mandalorian alias target");
         assertContains(manager, "integer(resource.json(), \"schema_version\", -1)",
                 "missing schema versions are rejected");
+        assertContains(manager, "pledge grants", "pledge-to-hire deadlocks are rejected");
     }
 
     private static void reciprocal(String own, Set<String> relations, String field, Map<String, String> factions) {

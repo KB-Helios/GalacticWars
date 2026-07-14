@@ -26,6 +26,7 @@ import galacticwars.clonewars.economy.PhysicalTradeService;
 import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.vehicle.GalacticVehicleEntity;
+import galacticwars.clonewars.conquest.ConquestCaptureService;
 import galacticwars.clonewars.conquest.ConquestControlState;
 import galacticwars.clonewars.conquest.ConquestSavedData;
 import galacticwars.clonewars.entity.RecruitSpawnEggItem;
@@ -33,7 +34,9 @@ import galacticwars.clonewars.entity.RecruitLifecycleService;
 import galacticwars.clonewars.faction.FactionAlignmentSavedData;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.FactionRelation;
+import galacticwars.clonewars.force.ForceWorldEffectService;
 import galacticwars.clonewars.kingdom.BuildProject;
+import galacticwars.clonewars.kingdom.CommandCenterDashboardState;
 import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomClaim;
 import galacticwars.clonewars.kingdom.KingdomActionId;
@@ -56,13 +59,21 @@ import galacticwars.clonewars.kingdom.WorkOrder;
 import galacticwars.clonewars.kingdom.WorkOrderState;
 import galacticwars.clonewars.kingdom.WorkOrderType;
 import galacticwars.clonewars.kingdom.WorksiteRecord;
+import galacticwars.clonewars.item.CommandTargetSelection;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
+import galacticwars.clonewars.menu.CommandCenterOperationsMenu;
+import galacticwars.clonewars.menu.CommandCenterOperationsMenuProvider;
 import galacticwars.clonewars.menu.CommandCenterNavigationMenu;
 import galacticwars.clonewars.menu.FactionSelectionMenu;
+import galacticwars.clonewars.menu.MerchantTradeMenu;
+import galacticwars.clonewars.menu.MerchantTradeMenuProvider;
+import galacticwars.clonewars.progression.LaunchContentCatalog;
 import galacticwars.clonewars.progression.ProgressionEvent;
 import galacticwars.clonewars.progression.ProgressionDecision;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
+import galacticwars.clonewars.progression.ProgressionState;
+import galacticwars.clonewars.progression.ForceSavedData;
 import galacticwars.clonewars.recruitment.RecruitmentAction;
 import galacticwars.clonewars.recruitment.RecruitDuty;
 import galacticwars.clonewars.recruitment.RecruitmentPaymentService;
@@ -73,6 +84,8 @@ import galacticwars.clonewars.registry.ModEntityTypes;
 import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.registry.ModDataComponents;
 import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
+import galacticwars.clonewars.settlement.ConstructionPlan;
+import galacticwars.clonewars.settlement.ConstructionProjectService;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import galacticwars.clonewars.workforce.WorkerPhase;
 import galacticwars.clonewars.workforce.WorkerProfession;
@@ -91,6 +104,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.SpawnEggItemBehavior;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.FunctionGameTestInstance;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.TestData;
@@ -112,10 +126,12 @@ import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
@@ -156,7 +172,8 @@ public final class ModGameTests {
         Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(
                 ENVIRONMENT,
                 new TestEnvironmentDefinition.AllOf(List.of()));
-        Map<Identifier, Holder<TestEnvironmentDefinition<?>>> isolatedEnvironments = Map.of(
+        Map<Identifier, Holder<TestEnvironmentDefinition<?>>> isolatedEnvironments =
+                new LinkedHashMap<>(Map.of(
                 id("ungrouped_recruit_ranged_brain"), event.registerEnvironment(
                         id("ungrouped_recruit_ranged_brain_environment"),
                         new TestEnvironmentDefinition.AllOf(List.of())),
@@ -177,6 +194,18 @@ public final class ModGameTests {
                         new TestEnvironmentDefinition.AllOf(List.of())),
                 id("grouped_brain_authority"), event.registerEnvironment(
                         id("grouped_brain_authority_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("local_recruit_protect_owner"), event.registerEnvironment(
+                        id("local_recruit_protect_owner_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("command_marker_runtime"), event.registerEnvironment(
+                        id("command_marker_runtime_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())),
+                id("vehicle_embodied_runtime"), event.registerEnvironment(
+                        id("vehicle_embodied_runtime_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of()))));
+        isolatedEnvironments.put(id("force_embodied_runtime"), event.registerEnvironment(
+                        id("force_embodied_runtime_environment"),
                         new TestEnvironmentDefinition.AllOf(List.of())));
         List<Identifier> smartBrainRuntimeTests = List.of(
                 id("ungrouped_recruit_ranged_brain"),
@@ -185,17 +214,29 @@ public final class ModGameTests {
                 id("smart_brain_move_command"),
                 id("smart_brain_move_stall_recovery"),
                 id("natural_civilian_brain_runtime"),
-                id("grouped_brain_authority"));
+                id("grouped_brain_authority"),
+                id("local_recruit_protect_owner"),
+                id("command_marker_runtime"));
         for (Identifier testId : TESTS.keySet()) {
-            int timeoutTicks = Set.of(
-                    id("smart_brain_move_command"),
-                    id("smart_brain_move_stall_recovery")).contains(testId)
-                    ? 260
+            int timeoutTicks = testId.equals(id("smart_brain_move_stall_recovery"))
+                    ? 520
                     : Set.of(
-                            id("smart_brain_follow_and_sit"),
-                            id("natural_civilian_brain_runtime")).contains(testId)
-                            ? 160
-                            : 100;
+                    id("smart_brain_move_command"),
+                    id("grouped_brain_authority")).contains(testId)
+                    ? 260
+                    : testId.equals(id("smart_brain_follow_and_sit"))
+                            ? 360
+                            : testId.equals(id("command_marker_runtime"))
+                                    ? 180
+                                    : testId.equals(id("vehicle_embodied_runtime"))
+                                            ? 260
+                                    : testId.equals(id("chapter_three_campaign_runtime"))
+                                            ? 260
+                                    : Set.of(
+                                            id("faction_selection_transaction"),
+                                            id("natural_civilian_brain_runtime")).contains(testId)
+                                            ? 160
+                                            : 100;
             int runtimeTestIndex = smartBrainRuntimeTests.indexOf(testId);
             TestData<Holder<TestEnvironmentDefinition<?>>> data = new TestData<>(
                     isolatedEnvironments.getOrDefault(testId, environment),
@@ -219,7 +260,15 @@ public final class ModGameTests {
 
     private static Map<Identifier, Consumer<GameTestHelper>> createTests() {
         LinkedHashMap<Identifier, Consumer<GameTestHelper>> tests = new LinkedHashMap<>();
+        tests.put(id("command_center_player_interaction"),
+                ModGameTests::commandCenterPlayerInteraction);
         tests.put(id("command_center_authority"), ModGameTests::kingdomHallAuthority);
+        tests.put(id("command_center_multiplayer_invite"),
+                ModGameTests::commandCenterMultiplayerInvite);
+        tests.put(id("command_center_squad_orders"), ModGameTests::commandCenterSquadOrders);
+        tests.put(id("command_center_workforce_control"), ModGameTests::commandCenterWorkforceControl);
+        tests.put(id("command_marker_runtime"), ModGameTests::commandMarkerRuntime);
+        tests.put(id("blueprint_projector_runtime"), ModGameTests::blueprintProjectorRuntime);
         tests.put(id("kingdom_governance_persistence"), ModGameTests::kingdomGovernancePersistence);
         tests.put(id("kingdom_multiplayer_runtime"), ModGameTests::kingdomMultiplayerRuntime);
         tests.put(id("overworld_faction_outpost_runtime"), ModGameTests::overworldFactionOutpostRuntime);
@@ -228,6 +277,10 @@ public final class ModGameTests {
         tests.put(id("progression_runtime_adapter"), ModGameTests::progressionRuntimeAdapter);
         tests.put(id("class_ability_runtime_data"), ModGameTests::classAbilityRuntimeData);
         tests.put(id("vehicle_runtime_contract"), ModGameTests::vehicleRuntimeContract);
+        tests.put(id("vehicle_embodied_runtime"), ModGameTests::vehicleEmbodiedRuntime);
+        tests.put(id("force_embodied_runtime"), ModGameTests::forceEmbodiedRuntime);
+        tests.put(id("chapter_three_campaign_runtime"), ModGameTests::chapterThreeCampaignRuntime);
+        tests.put(id("all_faction_campaign_paths"), ModGameTests::allFactionCampaignPaths);
         tests.put(id("conquest_control_authority"), ModGameTests::conquestControlAuthority);
         tests.put(id("recruit_entity_contract"), ModGameTests::recruitEntityContract);
         tests.put(id("worker_tags_and_loot"), ModGameTests::workerTagsAndLoot);
@@ -355,7 +408,7 @@ public final class ModGameTests {
     private static void factionSelectionTransaction(GameTestHelper helper) {
         BlockPos hallPos = isolatedCapital(helper, 6);
         CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
-        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
         owner.setPos(hall.getBlockPos().getX() + 0.5D, hall.getBlockPos().getY(), hall.getBlockPos().getZ() + 0.5D);
         if (!hall.claim(owner)) {
             helper.fail("Faction selection setup could not claim the Command Center");
@@ -389,7 +442,69 @@ public final class ModGameTests {
             helper.fail("A second faction selection changed the committed kingdom faction");
             return;
         }
-        helper.succeed();
+        ProgressionSavedData progression = ProgressionSavedData.get(helper.getLevel());
+        if (!progression.state(owner.getUUID()).hasSubjectPath(
+                        ProgressionEventType.BUILDING_COMPLETED, "command_center")
+                || progression.state(owner.getUUID()).hasSubject(
+                        ProgressionEventType.QUEST_ADVANCED, "separatist_chapter_1")) {
+            helper.fail("Faction pledge did not preserve the Command Center objective or advanced too early");
+            return;
+        }
+        owner.getInventory().add(new ItemStack(ModItems.CREDIT_CHIP.get(), 64));
+        GalacticRecruitEntity firstRecruit = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), hallPos.offset(2, 0, 0));
+        firstRecruit.setNoAi(true);
+        boolean[] scenarioRun = {false};
+        helper.onEachTick(() -> {
+            if (scenarioRun[0]) {
+                return;
+            }
+            if (helper.getLevel().getEntity(firstRecruit.getUUID()) != firstRecruit) {
+                if (helper.getTick() >= 120L) {
+                    scenarioRun[0] = true;
+                    helper.fail("Chapter-one recruit never entered the server index within 120 ticks");
+                }
+                return;
+            }
+            scenarioRun[0] = true;
+            owner.setPos(firstRecruit.getX(), firstRecruit.getY(), firstRecruit.getZ());
+            boolean hired = firstRecruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_HIRE);
+            ProgressionState completed = progression.state(owner.getUUID());
+            owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+            CommandCenterOperationsMenu operations = (CommandCenterOperationsMenu)
+                    new CommandCenterOperationsMenuProvider(hallPos)
+                            .createMenu(2, owner.getInventory(), owner);
+            boolean chapterVisible = operations.dashboardState().activeQuest()
+                    .filter(quest -> quest.questId().equals("separatist_chapter_2"))
+                    .isPresent();
+            int creditsBeforeClaim = RecruitmentPaymentService.creditCount(owner);
+            boolean rewardClaimed = operations.handleReplayAction(
+                    owner, UUID.randomUUID(), CommandCenterOperationsMenu.CLAIM_REWARDS);
+            int creditsAfterClaim = RecruitmentPaymentService.creditCount(owner);
+            boolean duplicateRejected = !operations.handleReplayAction(
+                    owner, UUID.randomUUID(), CommandCenterOperationsMenu.CLAIM_REWARDS);
+            if (!hired
+                    || !completed.hasSubject(
+                    ProgressionEventType.QUEST_ADVANCED, "separatist_chapter_1")
+                    || completed.pendingCreditRewards() != 40
+                    || !chapterVisible
+                    || !rewardClaimed
+                    || creditsAfterClaim != creditsBeforeClaim + 40
+                    || progression.pendingCreditRewards(owner.getUUID()) != 0
+                    || !duplicateRejected) {
+                helper.fail("Fresh survival chapter one did not complete and pay exactly once: hired="
+                        + hired + ", completed=" + completed.hasSubject(
+                        ProgressionEventType.QUEST_ADVANCED, "separatist_chapter_1")
+                        + ", pending=" + completed.pendingCreditRewards()
+                        + ", chapterVisible=" + chapterVisible
+                        + ", rewardClaimed=" + rewardClaimed
+                        + ", credits=" + creditsBeforeClaim + "->" + creditsAfterClaim
+                        + ", remaining=" + progression.pendingCreditRewards(owner.getUUID())
+                        + ", duplicateRejected=" + duplicateRejected);
+                return;
+            }
+            helper.succeed();
+        });
     }
 
     private static void planetArrivalRuntime(GameTestHelper helper) {
@@ -675,49 +790,74 @@ public final class ModGameTests {
 
     private static void smartBrainFollowAndSit(GameTestHelper helper) {
         SmartBrainTestArea area = prepareSmartBrainTestArea(
-                helper, GameType.CREATIVE, 0, 5, 0, 4);
+                helper, GameType.CREATIVE, -4, 12, -6, 10);
         ServerPlayer owner = area.player();
         GalacticRecruitEntity recruit = spawnRecruitAt(
                 helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 2));
         recruit.setInvulnerable(true);
         recruit.tame(owner);
         BlockPos ownerPos = area.at(8, 1, 2);
-        owner.setPos(ownerPos.getX() + 0.5D, ownerPos.getY(), ownerPos.getZ() + 0.5D);
         owner.setNoGravity(true);
         owner.setYRot(-90.0F);
-        invokeRecruitCommand(recruit, RecruitmentAction.FOLLOW_OWNER);
-        Vec3 startingPosition = recruit.position();
-        double startingDistance = recruit.distanceToSqr(owner);
-
-        helper.runAfterDelay(80, () -> {
-            boolean approachedOwner = recruit.distanceToSqr(owner) < startingDistance - 4.0D;
-            boolean followedAnchor = recruit.position().distanceToSqr(startingPosition) > 4.0D
-                    && BrainUtil.hasMemory(recruit,
-                    net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
-            if (!approachedOwner && !followedAnchor) {
-                helper.fail("SmartBrain companion behaviour did not follow its owner: position="
-                        + recruit.position() + ", owner=" + owner.position()
-                        + ", start=" + startingPosition
-                        + ", command=" + recruit.getRecruitCommand()
-                        + ", shouldFollow=" + recruit.shouldUseCompanionAi()
-                        + ", walkMemory=" + BrainUtil.hasMemory(recruit,
-                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
-                        + ", pathMemory=" + BrainUtil.hasMemory(recruit,
-                        net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
-                        + ", navigationDone=" + recruit.getNavigation().isDone()
-                        + ", path=" + pathState(recruit, owner.blockPosition()));
+        long indexWaitStartedTick = helper.getTick();
+        int[] phase = {0};
+        int[] phaseStartedRecruitTick = {0};
+        Vec3[] startingPosition = {Vec3.ZERO};
+        Vec3[] heldPosition = {Vec3.ZERO};
+        double[] startingDistance = {0.0D};
+        helper.onEachTick(() -> {
+            if (phase[0] == 0) {
+                if (helper.getLevel().getEntity(recruit.getUUID()) != recruit) {
+                    if (helper.getTick() - indexWaitStartedTick >= 120L) {
+                        phase[0] = 4;
+                        helper.fail("SmartBrain companion never entered the server entity index");
+                    }
+                    return;
+                }
+                owner.setPos(ownerPos.getX() + 0.5D, ownerPos.getY(), ownerPos.getZ() + 0.5D);
+                invokeRecruitCommand(recruit, RecruitmentAction.FOLLOW_OWNER);
+                startingPosition[0] = recruit.position();
+                startingDistance[0] = recruit.distanceToSqr(owner);
+                phaseStartedRecruitTick[0] = recruit.tickCount;
+                phase[0] = 1;
                 return;
             }
-            recruit.setWorkerProfession(WorkerProfession.FARMER);
-            invokeRecruitCommand(recruit, RecruitmentAction.HOLD_POSITION);
-            Vec3 heldPosition = recruit.position();
-            helper.runAfterDelay(20, () -> {
-                double heldDeltaX = recruit.getX() - heldPosition.x();
-                double heldDeltaZ = recruit.getZ() - heldPosition.z();
+            if (phase[0] == 1 && recruit.tickCount - phaseStartedRecruitTick[0] >= 140) {
+                boolean approachedOwner = recruit.distanceToSqr(owner) < startingDistance[0] - 4.0D;
+                boolean followedAnchor = recruit.position().distanceToSqr(startingPosition[0]) > 4.0D
+                        && BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+                if (!approachedOwner && !followedAnchor) {
+                    phase[0] = 4;
+                    helper.fail("SmartBrain companion behaviour did not follow its owner: position="
+                            + recruit.position() + ", owner=" + owner.position()
+                            + ", start=" + startingPosition[0]
+                            + ", command=" + recruit.getRecruitCommand()
+                            + ", shouldFollow=" + recruit.shouldUseCompanionAi()
+                            + ", walkMemory=" + BrainUtil.hasMemory(recruit,
+                            net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                            + ", pathMemory=" + BrainUtil.hasMemory(recruit,
+                            net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
+                            + ", navigationDone=" + recruit.getNavigation().isDone()
+                            + ", recruitTicks=" + (recruit.tickCount - phaseStartedRecruitTick[0])
+                            + ", path=" + pathState(recruit, owner.blockPosition()));
+                    return;
+                }
+                recruit.setWorkerProfession(WorkerProfession.FARMER);
+                invokeRecruitCommand(recruit, RecruitmentAction.HOLD_POSITION);
+                heldPosition[0] = recruit.position();
+                phaseStartedRecruitTick[0] = recruit.tickCount;
+                phase[0] = 2;
+                return;
+            }
+            if (phase[0] == 2 && recruit.tickCount - phaseStartedRecruitTick[0] >= 20) {
+                double heldDeltaX = recruit.getX() - heldPosition[0].x();
+                double heldDeltaZ = recruit.getZ() - heldPosition[0].z();
                 if (!recruit.isOrderedToSit()
                         || heldDeltaX * heldDeltaX + heldDeltaZ * heldDeltaZ > 0.25D) {
+                    phase[0] = 4;
                     helper.fail("SmartBrain sit behaviour did not hold the recruit in place: position="
-                            + recruit.position() + ", held=" + heldPosition
+                            + recruit.position() + ", held=" + heldPosition[0]
                             + ", command=" + recruit.getRecruitCommand()
                             + ", orderedSit=" + recruit.isOrderedToSit()
                             + ", group=" + recruit.getArmyGroupId()
@@ -726,15 +866,19 @@ public final class ModGameTests {
                     return;
                 }
                 invokeRecruitCommand(recruit, RecruitmentAction.CLEAR_TARGET);
-                helper.runAfterDelay(5, () -> {
-                    if (recruit.isOrderedToSit()) {
-                        helper.fail("Clear-target command incorrectly kept the recruit sitting");
-                        return;
-                    }
-                    recruit.discard();
-                    helper.succeed();
-                });
-            });
+                phaseStartedRecruitTick[0] = recruit.tickCount;
+                phase[0] = 3;
+                return;
+            }
+            if (phase[0] == 3 && recruit.tickCount - phaseStartedRecruitTick[0] >= 5) {
+                phase[0] = 4;
+                if (recruit.isOrderedToSit()) {
+                    helper.fail("Clear-target command incorrectly kept the recruit sitting");
+                    return;
+                }
+                recruit.discard();
+                helper.succeed();
+            }
         });
     }
 
@@ -781,110 +925,37 @@ public final class ModGameTests {
         BlockPos unreachable = area.at(1, 20, 1);
         setRecruitField(recruit, "moveTarget", unreachable);
         invokeRecruitCommand(recruit, RecruitmentAction.MOVE_TO_POSITION);
-        boolean[] backoffObserved = {false};
+        boolean[] finished = {false};
         helper.onEachTick(() -> {
+            if (finished[0]) {
+                return;
+            }
             if (recruit.tickCount >= 200
                     && recruit.isAlive()
                     && recruit.distanceToMoveTargetSqr() > 4.0D
                     && recruit.getNavigation().isDone()
                     && !BrainUtil.hasMemory(recruit,
                     net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)) {
-                backoffObserved[0] = true;
-            }
-        });
-        helper.runAfterDelay(250, () -> {
-            if (!backoffObserved[0]) {
+                finished[0] = true;
+                recruit.discard();
+                helper.succeed();
+            } else if (recruit.tickCount >= 240) {
+                finished[0] = true;
                 helper.fail("Unreachable move command did not enter bounded retry backoff: tickCount="
                         + recruit.tickCount + ", walkMemory="
                         + BrainUtil.hasMemory(recruit,
                         net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
                         + ", navigationDone=" + recruit.getNavigation().isDone()
                         + ", running=" + recruit.getBrain().getRunningBehaviors());
-                return;
             }
-            recruit.discard();
-            helper.succeed();
         });
     }
 
     private static void naturalCivilianBrainRuntime(GameTestHelper helper) {
         SmartBrainTestArea area = prepareSmartBrainTestArea(
                 helper, GameType.CREATIVE, -4, 8, -4, 8);
-
-        BlockPos shelterHome = area.at(4, 1, 4);
-        GalacticRecruitEntity sheltering = spawnRecruitAt(
-                helper, ModEntityTypes.REPUBLIC_CIVILIAN.get(), area.at(1, 1, 1));
-        sheltering.setInvulnerable(true);
-        sheltering.initializeNaturalFactionNpc(
-                UUID.randomUUID(), NpcServiceBranch.CIVILIAN, shelterHome, 32);
-        double initialShelterDistance = sheltering.distanceToSqr(Vec3.atCenterOf(shelterHome));
-        GalacticRecruitEntity threat = spawnRecruitAt(
-                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(1, 1, 2));
-        threat.setInvulnerable(true);
-        threat.setNoAi(true);
-        threat.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
-        if (!sheltering.isHostileFactionRecruit(threat)) {
-            helper.fail("Natural civilian test threat is not hostile: relation="
-                    + sheltering.factionRelationTo(threat)
-                    + ", civilianFaction=" + sheltering.getRecruitFactionId()
-                    + ", threatFaction=" + threat.getRecruitFactionId()
-                    + ", threatDuty=" + threat.getRecruitDuty());
-            return;
-        }
-
-        BlockPos workHome = area.at(3, 1, 0);
-        BlockPos storage = workHome.offset(1, 0, 0);
-        helper.getLevel().setBlockAndUpdate(storage, Blocks.CHEST.defaultBlockState());
-        boolean[] shelterVerified = {false};
-        GalacticRecruitEntity[] worker = {null};
-        helper.onEachTick(() -> {
-            if (!shelterVerified[0]
-                    && sheltering.distanceToSqr(Vec3.atCenterOf(shelterHome))
-                    < initialShelterDistance - 4.0D) {
-                shelterVerified[0] = true;
-                threat.discard();
-                helper.setTime(6000L);
-                worker[0] = spawnRecruitAt(
-                        helper, ModEntityTypes.HUTT_CIVILIAN.get(), area.at(1, 1, 1));
-                worker[0].setInvulnerable(true);
-                worker[0].initializeNaturalFactionNpc(
-                        UUID.randomUUID(), NpcServiceBranch.CIVILIAN, workHome, 32);
-                helper.runAfterDelay(2, () -> {
-                    worker[0].setWorkerProfession(WorkerProfession.FARMER);
-                    setRecruitField(worker[0], "nextNaturalProductionGameTime", 0L);
-                    BlockPos workstation = worker[0].naturalWorkstationPosition();
-                    worker[0].setPos(
-                            workstation.getX() + 0.5D,
-                            workstation.getY(),
-                            workstation.getZ() + 0.5D);
-                    worker[0].getNavigation().stop();
-                    helper.runAfterDelay(30, () -> verifyNaturalCivilianWork(
-                            helper, sheltering, worker[0], storage));
-                });
-            }
-        });
-
-        helper.runAfterDelay(120, () -> {
-            if (!shelterVerified[0]) {
-                helper.fail("Natural civilian shelter behaviour did not retreat from a hostile soldier: position="
-                        + sheltering.position() + ", home=" + shelterHome
-                        + ", orderedSit=" + sheltering.isOrderedToSit()
-                        + ", tickCount=" + sheltering.tickCount
-                        + ", branch=" + sheltering.getServiceBranch()
-                        + ", outpost=" + sheltering.getFactionOutpostId()
-                        + ", group=" + sheltering.getArmyGroupId()
-                        + ", threatAlive=" + threat.isAlive()
-                        + ", threatDistance=" + sheltering.distanceToSqr(threat)
-                        + ", hostile=" + sheltering.isHostileFactionRecruit(threat)
-                        + ", walkMemory=" + BrainUtil.hasMemory(sheltering,
-                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
-                        + ", navigationDone=" + sheltering.getNavigation().isDone()
-                        + ", pathMemory=" + BrainUtil.hasMemory(sheltering,
-                        net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
-                        + ", running=" + sheltering.getBrain().getRunningBehaviors()
-                        + ", path=" + pathState(sheltering, shelterHome));
-            }
-        });
+        NaturalCivilianTestScenario scenario = new NaturalCivilianTestScenario(helper, area);
+        helper.onEachTick(scenario::tick);
     }
 
     private static void verifyNaturalCivilianWork(
@@ -925,23 +996,45 @@ public final class ModGameTests {
                 helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
         GalacticRecruitEntity target = spawnRecruitAt(
                 helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(2, 1, 1));
-        setRecruitField(recruit, "armyGroupId", UUID.randomUUID());
-        BrainUtil.setTargetOfEntity(recruit, target);
-        BrainUtil.setMemory(recruit, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET,
-                new net.minecraft.world.entity.ai.memory.WalkTarget(target, 1.0F, 1));
-        helper.runAfterDelay(80, () -> {
-            if (BrainUtil.hasMemory(recruit,
-                    net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET)
-                    || BrainUtil.hasMemory(recruit,
-                    net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)) {
-                helper.fail("Grouped recruit retained stale local SmartBrain targets: tickCount="
-                        + recruit.tickCount + ", running="
-                        + recruit.getBrain().getRunningBehaviors());
+        long indexWaitStartedTick = helper.getTick();
+        int[] phase = {0};
+        int[] scenarioStartedRecruitTick = {0};
+        helper.onEachTick(() -> {
+            if (phase[0] == 0) {
+                boolean recruitIndexed = helper.getLevel().getEntity(recruit.getUUID()) == recruit;
+                boolean targetIndexed = helper.getLevel().getEntity(target.getUUID()) == target;
+                if (!recruitIndexed || !targetIndexed) {
+                    if (helper.getTick() - indexWaitStartedTick >= 120L) {
+                        phase[0] = 2;
+                        helper.fail("Grouped SmartBrain entities never entered the server entity index: recruit="
+                                + recruitIndexed + ", target=" + targetIndexed);
+                    }
+                    return;
+                }
+                setRecruitField(recruit, "armyGroupId", UUID.randomUUID());
+                BrainUtil.setTargetOfEntity(recruit, target);
+                BrainUtil.setMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.world.entity.ai.memory.WalkTarget(target, 1.0F, 1));
+                scenarioStartedRecruitTick[0] = recruit.tickCount;
+                phase[0] = 1;
                 return;
             }
-            recruit.discard();
-            target.discard();
-            helper.succeed();
+            if (phase[0] == 1 && recruit.tickCount - scenarioStartedRecruitTick[0] >= 80) {
+                phase[0] = 2;
+                if (BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET)
+                        || BrainUtil.hasMemory(recruit,
+                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)) {
+                    helper.fail("Grouped recruit retained stale local SmartBrain targets: tickCount="
+                            + recruit.tickCount + ", running="
+                            + recruit.getBrain().getRunningBehaviors());
+                    return;
+                }
+                recruit.discard();
+                target.discard();
+                helper.succeed();
+            }
         });
     }
 
@@ -980,11 +1073,17 @@ public final class ModGameTests {
                         galacticwars.clonewars.network.VehicleInputPayload.STREAM_CODEC)
                 || !codecRoundTrips(
                         new galacticwars.clonewars.network.MenuActionPayload(
-                                UUID.randomUUID(), 7, 255),
+                                UUID.randomUUID(), 7, 255,
+                                Optional.of(UUID.randomUUID()), Optional.of(UUID.randomUUID())),
                         galacticwars.clonewars.network.MenuActionPayload.STREAM_CODEC)
                 || !codecRoundTrips(
                         new galacticwars.clonewars.network.ForceHudPayload(81, 4, 17, 0),
-                        galacticwars.clonewars.network.ForceHudPayload.STREAM_CODEC)) {
+                        galacticwars.clonewars.network.ForceHudPayload.STREAM_CODEC)
+                || !codecRoundTrips(
+                        new galacticwars.clonewars.network.CommandCenterStatePayload(
+                                7,
+                                populatedDashboard(helper.getLevel().getGameTime())),
+                        galacticwars.clonewars.network.CommandCenterStatePayload.STREAM_CODEC)) {
             helper.fail("A Framework message codec did not round-trip cleanly");
             return;
         }
@@ -1004,6 +1103,56 @@ public final class ModGameTests {
         } finally {
             buffer.release();
         }
+    }
+
+    private static CommandCenterDashboardState populatedDashboard(long gameTime) {
+        UUID actorId = UUID.randomUUID();
+        UUID kingdomId = UUID.randomUUID();
+        UUID candidateId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        UUID foreignKingdomId = UUID.randomUUID();
+        return new CommandCenterDashboardState(
+                Math.max(0L, gameTime), true, actorId, kingdomId, "galacticwars:republic", "owner",
+                120, 40, true, 3, 8, 1, 1, true, true, 2, 3, 1,
+                List.of(candidateId),
+                List.of(new CommandCenterDashboardState.ClaimSummary(
+                        UUID.randomUUID(), "minecraft:overworld", 2, 3, 9, true)),
+                List.of(new CommandCenterDashboardState.SquadSummary(
+                        UUID.randomUUID(), "Aurek Squad", Optional.of(actorId), List.of(memberId),
+                        2, "follow", "line", "active", 16)),
+                List.of(new CommandCenterDashboardState.CombatTargetSummary(
+                        UUID.randomUUID(), "B1 Battle Droid", "galacticwars:separatist", 14)),
+                List.of(new CommandCenterDashboardState.BlueprintSummary(
+                        CommandCenterDashboardState.BlueprintSummary.targetId("galacticwars:forward_base"),
+                        "galacticwars:forward_base", "Forward Base", List.of(0, 1, 2, 3), 12,
+                        List.of(new CommandCenterDashboardState.MaterialSummary(
+                                "minecraft:stone_bricks", 12)), 4, 9, 1)),
+                List.of(candidateId),
+                List.of(new CommandCenterDashboardState.BuildSummary(
+                        UUID.randomUUID(), "galacticwars:forward_base", "active", 4, 12, "")),
+                List.of(new CommandCenterDashboardState.WorkOrderSummary(
+                        UUID.randomUUID(), "build", "assigned", Optional.of(candidateId), 4, 12, "")),
+                List.of(new CommandCenterDashboardState.WorkerSummary(
+                        candidateId, "CT-6116", "builder", "work_at_site", "interact",
+                        "build_place", Optional.of(new CommandCenterDashboardState.PositionSummary(
+                        "minecraft:overworld", 2, 64, 3)), 8,
+                        Optional.of(new CommandCenterDashboardState.PositionSummary(
+                                "minecraft:overworld", 1, 64, 1)),
+                        Optional.of(new CommandCenterDashboardState.PositionSummary(
+                                "minecraft:overworld", 3, 64, 3)), Optional.empty(), 2, 24, 5)),
+                List.of(new CommandCenterDashboardState.QuestSummary(
+                        "galacticwars:republic_chapter_1", false, 40, List.of("workforce"),
+                        List.of(new CommandCenterDashboardState.ObjectiveSummary(
+                                "command_center", true)))),
+                List.of(new CommandCenterDashboardState.NearbyPlayerSummary(
+                        UUID.randomUUID(), "Nearby Player", 6)),
+                List.of(new CommandCenterDashboardState.MemberSummary(actorId, "owner")),
+                List.of(new CommandCenterDashboardState.ForeignKingdomSummary(
+                        foreignKingdomId, UUID.randomUUID(), "galacticwars:separatist")),
+                List.of(new CommandCenterDashboardState.InviteSummary(
+                        UUID.randomUUID(), kingdomId, actorId, memberId, "member", gameTime + 1200L)),
+                List.of(new CommandCenterDashboardState.DiplomacyProposalSummary(
+                        UUID.randomUUID(), foreignKingdomId, kingdomId, "ally", gameTime + 1200L)));
     }
 
     private static void blasterFriendlyFire(GameTestHelper helper) {
@@ -1441,6 +1590,1204 @@ public final class ModGameTests {
             }
             helper.succeed();
         });
+    }
+
+    private static void commandCenterPlayerInteraction(GameTestHelper helper) {
+        BlockPos hallPos = isolatedCapital(helper, 28);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        ServerPlayer player = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        player.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 2.5D);
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+
+        InteractionResult result;
+        try {
+            result = player.gameMode.useItemOn(
+                    player,
+                    helper.getLevel(),
+                    ItemStack.EMPTY,
+                    InteractionHand.MAIN_HAND,
+                    new BlockHitResult(Vec3.atCenterOf(hallPos), Direction.SOUTH, hallPos, false));
+        } catch (RuntimeException exception) {
+            String message = exception.getMessage() == null ? "" : exception.getMessage();
+            if (!hall.isOwner(player)
+                    || !message.contains("advanced_open_screen may not be sent to the client")) {
+                helper.fail("Command Center interaction failed before its headless-client menu boundary: "
+                        + exception);
+                return;
+            }
+            helper.succeed();
+            return;
+        }
+        if (!result.consumesAction()
+                || !hall.isOwner(player)
+                || !(player.containerMenu instanceof FactionSelectionMenu)) {
+            helper.fail("Empty-hand Command Center use did not claim the Hall and open faction selection: result="
+                    + result + ", owner=" + hall.isOwner(player)
+                    + ", menu=" + player.containerMenu.getClass().getSimpleName());
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void commandCenterMultiplayerInvite(GameTestHelper helper) {
+        BlockPos hallPos = isolatedCapital(helper, 18);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        ServerPlayer candidate = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        ServerPlayer distant = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        candidate.setPos(hallPos.getX() + 4.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        distant.setPos(hallPos.getX() + 40.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        hall.claim(owner);
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        KingdomRecord kingdom = data.foundKingdom(
+                owner.getUUID(), "galacticwars:republic",
+                helper.getLevel().dimension().identifier().toString(), hallPos);
+
+        CommandCenterOperationsMenu staleMenu = (CommandCenterOperationsMenu)
+                new CommandCenterOperationsMenuProvider(hallPos)
+                        .createMenu(1, owner.getInventory(), owner);
+        List<CommandCenterDashboardState.NearbyPlayerSummary> inviteTargets =
+                staleMenu.dashboardState().nearbyPlayers();
+        if (inviteTargets.size() != 1
+                || !inviteTargets.getFirst().playerId().equals(candidate.getUUID())
+                || inviteTargets.stream().anyMatch(target -> target.playerId().equals(distant.getUUID()))) {
+            helper.fail("Command Center did not expose only bounded explicit invite targets: "
+                    + inviteTargets);
+            return;
+        }
+
+        candidate.setPos(hallPos.getX() + 32.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        if (staleMenu.handleReplayAction(
+                owner, UUID.randomUUID(), CommandCenterOperationsMenu.INVITE_NEAREST,
+                Optional.of(candidate.getUUID()), Optional.empty())) {
+            helper.fail("Command Center accepted a stale invite target outside embodied range");
+            return;
+        }
+        candidate.setPos(hallPos.getX() + 4.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        CommandCenterOperationsMenu ownerMenu = (CommandCenterOperationsMenu)
+                new CommandCenterOperationsMenuProvider(hallPos)
+                        .createMenu(2, owner.getInventory(), owner);
+        UUID replayId = UUID.randomUUID();
+        boolean invited = ownerMenu.handleReplayAction(
+                owner, replayId, CommandCenterOperationsMenu.INVITE_NEAREST,
+                Optional.of(candidate.getUUID()), Optional.empty());
+        boolean replayRejected = !ownerMenu.handleReplayAction(
+                owner, replayId, CommandCenterOperationsMenu.INVITE_NEAREST,
+                Optional.of(candidate.getUUID()), Optional.empty());
+        var invite = data.pendingInvites().stream()
+                .filter(value -> value.kingdomId().equals(kingdom.id()))
+                .filter(value -> value.targetPlayerId().equals(candidate.getUUID()))
+                .findFirst().orElse(null);
+        if (!invited || !replayRejected || invite == null) {
+            helper.fail("Explicit multiplayer invitation was not replay-safe: invited="
+                    + invited + ", replay=" + replayRejected + ", invite=" + invite);
+            return;
+        }
+
+        CommandCenterOperationsMenu candidateMenu = (CommandCenterOperationsMenu)
+                new CommandCenterOperationsMenuProvider(hallPos)
+                        .createMenu(3, candidate.getInventory(), candidate);
+        if (!candidateMenu.dashboardState().actorRole().equals("visitor")
+                || !candidateMenu.handleReplayAction(
+                        candidate, UUID.randomUUID(), CommandCenterOperationsMenu.ACCEPT_INVITE,
+                        Optional.of(invite.id()), Optional.empty())
+                || data.kingdomForPlayer(candidate.getUUID())
+                        .filter(joined -> joined.id().equals(kingdom.id()))
+                        .flatMap(joined -> joined.member(candidate.getUUID()))
+                        .filter(member -> member.role() == KingdomMemberRole.MEMBER)
+                        .isEmpty()
+                || !hall.canOpen(candidate)) {
+            helper.fail("Invited player could not accept into the authoritative kingdom");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void forceEmbodiedRuntime(GameTestHelper helper) {
+        ProgressionSavedData progression = ProgressionSavedData.get(helper.getLevel());
+        ForceSavedData force = ForceSavedData.get(helper.getLevel());
+        ServerPlayer light = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        BlockPos lightOrigin = helper.absolutePos(new BlockPos(2, 1, 2));
+        light.setPos(lightOrigin.getX() + 0.5D, lightOrigin.getY(), lightOrigin.getZ() + 0.5D);
+        light.setYRot(0.0F);
+        light.setYHeadRot(0.0F);
+        light.setXRot(0.0F);
+        completeForceCampaign(progression, light, "galacticwars:republic",
+                "clone_trooper", "kamino");
+
+        GalacticRecruitEntity ally = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 5));
+        ally.setNoAi(true);
+        ally.initializeFromSpawnEgg();
+        ally.tame(light);
+        var pushed = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(2, 1, 8));
+        pushed.setNoAi(true);
+        ally.setDeltaMovement(Vec3.ZERO);
+        pushed.setDeltaMovement(Vec3.ZERO);
+        UUID lightPushId = UUID.randomUUID();
+        boolean lightPush = ForceWorldEffectService.activate(light, lightPushId, 0);
+        int lightAfterPush = force.state(light.getUUID()).energy();
+        boolean lightReplay = ForceWorldEffectService.activate(light, lightPushId, 0);
+        boolean lightCooldown = !ForceWorldEffectService.activate(
+                light, UUID.randomUUID(), 0);
+        if (!lightPush || !lightReplay || !lightCooldown || lightAfterPush != 80
+                || force.state(light.getUUID()).energy() != 80
+                || ally.getDeltaMovement().lengthSqr() > 0.0001D
+                || pushed.getDeltaMovement().z <= 0.1D) {
+            helper.fail("Light Push did not protect allied NPCs or enforce replay/cooldown state: "
+                    + "accepted=" + lightPush + ", replay=" + lightReplay
+                    + ", cooldown=" + lightCooldown + ", energy="
+                    + force.state(light.getUUID()).energy() + ", ally="
+                    + ally.getDeltaMovement() + ", target=" + pushed.getDeltaMovement());
+            return;
+        }
+        ally.discard();
+        pushed.discard();
+
+        var pulled = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(2, 1, 7));
+        pulled.setNoAi(true);
+        pulled.setDeltaMovement(Vec3.ZERO);
+        UUID lightPullId = UUID.randomUUID();
+        if (!ForceWorldEffectService.activate(light, lightPullId, 1)
+                || pulled.getDeltaMovement().z >= -0.1D
+                || force.state(light.getUUID()).energy() != 55) {
+            helper.fail("Light Pull did not move its physical target toward the player: "
+                    + pulled.getDeltaMovement() + "/" + force.state(light.getUUID()));
+            return;
+        }
+        pulled.discard();
+        light.setDeltaMovement(Vec3.ZERO);
+        UUID lightLeapId = UUID.randomUUID();
+        if (!ForceWorldEffectService.activate(light, lightLeapId, 2)
+                || light.getDeltaMovement().y <= 0.5D
+                || force.state(light.getUUID()).energy() != 40) {
+            helper.fail("Light Leap did not launch the player and conserve Force energy: "
+                    + light.getDeltaMovement() + "/" + force.state(light.getUUID()));
+            return;
+        }
+        light.setPos(lightOrigin.getX() + 100.5D, lightOrigin.getY(), lightOrigin.getZ() + 0.5D);
+
+        ServerPlayer dark = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        BlockPos darkOrigin = helper.absolutePos(new BlockPos(2, 1, 2));
+        dark.setPos(darkOrigin.getX() + 0.5D, darkOrigin.getY(), darkOrigin.getZ() + 0.5D);
+        dark.setYRot(0.0F);
+        dark.setYHeadRot(0.0F);
+        dark.setXRot(0.0F);
+        completeForceCampaign(progression, dark, "galacticwars:nightsister",
+                "nightsister_acolyte", "coruscant");
+
+        var darkPushed = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(2, 1, 8));
+        darkPushed.setNoAi(true);
+        darkPushed.setDeltaMovement(Vec3.ZERO);
+        UUID darkPushId = UUID.randomUUID();
+        if (!ForceWorldEffectService.activate(dark, darkPushId, 0)
+                || darkPushed.getDeltaMovement().z <= 0.1D
+                || force.state(dark.getUUID()).energy() != 80) {
+            helper.fail("Dark Push did not move its physical target: "
+                    + darkPushed.getDeltaMovement() + "/" + force.state(dark.getUUID()));
+            return;
+        }
+        darkPushed.discard();
+        dark.setDeltaMovement(Vec3.ZERO);
+        UUID darkDashId = UUID.randomUUID();
+        if (!ForceWorldEffectService.activate(dark, darkDashId, 1)
+                || dark.getDeltaMovement().z <= 1.0D
+                || force.state(dark.getUUID()).energy() != 65) {
+            helper.fail("Dark Dash did not propel the player and conserve Force energy: "
+                    + dark.getDeltaMovement() + "/" + force.state(dark.getUUID()));
+            return;
+        }
+        dark.setDeltaMovement(Vec3.ZERO);
+        var choked = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(2, 1, 6));
+        choked.setNoAi(true);
+        UUID darkChokeId = UUID.randomUUID();
+        if (!ForceWorldEffectService.activate(dark, darkChokeId, 2)
+                || !choked.hasEffect(MobEffects.LEVITATION)
+                || !choked.hasEffect(MobEffects.WEAKNESS)
+                || force.state(dark.getUUID()).energy() != 30) {
+            helper.fail("Dark Choke did not apply its physical effects and cost: effects="
+                    + choked.getActiveEffects() + ", state=" + force.state(dark.getUUID()));
+            return;
+        }
+
+        Tag encoded = ForceSavedData.CODEC.encodeStart(NbtOps.INSTANCE, force).getOrThrow();
+        ForceSavedData restored = ForceSavedData.CODEC.parse(NbtOps.INSTANCE, encoded).getOrThrow();
+        if (!restored.state(light.getUUID()).path().equals("light")
+                || restored.state(light.getUUID()).energy() != 40
+                || !restored.state(light.getUUID()).processedActivationIds().contains(lightLeapId)
+                || !restored.state(dark.getUUID()).path().equals("dark")
+                || restored.state(dark.getUUID()).energy() != 30
+                || !restored.state(dark.getUUID()).processedActivationIds().contains(darkChokeId)) {
+            helper.fail("Force paths, energy, cooldowns, or replay IDs did not survive persistence");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void allFactionCampaignPaths(GameTestHelper helper) {
+        record CampaignPath(
+                String faction,
+                String firstRecruit,
+                String planet,
+                String chapterTwoTrade,
+                String chapterThreeRecruit,
+                boolean chapterThreeTrade
+        ) {
+        }
+        List<CampaignPath> paths = List.of(
+                new CampaignPath("galacticwars:republic", "clone_trooper", "kamino", "", "", true),
+                new CampaignPath("galacticwars:separatist", "b1_battle_droid", "geonosis", "", "", true),
+                new CampaignPath("galacticwars:mandalorian", "mandalorian_warrior", "tatooine",
+                        "mandalorian_armorer", "bounty_hunter", false),
+                new CampaignPath("galacticwars:hutt_cartel", "hutt_enforcer", "tatooine",
+                        "hutt_broker", "smuggler", false),
+                new CampaignPath("galacticwars:nightsister", "nightsister_acolyte", "coruscant",
+                        "", "", true));
+        ProgressionSavedData progression = ProgressionSavedData.get(helper.getLevel());
+        for (CampaignPath path : paths) {
+            ServerPlayer player = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.FACTION_PLEDGED, path.faction());
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.BUILDING_COMPLETED, "command_center");
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.RECRUIT_HIRED, path.firstRecruit());
+            for (int delivery = 1; delivery <= 3; delivery++) {
+                applyCampaignSetupEvent(progression, player, ProgressionEventType.DELIVERY_COMPLETED,
+                        "campaign_matrix_delivery_" + delivery);
+            }
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.BUILDING_COMPLETED, "forward_base");
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.BUILDING_COMPLETED, "supply_depot");
+            if (!path.chapterTwoTrade().isEmpty()) {
+                applyCampaignSetupEvent(progression, player, ProgressionEventType.TRADE_COMPLETED,
+                        path.chapterTwoTrade());
+            }
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.PLANET_VISITED, path.planet());
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.VEHICLE_ACQUIRED, "campaign_matrix_vehicle");
+            applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.REGION_CAPTURED, "campaign_matrix_region");
+            if (path.chapterThreeTrade()) {
+                applyCampaignSetupEvent(progression, player, ProgressionEventType.TRADE_COMPLETED,
+                        "campaign_matrix_trade");
+            }
+            if (!path.chapterThreeRecruit().isEmpty()) {
+                applyCampaignSetupEvent(progression, player, ProgressionEventType.RECRUIT_HIRED,
+                        path.chapterThreeRecruit());
+            }
+            String factionPath = path.faction().substring(path.faction().indexOf(':') + 1);
+            ProgressionState state = progression.state(player.getUUID());
+            if (!state.hasSubject(
+                    ProgressionEventType.QUEST_ADVANCED, factionPath + "_chapter_3")
+                    || !state.hasSubject(
+                    ProgressionEventType.CAMPAIGN_COMPLETED, factionPath + "_campaign")
+                    || !state.unlocks().contains("campaign_victory")
+                    || !state.unlocks().contains("veteran_operations")) {
+                helper.fail("Faction campaign path did not reach persistent victory for "
+                        + path.faction() + ": " + state);
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    private static void completeForceCampaign(
+            ProgressionSavedData progression,
+            ServerPlayer player,
+            String faction,
+            String firstRecruit,
+            String chapterTwoPlanet
+    ) {
+        applyCampaignSetupEvent(progression, player, ProgressionEventType.FACTION_PLEDGED, faction);
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.BUILDING_COMPLETED, "command_center");
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.RECRUIT_HIRED, firstRecruit);
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.DELIVERY_COMPLETED, "force_test_delivery");
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.BUILDING_COMPLETED, "forward_base");
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.PLANET_VISITED, chapterTwoPlanet);
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.VEHICLE_ACQUIRED, "force_test_vehicle");
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.TRADE_COMPLETED, "force_test_trade");
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.REGION_CAPTURED, "force_test_region");
+        ProgressionState state = progression.state(player.getUUID());
+        String factionPath = faction.substring(faction.indexOf(':') + 1);
+        if (!state.hasSubject(ProgressionEventType.QUEST_ADVANCED, factionPath + "_chapter_3")) {
+            throw new IllegalStateException("Force test campaign did not unlock Chapter 3: " + state);
+        }
+    }
+
+    private static void commandCenterSquadOrders(GameTestHelper helper) {
+        BlockPos hallPos = helper.absolutePos(new BlockPos(1, 1, 1));
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        hall.claim(owner);
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        KingdomRecord kingdom = data.foundKingdom(
+                owner.getUUID(), "galacticwars:republic",
+                helper.getLevel().dimension().identifier().toString(), isolatedCapital(helper, 14));
+        GalacticRecruitEntity commander = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
+        GalacticRecruitEntity hostile = helper.spawn(
+                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(4, 1, 2));
+        commander.tame(owner);
+        commander.setNoAi(true);
+        hostile.setNoAi(true);
+        hostile.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
+        KingdomBaseBlueprint forwardBase = GameplayDataManager.snapshot()
+                .blueprint("galacticwars:forward_base").orElseThrow();
+        BuildProject forwardBaseProject = fullyProgressProject(
+                data, owner.getUUID(), forwardBase,
+                helper.getLevel().dimension().identifier().toString(),
+                isolatedCapital(helper, 14).offset(32, 0, 0));
+        boolean commanderSlotEarned = data.completeBuildProject(
+                owner.getUUID(), forwardBaseProject, forwardBase);
+        boolean commanderRegistered = data.registerRecruit(owner.getUUID(), commander.getUUID());
+        boolean commanderPromoted = commanderRegistered
+                && data.promoteCommander(owner.getUUID(), commander.getUUID());
+        if (!commanderSlotEarned || !commanderRegistered || !commanderPromoted) {
+            helper.fail("Command Center squad-order setup could not earn/register/promote its commander: slot="
+                    + commanderSlotEarned + ", registered=" + commanderRegistered
+                    + ", promoted=" + commanderPromoted);
+            return;
+        }
+        ArmyLocation anchor = new ArmyLocation(
+                helper.getLevel().dimension().identifier().toString(),
+                commander.getX(), commander.getY(), commander.getZ());
+        var squad = data.createOrReclaimArmyGroup(
+                owner.getUUID(), commander.getUUID(), ArmyFormation.LINE,
+                anchor, helper.getLevel().getGameTime()).orElseThrow();
+        boolean[] scenarioRun = {false};
+        helper.onEachTick(() -> {
+            if (scenarioRun[0]) {
+                return;
+            }
+            if (helper.getLevel().getEntity(commander.getUUID()) != commander
+                    || helper.getLevel().getEntity(hostile.getUUID()) != hostile) {
+                if (helper.getTick() >= 30L) {
+                    scenarioRun[0] = true;
+                    helper.fail("Command Center squad-order entities never entered the server index");
+                }
+                return;
+            }
+            scenarioRun[0] = true;
+            if (!commander.isHostileFactionRecruit(hostile)) {
+                helper.fail("Command Center target fixture is not faction-hostile");
+                return;
+            }
+            CommandCenterOperationsMenu menu = (CommandCenterOperationsMenu)
+                    new CommandCenterOperationsMenuProvider(hallPos)
+                            .createMenu(7, owner.getInventory(), owner);
+            if (menu.dashboardState().combatTargets().stream()
+                    .noneMatch(target -> target.entityId().equals(hostile.getUUID()))) {
+                helper.fail("Command Center dashboard omitted a nearby explicit hostile target");
+                return;
+            }
+            Optional<UUID> selectedSquad = Optional.of(squad.id());
+            boolean moveAccepted = menu.handleReplayAction(owner, UUID.randomUUID(),
+                    CommandCenterOperationsMenu.MOVE_SQUAD, selectedSquad, Optional.empty());
+            var moveOrder = data.armyGroup(squad.id()).orElseThrow().order();
+            boolean holdAccepted = menu.handleReplayAction(owner, UUID.randomUUID(),
+                    CommandCenterOperationsMenu.HOLD_SQUAD, selectedSquad, Optional.empty());
+            var holdOrder = data.armyGroup(squad.id()).orElseThrow().order();
+            boolean protectAccepted = menu.handleReplayAction(owner, UUID.randomUUID(),
+                    CommandCenterOperationsMenu.PROTECT_SQUAD, selectedSquad, Optional.empty());
+            var protectOrder = data.armyGroup(squad.id()).orElseThrow().order();
+            boolean attackAccepted = menu.handleReplayAction(owner, UUID.randomUUID(),
+                    CommandCenterOperationsMenu.ATTACK_SQUAD_TARGET, selectedSquad,
+                    Optional.of(hostile.getUUID()));
+            var attackOrder = data.armyGroup(squad.id()).orElseThrow().order();
+            boolean clearAccepted = menu.handleReplayAction(owner, UUID.randomUUID(),
+                    CommandCenterOperationsMenu.CLEAR_SQUAD_TARGET, selectedSquad, Optional.empty());
+            var clearOrder = data.armyGroup(squad.id()).orElseThrow().order();
+            boolean rallyAccepted = menu.handleReplayAction(owner, UUID.randomUUID(),
+                    CommandCenterOperationsMenu.SET_SQUAD_RALLY, selectedSquad, Optional.empty());
+            var rally = data.armyGroup(squad.id()).orElseThrow().rallyPoint();
+            boolean friendlyTargetRejected = !menu.handleReplayAction(owner, UUID.randomUUID(),
+                    CommandCenterOperationsMenu.ATTACK_SQUAD_TARGET, selectedSquad,
+                    Optional.of(commander.getUUID()));
+            if (!moveAccepted
+                    || moveOrder.type() != galacticwars.clonewars.army.ArmyCommandType.MOVE_TO_POSITION
+                    || !holdAccepted
+                    || holdOrder.type() != galacticwars.clonewars.army.ArmyCommandType.HOLD_POSITION
+                    || !protectAccepted
+                    || protectOrder.type() != galacticwars.clonewars.army.ArmyCommandType.PROTECT_OWNER
+                    || !attackAccepted
+                    || attackOrder.targetEntityId().filter(hostile.getUUID()::equals).isEmpty()
+                    || !clearAccepted
+                    || clearOrder.type() != galacticwars.clonewars.army.ArmyCommandType.CLEAR_TARGET
+                    || !rallyAccepted
+                    || rally.filter(location ->
+                    new Vec3(location.x(), location.y(), location.z())
+                            .distanceToSqr(owner.position()) <= 4.0D).isEmpty()
+                    || !friendlyTargetRejected) {
+                helper.fail("Command Center selected-squad orders failed: move=" + moveAccepted + "/" + moveOrder
+                        + ", hold=" + holdAccepted + "/" + holdOrder
+                        + ", protect=" + protectAccepted + "/" + protectOrder
+                        + ", attack=" + attackAccepted + "/" + attackOrder
+                        + ", clear=" + clearAccepted + "/" + clearOrder
+                        + ", rally=" + rallyAccepted + "/" + rally
+                        + ", friendlyRejected=" + friendlyTargetRejected);
+                return;
+            }
+            UUID replayId = UUID.randomUUID();
+            if (!menu.handleReplayAction(owner, replayId,
+                    CommandCenterOperationsMenu.FOLLOW_SQUAD, selectedSquad, Optional.empty())
+                    || menu.handleReplayAction(owner, replayId,
+                    CommandCenterOperationsMenu.HOLD_SQUAD, selectedSquad, Optional.empty())
+                    || data.armyGroup(squad.id()).orElseThrow().order().type()
+                    != galacticwars.clonewars.army.ArmyCommandType.FOLLOW_OWNER) {
+                helper.fail("Command Center squad command replay protection was not idempotent");
+                return;
+            }
+            helper.succeed();
+        });
+    }
+
+    private static void commandCenterWorkforceControl(GameTestHelper helper) {
+        BlockPos hallPos = isolatedCapital(helper, 15);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        hall.claim(owner);
+        hall.setFaction("galacticwars:republic");
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        KingdomRecord kingdom = data.activateHall(
+                owner.getUUID(), hall.factionId(),
+                helper.getLevel().dimension().identifier().toString(), hallPos).orElse(null);
+        if (kingdom == null) {
+            helper.fail("Command Center workforce setup could not activate its isolated Hall");
+            return;
+        }
+        FactionAlignmentSavedData.get(helper.getLevel()).setScore(
+                owner.getUUID(), FactionId.of("republic"), 100);
+        GalacticRecruitEntity worker = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(3, 1, 1));
+        worker.setNoAi(true);
+        boolean[] scenarioRun = {false};
+        helper.onEachTick(() -> {
+            if (scenarioRun[0]) {
+                return;
+            }
+            if (helper.getLevel().getEntity(worker.getUUID()) != worker) {
+                if (helper.getTick() >= 30L) {
+                    scenarioRun[0] = true;
+                    helper.fail("Command Center workforce recruit never entered the server index");
+                }
+                return;
+            }
+            scenarioRun[0] = true;
+            owner.setPos(worker.getX(), worker.getY(), worker.getZ());
+            boolean hired = worker.handleMenuButton(owner, RecruitCommandMenu.BUTTON_HIRE);
+            boolean assigned = hired && worker.handleMenuButton(
+                    owner, RecruitCommandMenu.BUTTON_ASSIGN_FARMER);
+            owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+            CommandCenterOperationsMenu menu = (CommandCenterOperationsMenu)
+                    new CommandCenterOperationsMenuProvider(hallPos)
+                            .createMenu(8, owner.getInventory(), owner);
+            boolean listed = menu.dashboardState().workers().stream()
+                    .anyMatch(summary -> summary.entityId().equals(worker.getUUID())
+                            && summary.profession().equals("farmer")
+                            && summary.worksite().isPresent());
+            Optional<UUID> selectedWorker = Optional.of(worker.getUUID());
+            boolean pauseAccepted = menu.handleReplayAction(
+                    owner, UUID.randomUUID(), CommandCenterOperationsMenu.PAUSE_WORKER,
+                    selectedWorker, Optional.empty());
+            boolean paused = worker.getRecruitCommand() == RecruitmentAction.HOLD_POSITION
+                    && worker.getWorkerStatus().phase() == WorkerPhase.PAUSED
+                    && worker.getWorkerStatus().reasonCode().equals("paused_by_command_center");
+            boolean recallAccepted = menu.handleReplayAction(
+                    owner, UUID.randomUUID(), CommandCenterOperationsMenu.RECALL_WORKER,
+                    selectedWorker, Optional.empty());
+            boolean recalled = worker.getRecruitCommand() == RecruitmentAction.MOVE_TO_POSITION
+                    && hallPos.equals(worker.getMoveTarget())
+                    && worker.getWorkerStatus().phase() == WorkerPhase.PAUSED
+                    && worker.getWorkerStatus().reasonCode().equals("recalled_to_command_center");
+            boolean resumeAccepted = menu.handleReplayAction(
+                    owner, UUID.randomUUID(), CommandCenterOperationsMenu.RESUME_WORKER,
+                    selectedWorker, Optional.empty());
+            boolean resumed = worker.getRecruitCommand() == RecruitmentAction.WORK_AT_SITE
+                    && worker.getWorkerStatus().phase() == WorkerPhase.ACQUIRE_ORDER
+                    && worker.getWorkerStatus().reasonCode().equals("return_to_worksite");
+            boolean unknownRejected = !menu.handleReplayAction(
+                    owner, UUID.randomUUID(), CommandCenterOperationsMenu.PAUSE_WORKER,
+                    Optional.of(UUID.randomUUID()), Optional.empty());
+            if (!hired || !assigned || !listed
+                    || !pauseAccepted || !paused
+                    || !recallAccepted || !recalled
+                    || !resumeAccepted || !resumed
+                    || !unknownRejected) {
+                helper.fail("Command Center workforce control failed: hired=" + hired
+                        + ", assigned=" + assigned + ", listed=" + listed
+                        + ", pause=" + pauseAccepted + "/" + paused
+                        + ", recall=" + recallAccepted + "/" + recalled
+                        + ", resume=" + resumeAccepted + "/" + resumed
+                        + ", unknownRejected=" + unknownRejected
+                        + ", command=" + worker.getRecruitCommand()
+                        + ", status=" + worker.getWorkerStatus());
+                return;
+            }
+            helper.succeed();
+        });
+    }
+
+    private static void blueprintProjectorRuntime(GameTestHelper helper) {
+        BlockPos hallPos = isolatedCapital(helper, 13);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(),
+                helper.absolutePos(new BlockPos(3, 1, 1)));
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        hall.claim(owner);
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        KingdomRecord kingdom = data.activateHall(
+                owner.getUUID(), hall.factionId(),
+                helper.getLevel().dimension().identifier().toString(), hallPos).orElseThrow();
+        FactionAlignmentSavedData.get(helper.getLevel()).setScore(
+                owner.getUUID(), FactionId.of("republic"), 100);
+        if (!recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_HIRE)) {
+            helper.fail("Blueprint projector builder could not be hired");
+            return;
+        }
+        KingdomBaseBlueprint blueprint = GameplayDataManager.snapshot()
+                .blueprint("galacticwars:barracks").orElseThrow();
+        BlockPos origin = hallPos.offset(4, 8, 4);
+        for (int placementIndex = 0; placementIndex < blueprint.placements().size(); placementIndex++) {
+            var placement = blueprint.rotatedPlacement(placementIndex, 0);
+            helper.getLevel().getChunkAt(origin.offset(
+                    placement.x(), placement.y(), placement.z()));
+        }
+        helper.getLevel().setBlock(origin.below(), Blocks.STONE.defaultBlockState(), 3);
+        BlockPos loadedBuilderPosition = helper.absolutePos(new BlockPos(3, 1, 1));
+        int[] scenarioPhase = {0};
+        long[] phaseStartedTick = {helper.getTick()};
+        BuildProject[] startedProject = {null};
+        UUID[] startedWorkOrder = {null};
+        helper.onEachTick(() -> {
+            if (scenarioPhase[0] >= 2) {
+                return;
+            }
+            if (helper.getLevel().getEntity(recruit.getUUID()) != recruit) {
+                if (helper.getTick() - phaseStartedTick[0] >= 30L) {
+                    int stalledPhase = scenarioPhase[0];
+                    scenarioPhase[0] = 2;
+                    helper.fail("Blueprint projector builder did not enter the server entity index in phase "
+                            + stalledPhase);
+                }
+                return;
+            }
+            if (scenarioPhase[0] == 1) {
+                scenarioPhase[0] = 2;
+                verifyBlueprintProjectCancellation(
+                        helper, owner, recruit, data, startedProject[0], startedWorkOrder[0]);
+                return;
+            }
+            owner.setPos(origin.getX() + 0.5D, origin.getY(), origin.getZ() + 0.5D);
+            ItemStack projector = new ItemStack(ModItems.BLUEPRINT_PROJECTOR.get());
+            projector.set(ModDataComponents.CONSTRUCTION_PLAN.get(), new ConstructionPlan(
+                    blueprint.id(), 0, recruit.getUUID(), kingdom.id()));
+            owner.setItemInHand(InteractionHand.MAIN_HAND, projector);
+            ItemStack heldProjector = owner.getItemInHand(InteractionHand.MAIN_HAND);
+            InteractionResult interaction = heldProjector.getItem().useOn(new UseOnContext(
+                    owner,
+                    InteractionHand.MAIN_HAND,
+                    new BlockHitResult(Vec3.atCenterOf(origin.below()), Direction.UP, origin.below(), false)));
+            if (interaction != InteractionResult.SUCCESS
+                    || heldProjector.get(ModDataComponents.CONSTRUCTION_PLAN.get()) != null) {
+                var diagnostic = ConstructionProjectService.start(
+                        helper.getLevel(), owner,
+                        new ConstructionPlan(blueprint.id(), 0, recruit.getUUID(), kingdom.id()),
+                        origin);
+                helper.fail("Successful in-world projection did not consume its armed plan: result="
+                        + interaction + ", heldPlan="
+                        + heldProjector.get(ModDataComponents.CONSTRUCTION_PLAN.get())
+                        + ", localPlan=" + projector.get(ModDataComponents.CONSTRUCTION_PLAN.get())
+                        + ", duty=" + recruit.getRecruitDuty()
+                        + ", profession=" + recruit.getWorkerProfession()
+                        + ", base=" + recruit.getBaseTarget()
+                        + ", diagnostic=" + diagnostic.reason()
+                        + ", indexed=" + (helper.getLevel().getEntity(recruit.getUUID()) == recruit)
+                        + ", kingdom=" + recruit.getKingdomId());
+                return;
+            }
+            BuildProject project = data.kingdomForOwner(owner.getUUID()).orElseThrow().settlement()
+                    .buildProjects().stream()
+                    .filter(candidate -> candidate.blueprintId().equals(blueprint.id()))
+                    .filter(candidate -> candidate.originX() == origin.getX()
+                            && candidate.originY() == origin.getY()
+                            && candidate.originZ() == origin.getZ())
+                    .findFirst().orElse(null);
+            if (project == null
+                    || recruit.getWorkerProfession().filter(WorkerProfession.BUILDER::equals).isEmpty()
+                    || recruit.getRecruitDuty() != RecruitDuty.WORKER
+                    || !origin.equals(recruit.getBaseTarget())
+                    || !origin.equals(recruit.getWorkTarget())
+                    || data.assignedWorksite(owner.getUUID(), recruit.getUUID())
+                            .flatMap(WorksiteRecord::sourceProjectId)
+                            .filter(project.id()::equals).isEmpty()) {
+                helper.fail("Projection did not create a persisted project-specific builder assignment");
+                return;
+            }
+            putContainerItem(hall, new ItemStack(Items.OAK_PLANKS, 64));
+            putContainerItem(hall, new ItemStack(Items.OAK_LOG, 64));
+            setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+            recruit.tickWorkerController();
+            UUID workOrderId = (UUID) getRecruitField(recruit, "workOrderId");
+            if (workOrderId == null || !recruit.getWorkerStatus().reasonCode()
+                    .equals("withdraw_build_material")) {
+                helper.fail("Projected build did not enter the persisted material-hauling loop");
+                return;
+            }
+            interactWorkerAt(recruit, hallPos, "withdraw_build_material");
+            setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+            recruit.tickWorkerController();
+            var firstPlacement = blueprint.rotatedPlacement(0, 0);
+            BlockPos firstPosition = origin.offset(
+                    firstPlacement.x(), firstPlacement.y(), firstPlacement.z());
+            interactWorkerAt(recruit, firstPosition, "build_place");
+            BuildProject progressed = data.kingdomForOwner(owner.getUUID()).orElseThrow().settlement()
+                    .buildProjects().stream().filter(candidate -> candidate.id().equals(project.id()))
+                    .findFirst().orElseThrow();
+            if (!helper.getLevel().getBlockState(firstPosition)
+                    .is(BuiltInRegistries.BLOCK.getValue(Identifier.parse(firstPlacement.blockId())))
+                    || !progressed.completedPlacements().contains(0)
+                    || data.workOrder(owner.getUUID(), workOrderId).isEmpty()) {
+                helper.fail("Projected builder did not place and persist its first blueprint block");
+                return;
+            }
+            startedProject[0] = project;
+            startedWorkOrder[0] = workOrderId;
+            scenarioPhase[0] = 1;
+            phaseStartedTick[0] = helper.getTick();
+            recruit.teleportTo(
+                    loadedBuilderPosition.getX() + 0.5D,
+                    loadedBuilderPosition.getY(),
+                    loadedBuilderPosition.getZ() + 0.5D);
+            recruit.getNavigation().stop();
+        });
+    }
+
+    private static void commandMarkerRuntime(GameTestHelper helper) {
+        BlockPos hallPos = isolatedCapital(helper, 16);
+        for (int x = -1; x <= 7; x++) {
+            for (int z = -1; z <= 5; z++) {
+                BlockPos floor = hallPos.offset(x, -1, z);
+                ChunkPos chunk = new ChunkPos(floor.getX() >> 4, floor.getZ() >> 4);
+                helper.getLevel().getChunkSource().updateChunkForced(chunk, true);
+                helper.getLevel().getChunk(chunk.x(), chunk.z());
+                helper.getLevel().setBlockAndUpdate(
+                        floor, Blocks.STONE.defaultBlockState());
+            }
+        }
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        hall.claim(owner);
+        hall.setFaction("galacticwars:republic");
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        KingdomRecord kingdom = data.activateHall(
+                owner.getUUID(), hall.factionId(),
+                helper.getLevel().dimension().identifier().toString(), hallPos).orElse(null);
+        if (kingdom == null) {
+            helper.fail("Command marker scenario could not activate its isolated kingdom");
+            return;
+        }
+        ProgressionSavedData progression = ProgressionSavedData.get(helper.getLevel());
+        progression.apply(new ProgressionEvent(
+                UUID.randomUUID(), owner.getUUID(), ProgressionEventType.FACTION_PLEDGED,
+                "galacticwars:republic", 1));
+        FactionAlignmentSavedData.get(helper.getLevel()).setScore(
+                owner.getUUID(), FactionId.of("republic"), 100);
+
+        BlockPos recruitSpawn = helper.absolutePos(new BlockPos(2, 1, 1));
+        BlockPos hostileSpawn = helper.absolutePos(new BlockPos(5, 1, 1));
+        helper.getLevel().setBlockAndUpdate(recruitSpawn.below(), Blocks.STONE.defaultBlockState());
+        helper.getLevel().setBlockAndUpdate(hostileSpawn.below(), Blocks.STONE.defaultBlockState());
+        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), recruitSpawn);
+        GalacticRecruitEntity hostile = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), hostileSpawn);
+        hostile.setNoAi(true);
+        hostile.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        if (!recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_HIRE)) {
+            helper.fail("Command marker recruit could not be hired");
+            return;
+        }
+
+        boolean[] scenarioRun = {false};
+        long indexWaitStartedTick = helper.getTick();
+        helper.onEachTick(() -> {
+            if (scenarioRun[0]) {
+                return;
+            }
+            boolean recruitIndexed = helper.getLevel().getEntity(recruit.getUUID()) == recruit;
+            boolean hostileIndexed = helper.getLevel().getEntity(hostile.getUUID()) == hostile;
+            if (!recruitIndexed || !hostileIndexed) {
+                if (helper.getTick() - indexWaitStartedTick >= 120L) {
+                    scenarioRun[0] = true;
+                    helper.fail("Command marker entities never entered the server entity index: recruit="
+                            + recruitIndexed + ", hostile=" + hostileIndexed);
+                }
+                return;
+            }
+            scenarioRun[0] = true;
+            verifyCommandMarkerActions(
+                    helper, hallPos, hall, owner, kingdom, recruit, hostile, progression);
+        });
+    }
+
+    private static void verifyCommandMarkerActions(
+            GameTestHelper helper,
+            BlockPos hallPos,
+            CommandCenterBlockEntity hall,
+            ServerPlayer owner,
+            KingdomRecord kingdom,
+            GalacticRecruitEntity recruit,
+            GalacticRecruitEntity hostile,
+            ProgressionSavedData progression
+    ) {
+        Vec3 managedRecruitPosition = recruit.position();
+        ItemStack marker = new ItemStack(ModItems.COMMAND_MARKER.get());
+        owner.setItemInHand(InteractionHand.MAIN_HAND, marker);
+        ItemStack heldMarker = owner.getItemInHand(InteractionHand.MAIN_HAND);
+        owner.setShiftKeyDown(true);
+        InteractionResult entitySelection = heldMarker.interactLivingEntity(
+                owner, hostile, InteractionHand.MAIN_HAND);
+        owner.setShiftKeyDown(false);
+        CommandTargetSelection selectedEntity = heldMarker.get(ModDataComponents.COMMAND_TARGET.get());
+        Optional<net.minecraft.world.entity.LivingEntity> resolvedEntity =
+                CommandTargetSelection.entityFromInventory(owner);
+        boolean attackAccepted = recruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_ATTACK);
+        boolean attackTargetAssigned = recruit.getTarget() == hostile;
+
+        BlockPos destination = hallPos.offset(4, 0, 3);
+        helper.getLevel().setBlock(destination, Blocks.CHEST.defaultBlockState(), 3);
+        InteractionResult blockSelection = heldMarker.getItem().useOn(new UseOnContext(
+                owner,
+                InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(destination), Direction.UP, destination, false)));
+        CommandTargetSelection selectedBlock = heldMarker.get(ModDataComponents.COMMAND_TARGET.get());
+        boolean courierAssigned = recruit.handleMenuButton(
+                owner, RecruitCommandMenu.BUTTON_ASSIGN_COURIER);
+        boolean worksiteAccepted = courierAssigned && recruit.handleMenuButton(
+                owner, RecruitCommandMenu.BUTTON_SET_WORKSITE);
+
+        heldMarker.getItem().useOn(new UseOnContext(
+                owner,
+                InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(hallPos), Direction.UP, hallPos, false)));
+        boolean storageAccepted = recruit.handleMenuButton(
+                owner, RecruitCommandMenu.BUTTON_SET_STORAGE);
+        invokeWorkerAuthorityReconciliation(recruit, helper.getLevel());
+        boolean courierRouteReconciled = hallPos.equals(recruit.getStorageTarget())
+                && destination.equals(recruit.getWorkTarget());
+        putContainerItem(hall, new ItemStack(ModItems.DURACRETE.get(), 3));
+        UUID courierOrder = acquirePersistedOrder(recruit);
+        interactWorkerAt(recruit, hallPos, "courier_withdraw");
+        setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+        recruit.tickWorkerController();
+        depositWorkerAt(recruit, destination);
+        boolean courierCompleted = KingdomSavedData.get(helper.getLevel())
+                .workOrder(owner.getUUID(), courierOrder)
+                .filter(order -> order.state() == WorkOrderState.COMPLETED)
+                .isPresent();
+        boolean deliveryRecorded = progression.state(owner.getUUID())
+                .total(ProgressionEventType.DELIVERY_COMPLETED) == 1;
+        int deliveredDuracrete = helper.getLevel().getBlockEntity(destination) instanceof Container destinationStorage
+                ? countContainerItem(destinationStorage, ModItems.DURACRETE.get())
+                : 0;
+        recruit.setPos(managedRecruitPosition);
+        recruit.setDeltaMovement(Vec3.ZERO);
+        recruit.getNavigation().stop();
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        boolean projectorPrepared = recruit.handleMenuButton(
+                owner, RecruitCommandMenu.BUTTON_BUILD_STARTER_KEEP);
+        ConstructionPlan projectorPlan = null;
+        for (int slot = 0; slot < owner.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = owner.getInventory().getItem(slot);
+            if (stack.is(ModItems.BLUEPRINT_PROJECTOR.get())) {
+                projectorPlan = stack.get(ModDataComponents.CONSTRUCTION_PLAN.get());
+                break;
+            }
+        }
+
+        if (entitySelection != InteractionResult.SUCCESS
+                || selectedEntity == null
+                || selectedEntity.entityId().filter(hostile.getUUID()::equals).isEmpty()
+                || !attackAccepted
+                || !attackTargetAssigned
+                || blockSelection != InteractionResult.SUCCESS
+                || selectedBlock == null
+                || selectedBlock.entityId().isPresent()
+                || !selectedBlock.blockPos().equals(destination)
+                || !courierAssigned
+                || !worksiteAccepted
+                || !destination.equals(recruit.getWorkTarget())
+                || !storageAccepted
+                || !hallPos.equals(recruit.getStorageTarget())
+                || !courierRouteReconciled
+                || !courierCompleted
+                || !deliveryRecorded
+                || deliveredDuracrete != 3
+                || !projectorPrepared
+                || projectorPlan == null
+                || !projectorPlan.builderId().equals(recruit.getUUID())
+                || !projectorPlan.kingdomId().equals(kingdom.id())) {
+            helper.fail("Command marker did not bridge physical selection into recruit controls: entity="
+                    + entitySelection + "/" + selectedEntity
+                    + ", attack=" + attackAccepted + "/" + attackTargetAssigned
+                    + ", resolved=" + resolvedEntity
+                    + ", factions=" + recruit.getRecruitFactionId() + "/" + hostile.getRecruitFactionId()
+                    + ", relation=" + recruit.factionRelationTo(hostile)
+                    + ", hostile=" + recruit.isHostileFactionRecruit(hostile)
+                    + ", duty=" + hostile.getRecruitDuty()
+                    + ", block=" + blockSelection + "/" + selectedBlock
+                    + ", courier=" + courierAssigned
+                    + ", worksite=" + worksiteAccepted + "/" + recruit.getWorkTarget()
+                    + ", storage=" + storageAccepted + "/" + recruit.getStorageTarget()
+                    + ", reconciled=" + courierRouteReconciled
+                    + ", delivery=" + courierCompleted + "/" + deliveryRecorded
+                    + "/" + deliveredDuracrete
+                    + ", courierStatus=" + recruit.getWorkerStatus()
+                    + ", carried=" + workerInventoryCount(recruit)
+                    + ", shouldRun=" + recruit.shouldRunWorkerCycle()
+                    + ", courierOrder=" + KingdomSavedData.get(helper.getLevel())
+                    .workOrder(owner.getUUID(), courierOrder)
+                    + ", assigned=" + KingdomSavedData.get(helper.getLevel())
+                    .assignedWorksite(owner.getUUID(), recruit.getUUID())
+                    + ", projector=" + projectorPrepared + "/" + projectorPlan);
+            return;
+        }
+        if (!completeForwardBaseFromPreparedProjector(
+                helper, hallPos, hall, owner, recruit)) {
+            return;
+        }
+        ProgressionState frontierState = progression.state(owner.getUUID());
+        boolean chapterOneComplete = frontierState.hasSubject(
+                ProgressionEventType.QUEST_ADVANCED, "republic_chapter_1");
+        boolean forwardBaseRecorded = frontierState.hasSubjectPath(
+                ProgressionEventType.BUILDING_COMPLETED, "forward_base");
+        boolean planetTravelUnlocked = frontierState.unlocks().contains("planet_travel");
+        boolean chapterTwoWaitingForTravel = !frontierState.hasSubject(
+                ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2");
+        if (!chapterOneComplete
+                || !forwardBaseRecorded
+                || !planetTravelUnlocked
+                || !chapterTwoWaitingForTravel) {
+            helper.fail("Chapter-two frontier journey did not unlock travel at the correct boundary: chapterOne="
+                    + chapterOneComplete + ", delivery=" + deliveryRecorded
+                    + ", forwardBase=" + forwardBaseRecorded
+                    + ", travel=" + planetTravelUnlocked
+                    + ", waitingForPlanet=" + chapterTwoWaitingForTravel
+                    + ", unlocks=" + frontierState.unlocks());
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void vehicleEmbodiedRuntime(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.SURVIVAL, -4, 36, -4, 50);
+        ServerPlayer owner = area.player();
+        ServerPlayer intruder = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+        intruder.setPos(
+                area.at(1, 1, 1).getX() + 0.5D,
+                area.at(1, 1, 1).getY(),
+                area.at(1, 1, 1).getZ() + 0.5D);
+        List<GalacticVehicleEntity> vehicles = new java.util.ArrayList<>();
+        int lane = 0;
+        for (var holder : ModEntityTypes.vehicles()) {
+            GalacticVehicleEntity vehicle = spawnVehicleAt(
+                    helper, holder.get(), area.at(2 + lane * 7, 1, 4));
+            vehicle.deploy(owner.getUUID(), "galacticwars:republic");
+            vehicles.add(vehicle);
+            lane++;
+        }
+        VehicleEmbodiedTestScenario scenario = new VehicleEmbodiedTestScenario(
+                helper, owner, intruder, vehicles);
+        helper.onEachTick(scenario::tick);
+    }
+
+    private static void chapterThreeCampaignRuntime(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestAreaAt(
+                helper, GameType.SURVIVAL, -4, 24, -4, 24,
+                isolatedCapital(helper, 17));
+        ServerPlayer owner = area.player();
+        BlockPos hallPos = area.at(1, 1, 1);
+        CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
+        hall.claim(owner);
+        hall.setFaction("galacticwars:republic");
+        KingdomSavedData kingdoms = KingdomSavedData.get(helper.getLevel());
+        KingdomRecord kingdom = kingdoms.foundKingdom(
+                owner.getUUID(), hall.factionId(),
+                helper.getLevel().dimension().identifier().toString(), hallPos);
+        ProgressionSavedData progression = ProgressionSavedData.get(helper.getLevel());
+        applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.BUILDING_COMPLETED, "command_center");
+        applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.FACTION_PLEDGED, "galacticwars:republic");
+        FactionAlignmentSavedData.get(helper.getLevel()).setScore(
+                owner.getUUID(), FactionId.of("republic"), 100);
+        applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.RECRUIT_HIRED, "clone_trooper");
+        applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.DELIVERY_COMPLETED, "chapter_three_supply_run");
+        applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.BUILDING_COMPLETED, "forward_base");
+        applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.PLANET_VISITED, "kamino");
+        applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.BUILDING_COMPLETED, "supply_depot");
+        ProgressionState chapterTwo = progression.state(owner.getUUID());
+        if (!chapterTwo.hasSubject(ProgressionEventType.QUEST_ADVANCED, "republic_chapter_2")
+                || !chapterTwo.unlocks().contains("vehicle_crafting")) {
+            helper.fail("Chapter-three setup did not cross the real Chapter 2 and Supply Depot gates");
+            return;
+        }
+
+        putContainerItem(hall, new ItemStack(ModItems.CREDIT_CHIP.get(), 32));
+        putContainerItem(hall, new ItemStack(ModItems.REPUBLIC_PLASTOID_INGOT.get(), 8));
+        putContainerItem(hall, new ItemStack(ModItems.ENERGY_CELL.get(), 4));
+        putContainerItem(hall, new ItemStack(ModItems.DURACRETE.get(), 16));
+        owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        CommandCenterOperationsMenu fabricationMenu = (CommandCenterOperationsMenu)
+                new CommandCenterOperationsMenuProvider(hallPos)
+                        .createMenu(20, owner.getInventory(), owner);
+        UUID fabricationId = UUID.randomUUID();
+        boolean fabricated = fabricationMenu.handleReplayAction(
+                owner, fabricationId, CommandCenterOperationsMenu.FABRICATE_FIRST);
+        boolean fabricationReplayRejected = !fabricationMenu.handleReplayAction(
+                owner, fabricationId, CommandCenterOperationsMenu.FABRICATE_FIRST);
+        int kitSlot = findPlayerItemSlot(owner, ModItems.BARC_SPEEDER_DEPLOYMENT_KIT.get());
+        if (!fabricated || !fabricationReplayRejected || kitSlot < 0
+                || CreditTransactionService.containerBalance(hall) != 0
+                || countContainerItem(hall, ModItems.REPUBLIC_PLASTOID_INGOT.get()) != 0
+                || countContainerItem(hall, ModItems.ENERGY_CELL.get()) != 0
+                || countContainerItem(hall, ModItems.DURACRETE.get()) != 0) {
+            helper.fail("Command Center fabrication did not atomically consume the BARC recipe: accepted="
+                    + fabricated + ", replay=" + fabricationReplayRejected + ", kitSlot=" + kitSlot
+                    + ", credits=" + CreditTransactionService.containerBalance(hall));
+            return;
+        }
+        owner.getInventory().setSelectedSlot(kitSlot);
+        BlockPos deploymentFloor = area.at(5, 0, 4);
+        InteractionResult deployed = owner.getMainHandItem().getItem().useOn(new UseOnContext(
+                owner, InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(deploymentFloor), Direction.UP, deploymentFloor, false)));
+        if (deployed != InteractionResult.SUCCESS || !owner.getMainHandItem().isEmpty()
+                || !progression.state(owner.getUUID()).hasSubject(
+                ProgressionEventType.VEHICLE_ACQUIRED, "barc_speeder")) {
+            helper.fail("Fabricated BARC kit did not deploy into owned in-world gameplay: result="
+                    + deployed + ", held=" + owner.getMainHandItem());
+            return;
+        }
+
+        GalacticRecruitEntity merchant = spawnRecruitAt(
+                helper, ModEntityTypes.REPUBLIC_CIVILIAN.get(), area.at(3, 1, 8));
+        merchant.setNoAi(true);
+        merchant.initializeFromSpawnEgg();
+        merchant.tame(owner);
+        merchant.setWorkerProfession(WorkerProfession.MERCHANT);
+        BlockPos beacon = area.at(10, 1, 10);
+        helper.getLevel().setBlockAndUpdate(beacon, ModBlocks.CONTROL_BEACON.get().defaultBlockState());
+        GalacticRecruitEntity escort = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), beacon.offset(1, 0, 0));
+        escort.setNoAi(true);
+        escort.initializeFromSpawnEgg();
+        escort.tame(owner);
+        var region = LaunchContentCatalog.data().conquestRegions().get("tatooine_spaceport");
+        ConquestSavedData.get(helper.getLevel()).put(new ConquestControlState(
+                region.id(), helper.getLevel().dimension().identifier().toString(),
+                beacon.getX(), beacon.getY(), beacon.getZ(), "galacticwars:hutt_cartel",
+                "", "", 0, 0L));
+        helper.setTime(101L);
+        ChapterThreeCampaignTestScenario scenario = new ChapterThreeCampaignTestScenario(
+                helper, area, owner, hallPos, hall, kingdom, merchant, escort,
+                deploymentFloor, beacon, region);
+        helper.onEachTick(scenario::tick);
+    }
+
+    private static void applyCampaignSetupEvent(
+            ProgressionSavedData progression,
+            ServerPlayer player,
+            ProgressionEventType type,
+            String subject
+    ) {
+        ProgressionDecision decision = progression.apply(new ProgressionEvent(
+                UUID.randomUUID(), player.getUUID(), type, subject, 1));
+        if (!decision.accepted()) {
+            throw new IllegalStateException(
+                    "Campaign setup rejected " + type + "/" + subject + ": " + decision.reason());
+        }
+    }
+
+    private static int findPlayerItemSlot(ServerPlayer player, net.minecraft.world.item.Item item) {
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            if (player.getInventory().getItem(slot).is(item)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean completeForwardBaseFromPreparedProjector(
+            GameTestHelper helper,
+            BlockPos hallPos,
+            CommandCenterBlockEntity hall,
+            ServerPlayer owner,
+            GalacticRecruitEntity recruit
+    ) {
+        KingdomBaseBlueprint blueprint = GameplayDataManager.snapshot()
+                .blueprint("galacticwars:forward_base").orElseThrow();
+        BlockPos origin = hallPos.offset(0, 8, 0);
+        for (int placementIndex = 0; placementIndex < blueprint.placements().size(); placementIndex++) {
+            var placement = blueprint.rotatedPlacement(placementIndex, 0);
+            BlockPos placementPos = origin.offset(
+                    placement.x(), placement.y(), placement.z());
+            helper.getLevel().getChunkAt(placementPos);
+            helper.getLevel().setBlock(placementPos, Blocks.AIR.defaultBlockState(), 3);
+        }
+        helper.getLevel().setBlock(origin.below(), Blocks.STONE.defaultBlockState(), 3);
+        ItemStack projector = ItemStack.EMPTY;
+        for (int slot = 0; slot < owner.getInventory().getContainerSize(); slot++) {
+            ItemStack candidate = owner.getInventory().getItem(slot);
+            ConstructionPlan plan = candidate.get(ModDataComponents.CONSTRUCTION_PLAN.get());
+            if (candidate.is(ModItems.BLUEPRINT_PROJECTOR.get())
+                    && plan != null
+                    && plan.blueprintId().equals(blueprint.id())) {
+                projector = candidate;
+                break;
+            }
+        }
+        if (projector.isEmpty()) {
+            helper.fail("Prepared Forward Base projector was not present in the player's inventory");
+            return false;
+        }
+        owner.setPos(origin.getX() + 0.5D, origin.getY(), origin.getZ() + 0.5D);
+        owner.setItemInHand(InteractionHand.MAIN_HAND, projector);
+        ItemStack heldProjector = owner.getItemInHand(InteractionHand.MAIN_HAND);
+        InteractionResult projection = heldProjector.getItem().useOn(new UseOnContext(
+                owner,
+                InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(origin.below()), Direction.UP, origin.below(), false)));
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        BuildProject project = data.kingdomForOwner(owner.getUUID()).orElseThrow().settlement()
+                .buildProjects().stream()
+                .filter(candidate -> candidate.blueprintId().equals(blueprint.id()))
+                .filter(candidate -> candidate.originX() == origin.getX()
+                        && candidate.originY() == origin.getY()
+                        && candidate.originZ() == origin.getZ())
+                .findFirst().orElse(null);
+        if (projection != InteractionResult.SUCCESS
+                || project == null
+                || recruit.getWorkerProfession().filter(WorkerProfession.BUILDER::equals).isEmpty()
+                || !origin.equals(recruit.getBaseTarget())) {
+            var diagnostic = ConstructionProjectService.start(
+                    helper.getLevel(), owner,
+                    new ConstructionPlan(blueprint.id(), 0, recruit.getUUID(),
+                            data.kingdomForOwner(owner.getUUID()).orElseThrow().id()),
+                    origin);
+            helper.fail("Forward Base projector did not create and assign an embodied build: projection="
+                    + projection + ", project=" + project
+                    + ", profession=" + recruit.getWorkerProfession()
+                    + ", base=" + recruit.getBaseTarget()
+                    + ", work=" + recruit.getWorkTarget()
+                    + ", diagnostic=" + diagnostic.reason()
+                    + ", indexed=" + (helper.getLevel().getEntity(recruit.getUUID()) == recruit)
+                    + ", kingdom=" + recruit.getKingdomId());
+            return false;
+        }
+
+        putContainerItem(hall, new ItemStack(ModItems.DURACRETE.get(), 64));
+        putContainerItem(hall, new ItemStack(ModItems.NIGHTSISTER_WEAVE_LOG.get(), 64));
+        putContainerItem(hall, new ItemStack(Items.OAK_PLANKS, 64));
+        UUID workOrderId = null;
+        for (int placementIndex = 0; placementIndex < blueprint.placements().size(); placementIndex++) {
+            setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+            recruit.tickWorkerController();
+            if (workOrderId == null) {
+                workOrderId = (UUID) getRecruitField(recruit, "workOrderId");
+            }
+            if (!recruit.getWorkerStatus().reasonCode().equals("withdraw_build_material")) {
+                helper.fail("Forward Base builder did not request material for placement "
+                        + placementIndex + ": status=" + recruit.getWorkerStatus()
+                        + ", carried=" + workerInventoryCount(recruit)
+                        + ", storage=" + recruit.getStorageTarget());
+                return false;
+            }
+            interactWorkerAt(recruit, hallPos, "withdraw_build_material");
+            setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+            recruit.tickWorkerController();
+            BuildProject current = data.kingdomForOwner(owner.getUUID()).orElseThrow().settlement()
+                    .buildProjects().stream()
+                    .filter(candidate -> candidate.id().equals(project.id()))
+                    .findFirst().orElseThrow();
+            var placement = blueprint.rotatedPlacement(placementIndex, current.rotationSteps());
+            BlockPos placementPos = origin.offset(
+                    placement.x(), placement.y(), placement.z());
+            interactWorkerAt(recruit, placementPos, "build_place");
+        }
+        setWorkerPhase(recruit, WorkerPhase.ACQUIRE_ORDER, "ready", null);
+        recruit.tickWorkerController();
+        boolean orderComplete = workOrderId != null && data.workOrder(owner.getUUID(), workOrderId)
+                .filter(order -> order.state() == WorkOrderState.COMPLETED).isPresent();
+        boolean projectComplete = data.kingdomForOwner(owner.getUUID()).orElseThrow().settlement()
+                .buildProjects().stream()
+                .filter(candidate -> candidate.id().equals(project.id()))
+                .anyMatch(candidate -> candidate.state()
+                        == galacticwars.clonewars.kingdom.BuildProjectState.COMPLETED);
+        if (!orderComplete || !projectComplete || recruit.getBaseTarget() != null) {
+            helper.fail("Forward Base builder did not complete its physical project: order="
+                    + orderComplete + ", project=" + projectComplete
+                    + ", status=" + recruit.getWorkerStatus()
+                    + ", base=" + recruit.getBaseTarget());
+            return false;
+        }
+        return true;
+    }
+
+    private static void verifyBlueprintProjectCancellation(
+            GameTestHelper helper,
+            ServerPlayer owner,
+            GalacticRecruitEntity recruit,
+            KingdomSavedData data,
+            BuildProject project,
+            UUID workOrderId
+    ) {
+        var cancelled = ConstructionProjectService.cancel(
+                helper.getLevel(), owner, project.id());
+        BuildProject cancelledProject = data.kingdomForOwner(owner.getUUID()).orElseThrow()
+                .settlement().buildProjects().stream()
+                .filter(candidate -> candidate.id().equals(project.id())).findFirst().orElseThrow();
+        if (!cancelled.accepted()
+                || cancelledProject.state()
+                != galacticwars.clonewars.kingdom.BuildProjectState.CANCELLED
+                || data.workOrder(owner.getUUID(), workOrderId)
+                        .filter(order -> order.state() == WorkOrderState.CANCELLED).isEmpty()
+                || data.assignedWorksite(owner.getUUID(), recruit.getUUID()).isPresent()
+                || recruit.getBaseTarget() != null
+                || recruit.getWorkTarget() != null) {
+            helper.fail("Construction cancellation left stale state: result=" + cancelled
+                    + ", project=" + cancelledProject.state()
+                    + ", order=" + data.workOrder(owner.getUUID(), workOrderId)
+                    + ", worksite=" + data.assignedWorksite(owner.getUUID(), recruit.getUUID())
+                    + ", base=" + recruit.getBaseTarget()
+                    + ", work=" + recruit.getWorkTarget());
+            return;
+        }
+        helper.succeed();
     }
 
     private static void kingdomGovernancePersistence(GameTestHelper helper) {
@@ -2035,9 +3382,11 @@ public final class ModGameTests {
     }
 
     private static void localRecruitProtectOwner(GameTestHelper helper) {
-        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
-        GalacticRecruitEntity recruit = helper.spawn(
-                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(1, 1, 1));
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.SURVIVAL, 0, 4, 0, 3);
+        ServerPlayer owner = area.player();
+        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
         owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
         recruit.setOwner(owner);
         recruit.setTame(true, true);
@@ -2047,8 +3396,8 @@ public final class ModGameTests {
             return;
         }
 
-        GalacticRecruitEntity attacker = helper.spawn(
-                ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(2, 1, 1));
+        GalacticRecruitEntity attacker = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(2, 1, 1));
         ServerPlayer enemyOwner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
         attacker.setOwner(enemyOwner);
         attacker.setTame(true, true);
@@ -2614,7 +3963,20 @@ public final class ModGameTests {
             int minZ,
             int maxZ
     ) {
-        BlockPos base = helper.absolutePos(BlockPos.ZERO);
+        return prepareSmartBrainTestAreaAt(
+                helper, playerGameType, minX, maxX, minZ, maxZ,
+                helper.absolutePos(BlockPos.ZERO));
+    }
+
+    private static SmartBrainTestArea prepareSmartBrainTestAreaAt(
+            GameTestHelper helper,
+            GameType playerGameType,
+            int minX,
+            int maxX,
+            int minZ,
+            int maxZ,
+            BlockPos base
+    ) {
         int minChunkX = Math.min(base.getX() + minX, base.getX() + maxX) >> 4;
         int maxChunkX = Math.max(base.getX() + minX, base.getX() + maxX) >> 4;
         int minChunkZ = Math.min(base.getZ() + minZ, base.getZ() + maxZ) >> 4;
@@ -2705,6 +4067,27 @@ public final class ModGameTests {
         }
     }
 
+    private static GalacticVehicleEntity spawnVehicleAt(
+            GameTestHelper helper,
+            EntityType<GalacticVehicleEntity> type,
+            BlockPos position
+    ) {
+        GalacticVehicleEntity vehicle = type.create(
+                helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        if (vehicle == null) {
+            throw new IllegalStateException("Could not create vehicle GameTest entity");
+        }
+        vehicle.setPos(
+                position.getX() + 0.5D,
+                position.getY(),
+                position.getZ() + 0.5D);
+        if (!helper.getLevel().addFreshEntity(vehicle)) {
+            throw new IllegalStateException("Could not register vehicle GameTest entity");
+        }
+        vehicle.setDeltaMovement(Vec3.ZERO);
+        return vehicle;
+    }
+
     private static void invokeRecruitCommand(GalacticRecruitEntity recruit, RecruitmentAction command) {
         try {
             Method method = GalacticRecruitEntity.class.getDeclaredMethod(
@@ -2744,6 +4127,559 @@ public final class ModGameTests {
             project = progressed;
         }
         return project;
+    }
+
+    private static final class VehicleEmbodiedTestScenario {
+        private final GameTestHelper helper;
+        private final ServerPlayer owner;
+        private final ServerPlayer intruder;
+        private final List<GalacticVehicleEntity> vehicles;
+        private final long indexWaitStartedTick;
+        private int phase;
+        private int driveStartedVehicleTick;
+        private long destructionStartedTick;
+        private int startingFuel;
+        private Vec3 startingPosition = Vec3.ZERO;
+        private boolean shotObserved;
+        private boolean shotRequested;
+
+        private VehicleEmbodiedTestScenario(
+                GameTestHelper helper,
+                ServerPlayer owner,
+                ServerPlayer intruder,
+                List<GalacticVehicleEntity> vehicles
+        ) {
+            this.helper = helper;
+            this.owner = owner;
+            this.intruder = intruder;
+            this.vehicles = vehicles;
+            this.indexWaitStartedTick = helper.getTick();
+        }
+
+        private void tick() {
+            if (this.phase == 0) {
+                this.waitForIndexAndPrepare();
+            } else if (this.phase == 1) {
+                this.driveAndFire();
+            } else if (this.phase == 2) {
+                this.verifyDestruction();
+            }
+        }
+
+        private void waitForIndexAndPrepare() {
+            boolean allIndexed = this.vehicles.stream().allMatch(
+                    vehicle -> this.helper.getLevel().getEntity(vehicle.getUUID()) == vehicle);
+            if (!allIndexed) {
+                if (this.helper.getTick() - this.indexWaitStartedTick >= 120L) {
+                    this.phase = 3;
+                    this.helper.fail("Vehicle chassis never entered the server entity index");
+                }
+                return;
+            }
+            for (GalacticVehicleEntity vehicle : this.vehicles) {
+                int maximum = vehicle.maxHealthForHud();
+                vehicle.damageVehicle(20);
+                int damaged = vehicle.health();
+                this.intruder.setItemInHand(
+                        InteractionHand.MAIN_HAND, new ItemStack(ModItems.DURACRETE.get()));
+                InteractionResult denied = vehicle.interact(
+                        this.intruder, InteractionHand.MAIN_HAND, this.intruder.position());
+                if (denied != InteractionResult.FAIL
+                        || vehicle.health() != damaged
+                        || this.intruder.getMainHandItem().getCount() != 1) {
+                    this.phase = 3;
+                    this.helper.fail("Unauthorized player repaired chassis " + vehicle.vehicleId());
+                    return;
+                }
+                this.owner.setItemInHand(
+                        InteractionHand.MAIN_HAND, new ItemStack(ModItems.DURACRETE.get()));
+                InteractionResult repaired = vehicle.interact(
+                        this.owner, InteractionHand.MAIN_HAND, this.owner.position());
+                int expectedHealth = Math.min(maximum, damaged + 12);
+                if (repaired != InteractionResult.SUCCESS
+                        || vehicle.health() != expectedHealth
+                        || !this.owner.getMainHandItem().isEmpty()) {
+                    this.phase = 3;
+                    this.helper.fail("Authorized Duracrete repair was not atomic for "
+                            + vehicle.vehicleId() + ": health=" + damaged + "->" + vehicle.health()
+                            + "/" + maximum + ", item=" + this.owner.getMainHandItem());
+                    return;
+                }
+            }
+
+            GalacticVehicleEntity driverVehicle = this.vehicles.getFirst();
+            this.owner.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            this.owner.setYRot(0.0F);
+            this.owner.setXRot(0.0F);
+            InteractionResult boarded = driverVehicle.interact(
+                    this.owner, InteractionHand.MAIN_HAND, this.owner.position());
+            if (boarded != InteractionResult.SUCCESS || this.owner.getVehicle() != driverVehicle) {
+                this.phase = 3;
+                this.helper.fail("Authorized owner could not physically board the BARC speeder");
+                return;
+            }
+            this.startingPosition = driverVehicle.position();
+            this.startingFuel = driverVehicle.fuel();
+            this.driveStartedVehicleTick = driverVehicle.tickCount;
+            this.phase = 1;
+        }
+
+        private void driveAndFire() {
+            GalacticVehicleEntity driverVehicle = this.vehicles.getFirst();
+            boolean fire = !this.shotRequested;
+            if (!driverVehicle.applyInput(
+                    this.owner, UUID.randomUUID(), 1.0F, 0.0F, false, false, fire)) {
+                this.phase = 3;
+                this.helper.fail("Server rejected fresh authorized BARC driving input");
+                return;
+            }
+            this.shotRequested = true;
+            this.shotObserved |= !this.helper.getLevel().getEntitiesOfClass(
+                    BlasterBoltEntity.class,
+                    driverVehicle.getBoundingBox().inflate(120.0D),
+                    bolt -> bolt.getOwner() == this.owner).isEmpty();
+            int drivenTicks = driverVehicle.tickCount - this.driveStartedVehicleTick;
+            if (drivenTicks < 25 || !this.shotObserved) {
+                if (drivenTicks >= 80) {
+                    this.phase = 3;
+                    this.helper.fail("BARC embodied runtime did not fire within 80 vehicle ticks: fuel="
+                            + driverVehicle.fuel() + ", position=" + driverVehicle.position()
+                            + ", passenger=" + this.owner.getVehicle());
+                }
+                return;
+            }
+            if (driverVehicle.position().distanceToSqr(this.startingPosition) <= 1.0D
+                    || driverVehicle.fuel() >= this.startingFuel) {
+                this.phase = 3;
+                this.helper.fail("BARC input did not produce movement and fuel use: position="
+                        + this.startingPosition + "->" + driverVehicle.position()
+                        + ", fuel=" + this.startingFuel + "->" + driverVehicle.fuel());
+                return;
+            }
+
+            int fuelBeforeIntrusion = driverVehicle.fuel();
+            this.intruder.setItemInHand(
+                    InteractionHand.MAIN_HAND, new ItemStack(ModItems.ENERGY_CELL.get()));
+            InteractionResult denied = driverVehicle.interact(
+                    this.intruder, InteractionHand.MAIN_HAND, this.intruder.position());
+            if (denied != InteractionResult.FAIL
+                    || driverVehicle.fuel() != fuelBeforeIntrusion
+                    || this.intruder.getMainHandItem().getCount() != 1) {
+                this.phase = 3;
+                this.helper.fail("Unauthorized player refuelled the occupied BARC speeder");
+                return;
+            }
+
+            this.owner.setItemInHand(
+                    InteractionHand.MAIN_HAND, new ItemStack(ModItems.ENERGY_CELL.get()));
+            InteractionResult refuelled = driverVehicle.interact(
+                    this.owner, InteractionHand.MAIN_HAND, this.owner.position());
+            if (refuelled != InteractionResult.SUCCESS
+                    || driverVehicle.fuel() <= fuelBeforeIntrusion
+                    || !this.owner.getMainHandItem().isEmpty()) {
+                this.phase = 3;
+                this.helper.fail("Authorized Energy Cell refuel was not atomic: fuel="
+                        + fuelBeforeIntrusion + "->" + driverVehicle.fuel()
+                        + ", item=" + this.owner.getMainHandItem());
+                return;
+            }
+
+            for (GalacticVehicleEntity vehicle : this.vehicles) {
+                vehicle.damageVehicle(vehicle.health());
+            }
+            this.destructionStartedTick = this.helper.getTick();
+            this.phase = 2;
+        }
+
+        private void verifyDestruction() {
+            boolean allRemoved = this.vehicles.stream().allMatch(GalacticVehicleEntity::isRemoved);
+            if (allRemoved && this.owner.getVehicle() == null) {
+                this.phase = 3;
+                this.helper.succeed();
+                return;
+            }
+            if (this.helper.getTick() - this.destructionStartedTick >= 20L) {
+                this.phase = 3;
+                this.helper.fail("Destroyed vehicle did not discard and release its passenger: removed="
+                        + this.vehicles.stream().map(GalacticVehicleEntity::isRemoved).toList()
+                        + ", passengerVehicle=" + this.owner.getVehicle());
+            }
+        }
+    }
+
+    private static final class ChapterThreeCampaignTestScenario {
+        private static final int EXPECTED_CAMPAIGN_REWARDS = 320;
+        private final GameTestHelper helper;
+        private final SmartBrainTestArea area;
+        private final ServerPlayer owner;
+        private final BlockPos hallPos;
+        private final CommandCenterBlockEntity hall;
+        private final KingdomRecord kingdom;
+        private final GalacticRecruitEntity merchant;
+        private final GalacticRecruitEntity escort;
+        private final BlockPos deploymentFloor;
+        private final BlockPos beacon;
+        private final galacticwars.clonewars.data.LaunchContentDefinitions.ConquestRegionDefinition region;
+        private final long indexWaitStartedTick;
+        private int phase;
+        private int captureTicks;
+        private GalacticVehicleEntity vehicle;
+
+        private ChapterThreeCampaignTestScenario(
+                GameTestHelper helper,
+                SmartBrainTestArea area,
+                ServerPlayer owner,
+                BlockPos hallPos,
+                CommandCenterBlockEntity hall,
+                KingdomRecord kingdom,
+                GalacticRecruitEntity merchant,
+                GalacticRecruitEntity escort,
+                BlockPos deploymentFloor,
+                BlockPos beacon,
+                galacticwars.clonewars.data.LaunchContentDefinitions.ConquestRegionDefinition region
+        ) {
+            this.helper = helper;
+            this.area = area;
+            this.owner = owner;
+            this.hallPos = hallPos;
+            this.hall = hall;
+            this.kingdom = kingdom;
+            this.merchant = merchant;
+            this.escort = escort;
+            this.deploymentFloor = deploymentFloor;
+            this.beacon = beacon;
+            this.region = region;
+            this.indexWaitStartedTick = helper.getTick();
+        }
+
+        private void tick() {
+            if (this.phase == 0) {
+                this.waitForEntitiesAndTrade();
+            } else if (this.phase == 1) {
+                this.captureRegion();
+            }
+        }
+
+        private void waitForEntitiesAndTrade() {
+            if (this.vehicle == null) {
+                this.vehicle = this.helper.getLevel().getEntitiesOfClass(
+                        GalacticVehicleEntity.class, new AABB(this.deploymentFloor).inflate(4.0D),
+                        candidate -> candidate.ownerId().filter(this.owner.getUUID()::equals).isPresent())
+                        .stream().findFirst().orElse(null);
+            }
+            boolean indexed = this.helper.getLevel().getEntity(this.merchant.getUUID()) == this.merchant
+                    && this.helper.getLevel().getEntity(this.escort.getUUID()) == this.escort
+                    && this.vehicle != null
+                    && this.helper.getLevel().getEntity(this.vehicle.getUUID()) == this.vehicle;
+            if (!indexed) {
+                if (this.helper.getTick() - this.indexWaitStartedTick >= 120L) {
+                    this.phase = 2;
+                    this.helper.fail("Chapter-three merchant, escort, or vehicle never entered the entity index");
+                }
+                return;
+            }
+            this.owner.setPos(
+                    this.merchant.getX(), this.merchant.getY(), this.merchant.getZ() + 1.0D);
+            this.owner.getInventory().add(new ItemStack(ModItems.CREDIT_CHIP.get(), 12));
+            MerchantTradeMenu tradeMenu = (MerchantTradeMenu) new MerchantTradeMenuProvider(this.merchant)
+                    .createMenu(21, this.owner.getInventory(), this.owner);
+            int offer = tradeMenu.tradeIds().indexOf("republic_quartermaster");
+            UUID tradeId = UUID.randomUUID();
+            boolean traded = offer >= 0 && tradeMenu.handleReplayAction(this.owner, tradeId, offer);
+            boolean replayRejected = offer >= 0
+                    && !tradeMenu.handleReplayAction(this.owner, tradeId, offer);
+            ProgressionState tradedState = ProgressionSavedData.get(this.helper.getLevel())
+                    .state(this.owner.getUUID());
+            if (!traded || !replayRejected || countPlayerItem(this.owner, ModItems.ENERGY_CELL.get()) != 8
+                    || CreditTransactionService.playerBalance(this.owner) != 0
+                    || tradedState.total(ProgressionEventType.TRADE_COMPLETED) != 1) {
+                this.phase = 2;
+                this.helper.fail("Physical merchant trade did not commit exactly once in Chapter 3: offer="
+                        + offer + ", traded=" + traded + ", replay=" + replayRejected
+                        + ", energy=" + countPlayerItem(this.owner, ModItems.ENERGY_CELL.get())
+                        + ", credits=" + CreditTransactionService.playerBalance(this.owner)
+                        + ", total=" + tradedState.total(ProgressionEventType.TRADE_COMPLETED)
+                        + ", merchant=" + this.merchant.isMerchant() + "/"
+                        + this.merchant.factionIdForGameplay() + "/"
+                        + this.merchant.factionRelationTo(this.owner)
+                        + ", valid=" + tradeMenu.stillValid(this.owner)
+                        + ", unlocks=" + tradedState.unlocks());
+                return;
+            }
+            this.owner.setPos(
+                    this.beacon.getX() + 0.5D, this.beacon.getY(), this.beacon.getZ() + 0.5D);
+            this.escort.setPos(
+                    this.beacon.getX() + 1.5D, this.beacon.getY(), this.beacon.getZ() + 0.5D);
+            this.phase = 1;
+        }
+
+        private void captureRegion() {
+            this.captureTicks++;
+            ConquestCaptureService.CaptureResult result = ConquestCaptureService.tick(
+                    this.helper.getLevel(), this.region, this.beacon);
+            if (!result.accepted()) {
+                this.phase = 2;
+                this.helper.fail("Embodied conquest transaction was rejected: " + result);
+                return;
+            }
+            ConquestControlState control = ConquestSavedData.get(this.helper.getLevel())
+                    .state(this.region.id()).orElseThrow();
+            if (!control.controllingFaction().equals("galacticwars:republic")) {
+                if (this.captureTicks >= 80) {
+                    this.phase = 2;
+                    this.helper.fail("Owned military escort did not capture the physical beacon: result="
+                            + result + ", control=" + control + ", escortOwner="
+                            + this.escort.getOwnerReference() + ", escortDuty="
+                            + this.escort.getServiceBranch());
+                }
+                return;
+            }
+            this.verifyVictory(control);
+        }
+
+        private void verifyVictory(ConquestControlState control) {
+            ProgressionSavedData progression = ProgressionSavedData.get(this.helper.getLevel());
+            ProgressionState victory = progression.state(this.owner.getUUID());
+            boolean chapterComplete = victory.hasSubject(
+                    ProgressionEventType.QUEST_ADVANCED, "republic_chapter_3");
+            boolean campaignComplete = victory.hasSubject(
+                    ProgressionEventType.CAMPAIGN_COMPLETED, "republic_campaign");
+            boolean victoryUnlocks = victory.unlocks().contains("campaign_victory")
+                    && victory.unlocks().contains("veteran_operations");
+            ConquestCaptureService.CaptureResult replay = ConquestCaptureService.tick(
+                    this.helper.getLevel(), this.region, this.beacon);
+            if (!chapterComplete || !campaignComplete || !victoryUnlocks
+                    || control.revision() != 1L
+                    || !control.controllingKingdom().equals(this.kingdom.id().toString())
+                    || victory.total(ProgressionEventType.VEHICLE_ACQUIRED) != 1
+                    || victory.total(ProgressionEventType.TRADE_COMPLETED) != 1
+                    || victory.total(ProgressionEventType.REGION_CAPTURED) != 1
+                    || victory.pendingCreditRewards() != EXPECTED_CAMPAIGN_REWARDS
+                    || !replay.accepted() || replay.captured()
+                    || progression.state(this.owner.getUUID())
+                    .total(ProgressionEventType.REGION_CAPTURED) != 1) {
+                this.phase = 2;
+                this.helper.fail("Chapter 3 did not atomically become a persistent campaign victory: chapter="
+                        + chapterComplete + ", campaign=" + campaignComplete
+                        + ", unlocks=" + victory.unlocks() + ", control=" + control
+                        + ", totals=" + victory.eventTotals() + ", pending="
+                        + victory.pendingCreditRewards() + ", replay=" + replay);
+                return;
+            }
+
+            this.owner.setPos(
+                    this.merchant.getX(), this.merchant.getY(), this.merchant.getZ() + 1.0D);
+            this.owner.getInventory().add(new ItemStack(ModItems.CREDIT_CHIP.get(), 12));
+            MerchantTradeMenu veteranTrade = (MerchantTradeMenu)
+                    new MerchantTradeMenuProvider(this.merchant)
+                            .createMenu(22, this.owner.getInventory(), this.owner);
+            int offer = veteranTrade.tradeIds().indexOf("republic_quartermaster");
+            boolean repeatedTrade = offer >= 0 && veteranTrade.handleReplayAction(
+                    this.owner, UUID.randomUUID(), offer);
+            ProgressionState repeated = progression.state(this.owner.getUUID());
+            if (!repeatedTrade || repeated.total(ProgressionEventType.TRADE_COMPLETED) != 2
+                    || repeated.pendingCreditRewards() != EXPECTED_CAMPAIGN_REWARDS
+                    || countPlayerItem(this.owner, ModItems.ENERGY_CELL.get()) != 16) {
+                this.phase = 2;
+                this.helper.fail("Veteran trade operation was not repeatable without duplicating victory rewards");
+                return;
+            }
+
+            this.owner.setPos(
+                    this.hallPos.getX() + 0.5D, this.hallPos.getY(), this.hallPos.getZ() + 0.5D);
+            CommandCenterOperationsMenu operations = (CommandCenterOperationsMenu)
+                    new CommandCenterOperationsMenuProvider(this.hallPos)
+                            .createMenu(23, this.owner.getInventory(), this.owner);
+            CommandCenterDashboardState dashboard = operations.dashboardState();
+            boolean claimed = operations.handleReplayAction(
+                    this.owner, UUID.randomUUID(), CommandCenterOperationsMenu.CLAIM_REWARDS);
+            int paidBalance = CreditTransactionService.playerBalance(this.owner);
+            boolean duplicateClaimRejected = !operations.handleReplayAction(
+                    this.owner, UUID.randomUUID(), CommandCenterOperationsMenu.CLAIM_REWARDS);
+            Tag encoded = ProgressionSavedData.CODEC.encodeStart(
+                    NbtOps.INSTANCE, progression).getOrThrow();
+            ProgressionSavedData restored = ProgressionSavedData.CODEC.parse(
+                    NbtOps.INSTANCE, encoded).getOrThrow();
+            ProgressionState restoredVictory = restored.state(this.owner.getUUID());
+            if (!dashboard.campaignVictory()
+                    || dashboard.activeQuest().isPresent()
+                    || dashboard.veteranVehicleDeployments() != 1
+                    || dashboard.veteranTrades() != 2
+                    || dashboard.veteranRegionCaptures() != 1
+                    || !claimed || !duplicateClaimRejected
+                    || paidBalance != EXPECTED_CAMPAIGN_REWARDS
+                    || progression.pendingCreditRewards(this.owner.getUUID()) != 0
+                    || !restoredVictory.hasSubject(
+                    ProgressionEventType.CAMPAIGN_COMPLETED, "republic_campaign")
+                    || !restoredVictory.unlocks().contains("veteran_operations")
+                    || restoredVictory.total(ProgressionEventType.TRADE_COMPLETED) != 2) {
+                this.phase = 2;
+                this.helper.fail("Victory dashboard, reward claim, or persistence contract failed: dashboard="
+                        + dashboard.campaignVictory() + "/" + dashboard.activeQuest()
+                        + "/" + dashboard.veteranVehicleDeployments() + "/"
+                        + dashboard.veteranTrades() + "/" + dashboard.veteranRegionCaptures()
+                        + ", claim=" + claimed + "/" + duplicateClaimRejected
+                        + ", paid=" + paidBalance + ", pending="
+                        + progression.pendingCreditRewards(this.owner.getUUID())
+                        + ", restored=" + restoredVictory);
+                return;
+            }
+            this.phase = 2;
+            this.helper.succeed();
+        }
+    }
+
+    private static int countPlayerItem(ServerPlayer player, net.minecraft.world.item.Item item) {
+        return player.getInventory().getNonEquipmentItems().stream()
+                .filter(stack -> stack.is(item))
+                .mapToInt(ItemStack::getCount)
+                .sum();
+    }
+
+    private static final class NaturalCivilianTestScenario {
+        private final GameTestHelper helper;
+        private final SmartBrainTestArea area;
+        private boolean started;
+        private boolean shelterVerified;
+        private boolean workerPrepared;
+        private boolean complete;
+        private long startTick;
+        private long workerSpawnTick;
+        private long workStartTick;
+        private BlockPos shelterHome;
+        private BlockPos storage;
+        private GalacticRecruitEntity sheltering;
+        private GalacticRecruitEntity threat;
+        private GalacticRecruitEntity worker;
+        private double initialShelterDistance;
+
+        private NaturalCivilianTestScenario(GameTestHelper helper, SmartBrainTestArea area) {
+            this.helper = helper;
+            this.area = area;
+        }
+
+        private void tick() {
+            if (this.complete) {
+                return;
+            }
+            if (!this.started) {
+                BlockPos spawnPosition = this.area.at(1, 1, 1);
+                if (!this.helper.getLevel().areEntitiesActuallyLoadedAndTicking(
+                        new ChunkPos(spawnPosition.getX() >> 4, spawnPosition.getZ() >> 4))) {
+                    if (this.helper.getTick() >= 100L) {
+                        this.complete = true;
+                        this.helper.fail("Natural civilian GameTest chunk never reached entity-ticking status");
+                    }
+                    return;
+                }
+                this.start();
+            }
+            if (!this.shelterVerified) {
+                if (this.sheltering.distanceToSqr(Vec3.atCenterOf(this.shelterHome))
+                        < this.initialShelterDistance - 4.0D) {
+                    this.startWorkerScenario();
+                } else if (this.helper.getTick() - this.startTick >= 120L) {
+                    this.complete = true;
+                    this.helper.fail("Natural civilian shelter behaviour did not retreat from a hostile soldier: position="
+                            + this.sheltering.position() + ", home=" + this.shelterHome
+                            + ", orderedSit=" + this.sheltering.isOrderedToSit()
+                            + ", tickCount=" + this.sheltering.tickCount
+                            + ", branch=" + this.sheltering.getServiceBranch()
+                            + ", outpost=" + this.sheltering.getFactionOutpostId()
+                            + ", group=" + this.sheltering.getArmyGroupId()
+                            + ", threatAlive=" + this.threat.isAlive()
+                            + ", threatDistance=" + this.sheltering.distanceToSqr(this.threat)
+                            + ", hostile=" + this.sheltering.isHostileFactionRecruit(this.threat)
+                            + ", walkMemory=" + BrainUtil.hasMemory(this.sheltering,
+                            net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                            + ", navigationDone=" + this.sheltering.getNavigation().isDone()
+                            + ", pathMemory=" + BrainUtil.hasMemory(this.sheltering,
+                            net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
+                            + ", running=" + this.sheltering.getBrain().getRunningBehaviors()
+                            + ", path=" + pathState(this.sheltering, this.shelterHome));
+                }
+                return;
+            }
+            if (!this.workerPrepared && this.helper.getTick() - this.workerSpawnTick >= 2L) {
+                this.prepareWorker();
+            }
+            if (this.workerPrepared && this.helper.getTick() - this.workStartTick >= 30L) {
+                this.complete = true;
+                verifyNaturalCivilianWork(
+                        this.helper, this.sheltering, this.worker, this.storage);
+            }
+        }
+
+        private void start() {
+            this.started = true;
+            this.startTick = this.helper.getTick();
+            this.shelterHome = this.area.at(4, 1, 4);
+            this.sheltering = spawnRecruitAt(
+                    this.helper, ModEntityTypes.REPUBLIC_CIVILIAN.get(), this.area.at(1, 1, 1));
+            this.sheltering.setInvulnerable(true);
+            this.sheltering.initializeNaturalFactionNpc(
+                    UUID.randomUUID(), NpcServiceBranch.CIVILIAN, this.shelterHome, 32);
+            this.initialShelterDistance = this.sheltering.distanceToSqr(
+                    Vec3.atCenterOf(this.shelterHome));
+            this.threat = spawnRecruitAt(
+                    this.helper, ModEntityTypes.B1_BATTLE_DROID.get(), this.area.at(1, 1, 2));
+            this.threat.setInvulnerable(true);
+            this.threat.setNoAi(true);
+            this.threat.initializeNaturalFactionNpc(
+                    UUID.randomUUID(), NpcServiceBranch.MILITARY);
+            if (!this.sheltering.isHostileFactionRecruit(this.threat)) {
+                this.complete = true;
+                this.helper.fail("Natural civilian test threat is not hostile: relation="
+                        + this.sheltering.factionRelationTo(this.threat)
+                        + ", civilianFaction=" + this.sheltering.getRecruitFactionId()
+                        + ", threatFaction=" + this.threat.getRecruitFactionId()
+                        + ", threatDuty=" + this.threat.getRecruitDuty());
+                return;
+            }
+            BlockPos workHome = this.area.at(3, 1, 0);
+            this.storage = workHome.offset(1, 0, 0);
+            this.helper.getLevel().setBlockAndUpdate(this.storage, Blocks.CHEST.defaultBlockState());
+        }
+
+        private void startWorkerScenario() {
+            this.shelterVerified = true;
+            this.threat.discard();
+            this.helper.setTime(6000L);
+            BlockPos workHome = this.area.at(3, 1, 0);
+            this.worker = spawnRecruitAt(
+                    this.helper, ModEntityTypes.HUTT_CIVILIAN.get(), this.area.at(1, 1, 1));
+            this.worker.setInvulnerable(true);
+            this.worker.initializeNaturalFactionNpc(
+                    UUID.randomUUID(), NpcServiceBranch.CIVILIAN, workHome, 32);
+            this.workerSpawnTick = this.helper.getTick();
+        }
+
+        private void prepareWorker() {
+            this.workerPrepared = true;
+            this.worker.setWorkerProfession(WorkerProfession.FARMER);
+            setRecruitField(this.worker, "nextNaturalProductionGameTime", 0L);
+            BlockPos workstation = this.worker.naturalWorkstationPosition();
+            this.worker.setPos(
+                    workstation.getX() + 0.5D,
+                    workstation.getY(),
+                    workstation.getZ() + 0.5D);
+            this.worker.getNavigation().stop();
+            this.workStartTick = this.helper.getTick();
+        }
+    }
+
+    private static void invokeWorkerAuthorityReconciliation(
+            GalacticRecruitEntity recruit,
+            net.minecraft.server.level.ServerLevel level
+    ) {
+        try {
+            Method method = GalacticRecruitEntity.class.getDeclaredMethod(
+                    "reconcileWorkerAuthority", net.minecraft.server.level.ServerLevel.class);
+            method.setAccessible(true);
+            method.invoke(recruit, level);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Could not reconcile recruit worker authority", exception);
+        }
     }
 
     private record SpawnEggCase(

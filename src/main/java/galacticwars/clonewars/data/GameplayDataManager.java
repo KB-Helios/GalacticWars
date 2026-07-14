@@ -113,6 +113,12 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 validateEquipment(unit);
             }
             for (FactionDefinition faction : factions.values()) {
+                if (faction.pledgeDirectDelta() < faction.minimumHiringAlignment()) {
+                    throw new IllegalArgumentException("Faction " + faction.id()
+                            + " pledge grants " + faction.pledgeDirectDelta()
+                            + " alignment but direct hiring requires "
+                            + faction.minimumHiringAlignment());
+                }
                 requireRegistered(BuiltInRegistries.ITEM, faction.pledgeTokenItemId(),
                         "pledge token for " + faction.id());
             }

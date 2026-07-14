@@ -8,9 +8,11 @@ import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.IdentityChipItem;
 import galacticwars.clonewars.item.GalacticArmorItem;
 import galacticwars.clonewars.item.LightsaberItem;
+import galacticwars.clonewars.item.TacticalCommandMarkerItem;
 import galacticwars.clonewars.world.HyperspaceNavigatorItem;
 import galacticwars.clonewars.vehicle.VehicleDeploymentKitItem;
 import galacticwars.clonewars.kingdom.ClaimTransponderItem;
+import galacticwars.clonewars.settlement.BlueprintProjectorItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BowItem;
@@ -65,6 +67,10 @@ public final class ModItems {
             ITEMS.registerItem("hyperspace_navigator", HyperspaceNavigatorItem::new);
     public static final DeferredItem<ClaimTransponderItem> CLAIM_TRANSPONDER =
             ITEMS.registerItem("claim_transponder", ClaimTransponderItem::new);
+    public static final DeferredItem<BlueprintProjectorItem> BLUEPRINT_PROJECTOR =
+            ITEMS.registerItem("blueprint_projector", BlueprintProjectorItem::new);
+    public static final DeferredItem<TacticalCommandMarkerItem> COMMAND_MARKER =
+            ITEMS.registerItem("command_marker", TacticalCommandMarkerItem::new);
     public static final DeferredItem<BlasterItem> DC15_BLASTER =
             ITEMS.registerItem("dc15_blaster", properties -> new BlasterItem(blaster(properties, 850), 6.0D, 3.4F, 0.7F));
     public static final DeferredItem<BlasterItem> E5_BLASTER =

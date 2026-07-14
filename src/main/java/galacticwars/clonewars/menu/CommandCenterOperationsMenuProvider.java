@@ -28,5 +28,9 @@ public final class CommandCenterOperationsMenuProvider implements MenuProvider {
     @Override
     public void writeClientSideData(AbstractContainerMenu menu, RegistryFriendlyByteBuf buffer) {
         buffer.writeBlockPos(hallPos);
+        if (!(menu instanceof CommandCenterOperationsMenu operations)) {
+            throw new IllegalArgumentException("Command Center provider received an incompatible menu");
+        }
+        CommandCenterDashboardCodec.write(buffer, operations.dashboardState());
     }
 }

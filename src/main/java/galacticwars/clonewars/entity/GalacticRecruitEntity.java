@@ -51,6 +51,7 @@ import galacticwars.clonewars.kingdom.WorkOrder;
 import galacticwars.clonewars.kingdom.WorkOrderState;
 import galacticwars.clonewars.kingdom.WorkOrderType;
 import galacticwars.clonewars.kingdom.WorksiteRecord;
+import galacticwars.clonewars.item.CommandTargetSelection;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
 import galacticwars.clonewars.menu.RecruitCommandAction;
 import galacticwars.clonewars.menu.RecruitCommandMenuProvider;
@@ -64,6 +65,8 @@ import galacticwars.clonewars.recruitment.RecruitmentPaymentService;
 import galacticwars.clonewars.registry.ModBlocks;
 import galacticwars.clonewars.registry.ModBlockTags;
 import galacticwars.clonewars.registry.ModEntityTypes;
+import galacticwars.clonewars.registry.ModDataComponents;
+import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.settlement.BaseBlockPlacement;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import galacticwars.clonewars.settlement.KingdomBaseBuildAction;
@@ -73,6 +76,7 @@ import galacticwars.clonewars.settlement.KingdomSettlementPlanner;
 import galacticwars.clonewars.settlement.KingdomSettlementState;
 import galacticwars.clonewars.settlement.KingdomWorkOrder;
 import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
+import galacticwars.clonewars.settlement.ConstructionPlan;
 import galacticwars.clonewars.workforce.ResourceInventory;
 import galacticwars.clonewars.workforce.WorkAreaType;
 import galacticwars.clonewars.workforce.WorkerLogisticsDecision;
@@ -897,6 +901,65 @@ public class GalacticRecruitEntity extends TamableAnimal
         return new WorkerStatus(this.workerPhase, this.workerReason, target);
     }
 
+    public int getWorkerCarriedItemCount() {
+        return this.workerInventory.stream().mapToInt(ItemStack::getCount).sum();
+    }
+
+    public int getWorkerStorageItemCount() {
+        return this.storageItemCount();
+    }
+
+    public boolean resumeWorkFromCommandCenter(ServerPlayer actor) {
+        if (!this.canManageWorkerFromCommandCenter(actor) || this.workTarget == null) {
+            return false;
+        }
+        this.moveTarget = this.workTarget;
+        this.setRecruitCommand(RecruitmentAction.WORK_AT_SITE);
+        this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "return_to_worksite", null);
+        return true;
+    }
+
+    public boolean recallWorkerToCommandCenter(ServerPlayer actor, BlockPos commandCenterPos) {
+        if (!this.canManageWorkerFromCommandCenter(actor)) {
+            return false;
+        }
+        this.pauseWorkerNavigation();
+        this.moveTarget = Objects.requireNonNull(commandCenterPos, "commandCenterPos").immutable();
+        this.setRecruitCommand(RecruitmentAction.MOVE_TO_POSITION);
+        this.transitionWorker(WorkerPhase.PAUSED, "recalled_to_command_center", null);
+        return true;
+    }
+
+    public boolean pauseWorkerFromCommandCenter(ServerPlayer actor) {
+        if (!this.canManageWorkerFromCommandCenter(actor)) {
+            return false;
+        }
+        this.pauseWorkerNavigation();
+        this.moveTarget = this.blockPosition();
+        this.setRecruitCommand(RecruitmentAction.HOLD_POSITION);
+        this.transitionWorker(WorkerPhase.PAUSED, "paused_by_command_center", null);
+        return true;
+    }
+
+    private boolean canManageWorkerFromCommandCenter(ServerPlayer actor) {
+        if (!(this.level() instanceof ServerLevel serverLevel)
+                || actor.level() != serverLevel
+                || !this.isAlive()
+                || !this.isTame()
+                || this.getRecruitDuty() != RecruitDuty.WORKER
+                || this.getWorkerProfession().isEmpty()
+                || this.kingdomId == null) {
+            return false;
+        }
+        KingdomRecord kingdom = KingdomSavedData.get(serverLevel)
+                .kingdomForPlayer(actor.getUUID()).orElse(null);
+        return kingdom != null
+                && kingdom.id().equals(this.kingdomId)
+                && kingdom.npc(this.getUUID()).isPresent()
+                && kingdom.allows(actor.getUUID(),
+                galacticwars.clonewars.kingdom.KingdomPermission.MANAGE_WORKSITES);
+    }
+
     public @Nullable BlockPos getMoveTarget() {
         return this.moveTarget;
     }
@@ -1028,7 +1091,9 @@ public class GalacticRecruitEntity extends TamableAnimal
                 yield true;
             }
             case MOVE -> {
-                if (!this.applyMenuArmyOrder(player, RecruitmentAction.MOVE_TO_POSITION, player.blockPosition())) {
+                BlockPos moveTarget = CommandTargetSelection.blockFromInventory(player)
+                        .orElse(player.blockPosition());
+                if (!this.applyMenuArmyOrder(player, RecruitmentAction.MOVE_TO_POSITION, moveTarget)) {
                     yield false;
                 }
                 player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.move"));
@@ -1120,61 +1185,34 @@ public class GalacticRecruitEntity extends TamableAnimal
                 yield true;
             }
             case BUILD_STARTER_KEEP -> {
-                Optional<BlockPos> targetedBase = targetedBlock(player);
-                if (targetedBase.isEmpty()) {
-                    player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.worksite.invalid_target"));
-                    yield false;
-                }
-                if (!this.isInsideSettlementClaim(targetedBase.get())) {
-                    player.sendSystemMessage(Component.translatable("message.galacticwars.recruit.worksite.invalid_target"));
-                    yield false;
-                }
-                this.setBaseTarget(targetedBase.get());
-                this.setWorkTarget(this.baseTarget);
-                this.starterBaseCompletedBlocks = 0;
                 KingdomSavedData buildData = KingdomSavedData.get((ServerLevel) this.level());
-                String buildDimension = this.level().dimension().identifier().toString();
-                boolean projectAlreadyExisted = buildData.kingdomForOwner(player.getUUID()).stream()
-                        .flatMap(kingdom -> kingdom.settlement().buildProjects().stream())
-                        .anyMatch(project -> project.dimensionId().equals(buildDimension)
-                                && project.originX() == this.baseTarget.getX()
-                                && project.originY() == this.baseTarget.getY()
-                                && project.originZ() == this.baseTarget.getZ()
-                                && (project.state() == galacticwars.clonewars.kingdom.BuildProjectState.ACTIVE
-                                        || project.state()
-                                                == galacticwars.clonewars.kingdom.BuildProjectState.BLOCKED));
-                Optional<BuildProject> startedProject = buildData
-                        .startBuildProject(
-                                player.getUUID(), this.selectedBlueprint(),
-                                buildDimension,
-                                this.baseTarget, this.buildRotationSteps);
-                this.activeBuildProjectId = startedProject.map(BuildProject::id).orElse(null);
-                if (startedProject.isEmpty()) {
-                    this.blockWorker("project_persistence_failed");
+                KingdomRecord actorKingdom = buildData.kingdomForPlayer(player.getUUID()).orElse(null);
+                if (actorKingdom == null) {
                     yield false;
                 }
-                if (!this.tryAssignWorkerProfession(player, WorkerProfession.BUILDER)) {
-                    if (!projectAlreadyExisted) {
-                        buildData.replaceBuildProject(
-                                player.getUUID(), startedProject.orElseThrow().cancel());
+                KingdomBaseBlueprint blueprint = this.selectedBlueprint();
+                ItemStack projector = ItemStack.EMPTY;
+                for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+                    ItemStack candidate = player.getInventory().getItem(slot);
+                    if (candidate.is(ModItems.BLUEPRINT_PROJECTOR.get())) {
+                        projector = candidate;
+                        break;
                     }
-                    this.activeBuildProjectId = null;
-                    this.setBaseTarget(null);
-                    this.setWorkTarget(null);
-                    this.starterBaseCompletedBlocks = 0;
-                    yield false;
                 }
-                this.setRecruitCommand(RecruitmentAction.WORK_AT_SITE);
-                this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "blueprint_queued", null);
-                KingdomBaseBuildDecision buildDecision = this.planStarterBaseBuild().orElseThrow();
-                WorkerResourceDecision resourceDecision = this.planResourceDecision().orElseThrow();
+                ConstructionPlan plan = new ConstructionPlan(
+                        blueprint.id(), this.buildRotationSteps, this.getUUID(), actorKingdom.id());
+                if (projector.isEmpty()) {
+                    projector = new ItemStack(ModItems.BLUEPRINT_PROJECTOR.get());
+                    projector.set(ModDataComponents.CONSTRUCTION_PLAN.get(), plan);
+                    if (!player.getInventory().add(projector)) {
+                        player.drop(projector, false);
+                    }
+                } else {
+                    projector.set(ModDataComponents.CONSTRUCTION_PLAN.get(), plan);
+                }
                 player.sendSystemMessage(Component.translatable(
-                        "message.galacticwars.recruit.base.forward_base",
-                        Component.literal(this.selectedBlueprint().displayName()),
-                        Component.translatable("screen.galacticwars.recruit.basebuild."
-                                + buildDecision.action().name().toLowerCase()),
-                        Component.translatable("screen.galacticwars.recruit.workaction."
-                                + resourceDecision.action().name().toLowerCase())));
+                        "message.galacticwars.recruit.projector_prepared",
+                        Component.literal(blueprint.displayName()), this.buildRotationSteps * 90));
                 yield true;
             }
             case PROTECT -> {
@@ -1484,6 +1522,21 @@ public class GalacticRecruitEntity extends TamableAnimal
         }
         UUID ownerId = this.getOwnerReference().getUUID();
         KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        if (profession == WorkerProfession.BUILDER && this.activeBuildProjectId != null) {
+            BuildProject linkedProject = this.activeBuildProject().orElse(null);
+            if (linkedProject == null
+                    || linkedProject.state() == galacticwars.clonewars.kingdom.BuildProjectState.CANCELLED
+                    || linkedProject.state() == galacticwars.clonewars.kingdom.BuildProjectState.COMPLETED) {
+                this.pauseWorkerNavigation();
+                this.releaseCurrentWorkOrder(false);
+                this.activeBuildProjectId = null;
+                this.setBaseTarget(null);
+                this.setWorkTarget(null);
+                this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
+                this.transitionWorker(WorkerPhase.BLOCKED, "build_cancelled", null);
+                return;
+            }
+        }
         Optional<UUID> preferredProject = profession == WorkerProfession.BUILDER
                 ? Optional.ofNullable(this.activeBuildProjectId)
                 : Optional.empty();
@@ -1508,13 +1561,16 @@ public class GalacticRecruitEntity extends TamableAnimal
         List<BlockPos> availableStorage = this.availableRegisteredStorage(serverLevel, data, ownerId);
         if (profession == WorkerProfession.COURIER) {
             WorksiteRecord authoritativeWorksite = worksite;
-            BlockPos destination = availableStorage.stream()
-                    .filter(pos -> Math.abs(pos.getX() - authoritativeWorksite.x())
-                            <= authoritativeWorksite.radius())
-                    .filter(pos -> Math.abs(pos.getZ() - authoritativeWorksite.z())
-                            <= authoritativeWorksite.radius())
-                    .filter(pos -> Math.abs(pos.getY() - authoritativeWorksite.y()) <= 4)
-                    .findFirst().orElse(null);
+            BlockPos destination = authoritativeWorksite.type().equals("frontier")
+                    && this.findContainer(worksiteCenter).isPresent()
+                    ? worksiteCenter
+                    : availableStorage.stream()
+                            .filter(pos -> Math.abs(pos.getX() - authoritativeWorksite.x())
+                                    <= authoritativeWorksite.radius())
+                            .filter(pos -> Math.abs(pos.getZ() - authoritativeWorksite.z())
+                                    <= authoritativeWorksite.radius())
+                            .filter(pos -> Math.abs(pos.getY() - authoritativeWorksite.y()) <= 4)
+                            .findFirst().orElse(null);
             BlockPos source = availableStorage.stream()
                     .filter(pos -> !pos.equals(destination))
                     .findFirst().orElse(null);
@@ -1657,6 +1713,7 @@ public class GalacticRecruitEntity extends TamableAnimal
                     this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "ready", null);
                 }
             }
+            case PAUSED -> this.pauseWorkerNavigation();
         }
     }
 
@@ -2078,7 +2135,7 @@ public class GalacticRecruitEntity extends TamableAnimal
 
     private void tickWorkerDeposit() {
         if (this.activeWorkTarget == null
-                || !this.isRegisteredStorageTarget(this.activeWorkTarget)
+                || !this.isAuthorizedWorkerDepositTarget(this.activeWorkTarget)
                 || !this.insertWorkerInventory(this.activeWorkTarget)) {
             this.blockWorker("storage_full_or_missing");
             return;
@@ -2089,6 +2146,29 @@ public class GalacticRecruitEntity extends TamableAnimal
         }
         this.workerCooldownTicks = 40;
         this.transitionWorker(WorkerPhase.COOLDOWN, "deposit_complete", null);
+    }
+
+    private boolean isAuthorizedWorkerDepositTarget(BlockPos target) {
+        if (this.isRegisteredStorageTarget(target)) {
+            return true;
+        }
+        if (!(this.level() instanceof ServerLevel serverLevel)
+                || this.getOwnerReference() == null
+                || this.getWorkerProfession().filter(WorkerProfession.COURIER::equals).isEmpty()
+                || this.workTarget == null
+                || !this.workTarget.equals(target)
+                || !this.isInsideSettlementClaim(target)) {
+            return false;
+        }
+        String dimensionId = serverLevel.dimension().identifier().toString();
+        return KingdomSavedData.get(serverLevel)
+                .assignedWorksite(this.getOwnerReference().getUUID(), this.getUUID())
+                .filter(worksite -> worksite.accepts(WorkerProfession.COURIER))
+                .filter(worksite -> worksite.dimensionId().equals(dimensionId))
+                .filter(worksite -> worksite.x() == target.getX()
+                        && worksite.y() == target.getY()
+                        && worksite.z() == target.getZ())
+                .isPresent();
     }
 
     private void performGatheringInteraction(ServerLevel level) {
@@ -2709,14 +2789,15 @@ public class GalacticRecruitEntity extends TamableAnimal
 
     private boolean insertWorkerInventory(BlockPos pos) {
         int authorizedSlots = this.registeredStorageSlots(pos);
-        if (authorizedSlots <= 0) {
-            return false;
-        }
         Optional<Container> containerOptional = this.findContainer(pos);
-        if (containerOptional.isEmpty()) {
+        if (containerOptional.isEmpty()
+                || authorizedSlots <= 0 && !this.isAuthorizedWorkerDepositTarget(pos)) {
             return false;
         }
         Container container = containerOptional.get();
+        if (authorizedSlots <= 0) {
+            authorizedSlots = container.getContainerSize();
+        }
         int slotLimit = Math.min(authorizedSlots, container.getContainerSize());
         NonNullList<ItemStack> simulated = NonNullList.withSize(slotLimit, ItemStack.EMPTY);
         for (int slot = 0; slot < slotLimit; slot++) {
@@ -3007,6 +3088,73 @@ public class GalacticRecruitEntity extends TamableAnimal
         return true;
     }
 
+    /**
+     * Connects an authoritative persisted project to this recruit's existing builder work loop.
+     * Project creation and site preflight belong to {@code ConstructionProjectService}; this method
+     * owns the recruit-side assignment and rolls its local selection back when the contract fails.
+     */
+    public boolean assignConstructionProject(
+            ServerPlayer actor,
+            BuildProject project,
+            KingdomBaseBlueprint blueprint
+    ) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(project, "project");
+        Objects.requireNonNull(blueprint, "blueprint");
+        if (!(this.level() instanceof ServerLevel serverLevel)
+                || actor.level() != serverLevel
+                || this.getOwnerReference() == null
+                || this.kingdomId == null
+                || !this.kingdomId.equals(KingdomSavedData.get(serverLevel)
+                        .kingdomForPlayer(actor.getUUID()).map(KingdomRecord::id).orElse(null))
+                || !project.blueprintId().equals(blueprint.id())
+                || !project.definitionHash().equals(blueprint.definitionHash())
+                || !project.dimensionId().equals(serverLevel.dimension().identifier().toString())
+                || !blueprint.supportsRotationSteps(project.rotationSteps())) {
+            sendFeedback(actor, Component.translatable(
+                    "message.galacticwars.recruit.worksite.missing"));
+            return false;
+        }
+        Optional<BuildProject> currentProject = this.activeBuildProject();
+        if (currentProject.filter(current -> !current.id().equals(project.id()))
+                .filter(current -> current.state()
+                        != galacticwars.clonewars.kingdom.BuildProjectState.COMPLETED)
+                .filter(current -> current.state()
+                        != galacticwars.clonewars.kingdom.BuildProjectState.CANCELLED)
+                .isPresent()) {
+            sendFeedback(actor, Component.translatable(
+                    "message.galacticwars.recruit.base.blueprint_locked"));
+            return false;
+        }
+        BlockPos previousBaseTarget = this.baseTarget;
+        BlockPos previousWorkTarget = this.workTarget;
+        UUID previousProjectId = this.activeBuildProjectId;
+        String previousBlueprintId = this.selectedBlueprintId;
+        int previousRotation = this.buildRotationSteps;
+        int previousProgress = this.starterBaseCompletedBlocks;
+        BlockPos origin = new BlockPos(project.originX(), project.originY(), project.originZ());
+        this.activeBuildProjectId = project.id();
+        this.selectedBlueprintId = blueprint.id();
+        this.buildRotationSteps = project.rotationSteps();
+        this.starterBaseCompletedBlocks = project.completedPlacements().size();
+        this.setBaseTarget(origin);
+        this.setWorkTarget(origin);
+        if (!this.tryAssignWorkerProfession(actor, WorkerProfession.BUILDER)) {
+            this.activeBuildProjectId = previousProjectId;
+            this.selectedBlueprintId = previousBlueprintId;
+            this.buildRotationSteps = previousRotation;
+            this.starterBaseCompletedBlocks = previousProgress;
+            this.setBaseTarget(previousBaseTarget);
+            this.setWorkTarget(previousWorkTarget);
+            this.syncRecruitStatusState();
+            return false;
+        }
+        this.setRecruitCommand(RecruitmentAction.WORK_AT_SITE);
+        this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "blueprint_queued", null);
+        this.syncRecruitStatusState();
+        return true;
+    }
+
     private void restorePreviousAssignment(
             KingdomSavedData kingdomData,
             UUID actorId,
@@ -3071,22 +3219,59 @@ public class GalacticRecruitEntity extends TamableAnimal
     }
 
     private boolean tryCancelBuilding(ServerPlayer player) {
-        if (this.baseTarget == null) {
+        if (this.activeBuildProjectId == null) {
+            if (this.baseTarget == null) {
+                sendFeedback(player, Component.translatable(
+                        "message.galacticwars.recruit.base.cancel_missing"));
+                return false;
+            }
+            this.pauseWorkerNavigation();
+            this.releaseCurrentWorkOrder(true);
+            this.setBaseTarget(null);
+            this.setWorkTarget(null);
+            this.starterBaseCompletedBlocks = 0;
+            this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
+            this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "build_cancelled", null);
             sendFeedback(player, Component.translatable(
-                    "message.galacticwars.recruit.base.cancel_missing"));
+                    "message.galacticwars.recruit.base.cancelled"));
+            return true;
+        }
+        return this.cancelConstructionProject(player, this.activeBuildProjectId);
+    }
+
+    public boolean cancelConstructionProject(ServerPlayer actor, UUID projectId) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(projectId, "projectId");
+        if (!(this.level() instanceof ServerLevel serverLevel)
+                || actor.level() != serverLevel
+                || this.activeBuildProjectId == null
+                || !this.activeBuildProjectId.equals(projectId)) {
+            return false;
+        }
+        KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        KingdomRecord kingdom = data.kingdomForPlayer(actor.getUUID()).orElse(null);
+        BuildProject project = this.activeBuildProject().filter(candidate ->
+                candidate.id().equals(projectId)).orElse(null);
+        if (kingdom == null || project == null
+                || !kingdom.id().equals(this.kingdomId)
+                || !kingdom.allows(actor.getUUID(),
+                galacticwars.clonewars.kingdom.KingdomPermission.BUILD)
+                || !kingdom.allows(actor.getUUID(),
+                galacticwars.clonewars.kingdom.KingdomPermission.MANAGE_WORKSITES)) {
             return false;
         }
         this.pauseWorkerNavigation();
         this.releaseCurrentWorkOrder(true);
+        if (!data.replaceBuildProject(kingdom.ownerId(), project.cancel())) {
+            return false;
+        }
         this.setBaseTarget(null);
         this.setWorkTarget(null);
         this.starterBaseCompletedBlocks = 0;
-        this.activeBuildProject().ifPresent(project -> KingdomSavedData.get((ServerLevel) this.level())
-                .replaceBuildProject(player.getUUID(), project.cancel()));
         this.activeBuildProjectId = null;
         this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
         this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "build_cancelled", null);
-        sendFeedback(player, Component.translatable(
+        sendFeedback(actor, Component.translatable(
                 "message.galacticwars.recruit.base.cancelled"));
         return true;
     }
@@ -4243,6 +4428,10 @@ public class GalacticRecruitEntity extends TamableAnimal
     }
 
     private static Optional<BlockPos> targetedBlock(ServerPlayer player) {
+        Optional<BlockPos> selected = CommandTargetSelection.blockFromInventory(player);
+        if (selected.isPresent()) {
+            return selected;
+        }
         HitResult hit = player.pick(8.0, 1.0F, false);
         if (hit.getType() != HitResult.Type.BLOCK || !(hit instanceof BlockHitResult blockHit)) {
             return Optional.empty();
@@ -4251,6 +4440,10 @@ public class GalacticRecruitEntity extends TamableAnimal
     }
 
     private static Optional<LivingEntity> targetedLivingEntity(ServerPlayer player) {
+        Optional<LivingEntity> selected = CommandTargetSelection.entityFromInventory(player);
+        if (selected.isPresent()) {
+            return selected;
+        }
         Vec3 start = player.getEyePosition();
         Vec3 direction = player.getViewVector(1.0F).scale(32.0D);
         Vec3 end = start.add(direction);

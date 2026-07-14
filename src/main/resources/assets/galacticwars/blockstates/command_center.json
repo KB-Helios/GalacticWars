@@ -1,7 +1,8 @@
 {
   "variants": {
-    "": {
-      "model": "galacticwars:block/command_center"
-    }
+    "facing=north": {"model": "galacticwars:block/command_center"},
+    "facing=east": {"model": "galacticwars:block/command_center", "y": 90},
+    "facing=south": {"model": "galacticwars:block/command_center", "y": 180},
+    "facing=west": {"model": "galacticwars:block/command_center", "y": 270}
   }
 }

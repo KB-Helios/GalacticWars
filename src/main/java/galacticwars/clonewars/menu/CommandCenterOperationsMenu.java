@@ -2,23 +2,40 @@ package galacticwars.clonewars.menu;
 
 import galacticwars.clonewars.army.ArmyLocation;
 import galacticwars.clonewars.army.ArmyFormation;
+import galacticwars.clonewars.army.ArmyCommandType;
 import galacticwars.clonewars.army.ArmyGroupOrder;
 import galacticwars.clonewars.kingdom.KingdomMemberRole;
 import galacticwars.clonewars.kingdom.KingdomRelation;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.kingdom.BuildProject;
 import galacticwars.clonewars.kingdom.BuildProjectState;
+import galacticwars.clonewars.kingdom.CommandCenterDashboardState;
+import galacticwars.clonewars.kingdom.CommandCenterDashboardState.CombatTargetSummary;
+import galacticwars.clonewars.kingdom.CommandCenterDashboardState.NearbyPlayerSummary;
+import galacticwars.clonewars.kingdom.CommandCenterDashboardState.PositionSummary;
+import galacticwars.clonewars.kingdom.CommandCenterDashboardState.WorkerSummary;
+import galacticwars.clonewars.kingdom.CommandTargetResolver;
+import galacticwars.clonewars.kingdom.KingdomRecord;
+import galacticwars.clonewars.data.GameplayDataManager;
+import galacticwars.clonewars.item.CommandTargetSelection;
 import galacticwars.clonewars.kingdom.SettlementRecord;
+import galacticwars.clonewars.network.CommandCenterStatePayload;
+import galacticwars.clonewars.network.GalacticNetwork;
 import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.registry.ModItems;
+import galacticwars.clonewars.registry.ModDataComponents;
 import galacticwars.clonewars.registry.ModMenuTypes;
 import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
+import galacticwars.clonewars.settlement.ConstructionPlan;
+import galacticwars.clonewars.settlement.ConstructionProjectService;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import galacticwars.clonewars.vehicle.VehicleFabricationService;
 import java.util.List;
 import java.util.LinkedHashSet;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -28,11 +45,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
     public static final int STORAGE = 0;
     public static final int CLAIM_REWARDS = 1;
+    public static final int NAVIGATION = 2;
     public static final int FABRICATE_FIRST = 10;
     public static final int MERGE_SQUADS = 20;
     public static final int PATROL_SQUAD = 21;
@@ -42,6 +62,15 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
     public static final int CYCLE_FORMATION = 25;
     public static final int SUPPLY_SQUAD = 26;
     public static final int FOLLOW_SQUAD = 27;
+    public static final int HOLD_SQUAD = 68;
+    public static final int MOVE_SQUAD = 69;
+    public static final int PROTECT_SQUAD = 70;
+    public static final int CLEAR_SQUAD_TARGET = 71;
+    public static final int ATTACK_SQUAD_TARGET = 72;
+    public static final int SET_SQUAD_RALLY = 73;
+    public static final int RESUME_WORKER = 74;
+    public static final int RECALL_WORKER = 75;
+    public static final int PAUSE_WORKER = 76;
     public static final int REGISTER_OUTPOST = 30;
     public static final int INVITE_NEAREST = 31;
     public static final int ACCEPT_INVITE = 32;
@@ -53,18 +82,33 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
     public static final int REJECT_DIPLOMACY = 44;
     public static final int DECLARE_HOSTILITY = 42;
     public static final int TOGGLE_EMBARGO = 43;
+    public static final int PREPARE_PROJECTOR_FIRST = 50;
+    public static final int CANCEL_BUILD_PROJECT = 54;
     private static final List<String> VEHICLES = List.of(
             "barc_speeder", "at_rt", "stap", "aat", "laat_gunship");
+    private static final double INVITE_RANGE_SQUARED = 16.0D * 16.0D;
     private final BlockPos hallPos;
     private final LinkedHashSet<UUID> processedActionIds = new LinkedHashSet<>();
+    private CommandCenterDashboardState dashboardState;
+    private int dashboardRevision;
 
     public CommandCenterOperationsMenu(int id, Inventory inventory, RegistryFriendlyByteBuf buffer) {
-        this(id, inventory, buffer.readBlockPos());
+        this(id, inventory, buffer.readBlockPos(), CommandCenterDashboardCodec.read(buffer));
     }
 
     CommandCenterOperationsMenu(int id, Inventory inventory, BlockPos hallPos) {
+        this(id, inventory, hallPos, captureDashboard(inventory, hallPos));
+    }
+
+    private CommandCenterOperationsMenu(
+            int id,
+            Inventory inventory,
+            BlockPos hallPos,
+            CommandCenterDashboardState dashboardState
+    ) {
         super(ModMenuTypes.COMMAND_CENTER_OPERATIONS.get(), id);
         this.hallPos = hallPos.immutable();
+        this.dashboardState = dashboardState;
     }
 
     @Override
@@ -73,14 +117,33 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
     }
 
     public boolean handleReplayAction(ServerPlayer player, UUID replayId, int buttonId) {
+        return handleReplayAction(player, replayId, buttonId, Optional.empty(), Optional.empty());
+    }
+
+    public boolean handleReplayAction(
+            ServerPlayer player,
+            UUID replayId,
+            int buttonId,
+            Optional<UUID> primaryTargetId,
+            Optional<UUID> secondaryTargetId
+    ) {
         if (!processedActionIds.add(replayId)) return false;
         while (processedActionIds.size() > 64) {
             processedActionIds.remove(processedActionIds.iterator().next());
         }
-        return executeAction(player, buttonId);
+        boolean result = executeAction(player, buttonId, primaryTargetId, secondaryTargetId);
+        if (player.containerMenu == this) {
+            refreshDashboard(player);
+        }
+        return result;
     }
 
-    private boolean executeAction(Player player, int buttonId) {
+    private boolean executeAction(
+            Player player,
+            int buttonId,
+            Optional<UUID> primaryTargetId,
+            Optional<UUID> secondaryTargetId
+    ) {
         if (!(player instanceof ServerPlayer serverPlayer)
                 || !(player.level() instanceof ServerLevel level)
                 || !(level.getBlockEntity(hallPos) instanceof CommandCenterBlockEntity hall)
@@ -95,6 +158,12 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
         if (buttonId == STORAGE) {
             serverPlayer.openMenu(hall);
             return true;
+        } else if (buttonId == NAVIGATION) {
+            if (!hall.canUse(player, galacticwars.clonewars.kingdom.KingdomPermission.TRAVEL)) {
+                return report(serverPlayer, false, "permission_denied");
+            }
+            serverPlayer.openMenu(new CommandCenterNavigationMenuProvider());
+            return true;
         } else if (buttonId == CLAIM_REWARDS) {
             success = ProgressionSavedData.get(level).claimCreditRewards(serverPlayer) > 0;
             if (!success) reason = "no_pending_rewards";
@@ -104,49 +173,84 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
             success = reason.equals("accepted");
         } else if (buttonId == MERGE_SQUADS) {
             var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
-            var groups = kingdom == null ? List.<galacticwars.clonewars.army.ArmyGroupRecord>of() : data.armyGroupsForKingdom(kingdom.id());
-            success = groups.size() >= 2 && data.mergeArmyGroups(
-                    player.getUUID(), groups.get(0).id(), groups.get(1).id());
+            var groups = kingdom == null ? List.<galacticwars.clonewars.army.ArmyGroupRecord>of()
+                    : data.armyGroupsForKingdom(kingdom.id());
+            var targetGroup = selectTarget(groups, primaryTargetId,
+                    galacticwars.clonewars.army.ArmyGroupRecord::id);
+            var sourceCandidates = targetGroup == null ? List.<galacticwars.clonewars.army.ArmyGroupRecord>of()
+                    : groups.stream().filter(group -> !group.id().equals(targetGroup.id())).toList();
+            var sourceGroup = selectTarget(sourceCandidates, secondaryTargetId,
+                    galacticwars.clonewars.army.ArmyGroupRecord::id);
+            success = targetGroup != null && sourceGroup != null && data.mergeArmyGroups(
+                    player.getUUID(), targetGroup.id(), sourceGroup.id());
+            if (!success && (targetGroup == null || sourceGroup == null)) {
+                reason = selectionReason(groups.size() >= 2,
+                        primaryTargetId.isEmpty() || secondaryTargetId.isEmpty());
+            }
         } else if (buttonId == PATROL_SQUAD) {
-            var group = data.kingdomForPlayer(player.getUUID()).stream()
-                    .flatMap(kingdom -> data.armyGroupsForKingdom(kingdom.id()).stream()).findFirst().orElse(null);
-            ArmyLocation center = new ArmyLocation(level.dimension().identifier().toString(),
-                    player.getX(), player.getY(), player.getZ());
+            var groups = data.kingdomForPlayer(player.getUUID())
+                    .map(kingdom -> data.armyGroupsForKingdom(kingdom.id())).orElse(List.of());
+            var group = selectTarget(groups, primaryTargetId,
+                    galacticwars.clonewars.army.ArmyGroupRecord::id);
+            ArmyLocation center = selectedCommandLocation(level, serverPlayer)
+                    .orElseGet(() -> new ArmyLocation(level.dimension().identifier().toString(),
+                            player.getX(), player.getY(), player.getZ()));
             success = group != null && data.startArmyPatrol(player.getUUID(), group.id(), center, List.of(
                     center, new ArmyLocation(center.dimensionId(), center.x() + 16, center.y(), center.z()),
                     new ArmyLocation(center.dimensionId(), center.x() + 16, center.y(), center.z() + 16),
                     new ArmyLocation(center.dimensionId(), center.x(), center.y(), center.z() + 16)));
-        } else if (buttonId >= CREATE_SQUAD && buttonId <= FOLLOW_SQUAD) {
+            if (!success && group == null) {
+                reason = selectionReason(!groups.isEmpty(), primaryTargetId.isEmpty());
+            }
+        } else if ((buttonId >= CREATE_SQUAD && buttonId <= FOLLOW_SQUAD)
+                || isDirectSquadAction(buttonId)) {
             var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
             var groups = kingdom == null ? List.<galacticwars.clonewars.army.ArmyGroupRecord>of()
                     : data.armyGroupsForKingdom(kingdom.id());
-            var group = groups.isEmpty() ? null : groups.getFirst();
+            var group = selectTarget(groups, primaryTargetId,
+                    galacticwars.clonewars.army.ArmyGroupRecord::id);
             ArmyLocation here = new ArmyLocation(level.dimension().identifier().toString(),
                     player.getX(), player.getY(), player.getZ());
+            ArmyLocation markedTarget = selectedCommandLocation(level, serverPlayer).orElse(here);
             if (buttonId == CREATE_SQUAD) {
-                UUID commander = kingdom == null ? null : kingdom.npcRoster().stream()
+                List<UUID> candidates = kingdom == null ? List.of() : kingdom.npcRoster().stream()
                         .filter(npc -> npc.serviceBranch()
                                 == galacticwars.clonewars.recruitment.NpcServiceBranch.MILITARY)
                         .map(galacticwars.clonewars.kingdom.KingdomNpcRecord::recruitId)
                         .filter(id -> level.getEntity(id) != null)
-                        .filter(id -> data.armyGroupForRecruit(id).isEmpty()).findFirst().orElse(null);
+                        .filter(id -> data.armyGroupForRecruit(id).isEmpty()).toList();
+                UUID commander = selectTarget(candidates, primaryTargetId, Function.identity());
                 success = commander != null && data.promoteCommander(player.getUUID(), commander)
                         && data.createOrReclaimArmyGroup(player.getUUID(), commander,
                         ArmyFormation.LINE, here, level.getGameTime()).isPresent();
+                if (!success && commander == null) {
+                    reason = selectionReason(!candidates.isEmpty(), primaryTargetId.isEmpty());
+                }
             } else if (buttonId == SPLIT_SQUAD) {
-                UUID commander = group == null || group.memberIds().isEmpty()
-                        ? null : group.memberIds().getFirst();
+                List<UUID> candidates = group == null ? List.of() : group.memberIds();
+                UUID commander = selectTarget(candidates, secondaryTargetId, Function.identity());
                 List<UUID> transferred = group == null ? List.of()
                         : group.memberIds().stream().skip(1)
                         .limit(Math.max(0, group.memberIds().size() / 2)).toList();
                 success = commander != null && data.splitArmyGroup(player.getUUID(), group.id(), commander,
                         transferred, "Split Squad", here, level.getGameTime()).isPresent();
+                if (!success && (group == null || commander == null)) {
+                    reason = selectionReason(!groups.isEmpty() && !candidates.isEmpty(),
+                            primaryTargetId.isEmpty() || secondaryTargetId.isEmpty());
+                }
             } else if (buttonId == CONFIGURE_SQUAD) {
-                Optional<UUID> claim = kingdom == null ? Optional.empty()
-                        : kingdom.claims().stream().findFirst().map(claimRecord -> claimRecord.id());
-                success = group != null && data.configureArmyGroup(player.getUUID(), group.id(),
+                List<galacticwars.clonewars.kingdom.KingdomClaim> claims = kingdom == null
+                        ? List.of() : kingdom.claims();
+                var claim = selectTarget(claims, secondaryTargetId,
+                        galacticwars.clonewars.kingdom.KingdomClaim::id);
+                boolean ambiguousClaim = claims.size() > 1 && secondaryTargetId.isEmpty();
+                success = !ambiguousClaim && group != null && data.configureArmyGroup(player.getUUID(), group.id(),
                         "Squad at " + player.getBlockX() + "," + player.getBlockZ(), here,
-                        group.patrolRoute(), claim);
+                        group.patrolRoute(), Optional.ofNullable(claim).map(
+                                galacticwars.clonewars.kingdom.KingdomClaim::id));
+                if (ambiguousClaim) {
+                    reason = "selection_required";
+                }
             } else if (buttonId == CYCLE_FORMATION) {
                 ArmyFormation formation = group == null ? ArmyFormation.LINE
                         : nextFormation(group.order().formation());
@@ -156,13 +260,145 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
                 success = group != null && hasSupplyCell(hall)
                         && data.changeArmySupply(player.getUUID(), group.id(), 16);
                 if (success) consumeSupplyCell(hall);
+            } else if (buttonId == HOLD_SQUAD || buttonId == MOVE_SQUAD) {
+                ArmyCommandType type = buttonId == HOLD_SQUAD
+                        ? ArmyCommandType.HOLD_POSITION : ArmyCommandType.MOVE_TO_POSITION;
+                ArmyLocation orderTarget = buttonId == HOLD_SQUAD && group != null
+                        ? group.simulation().anchor() : markedTarget;
+                success = group != null && data.issueArmyOrder(player.getUUID(), group.id(),
+                        new ArmyGroupOrder(type, Optional.of(orderTarget), Optional.empty(),
+                                group.order().formation(), group.order().spacing()));
+            } else if (buttonId == PROTECT_SQUAD || buttonId == CLEAR_SQUAD_TARGET) {
+                ArmyCommandType type = buttonId == PROTECT_SQUAD
+                        ? ArmyCommandType.PROTECT_OWNER : ArmyCommandType.CLEAR_TARGET;
+                success = group != null && data.issueArmyOrder(player.getUUID(), group.id(),
+                        new ArmyGroupOrder(type, Optional.empty(), Optional.empty(),
+                                group.order().formation(), group.order().spacing()));
+            } else if (buttonId == ATTACK_SQUAD_TARGET) {
+                List<CombatTargetSummary> targets = kingdom == null
+                        ? List.of() : nearbyCombatTargets(level, player, kingdom);
+                CombatTargetSummary target = selectTarget(
+                        targets, secondaryTargetId, CombatTargetSummary::entityId);
+                LivingEntity targetEntity = target == null ? null
+                        : level.getEntity(target.entityId()) instanceof LivingEntity living ? living : null;
+                success = group != null && targetEntity != null && targetEntity.isAlive()
+                        && !group.contains(targetEntity.getUUID())
+                        && data.issueArmyOrder(player.getUUID(), group.id(),
+                        new ArmyGroupOrder(ArmyCommandType.ATTACK_TARGET,
+                                Optional.of(new ArmyLocation(
+                                        level.dimension().identifier().toString(),
+                                        targetEntity.getX(), targetEntity.getY(), targetEntity.getZ())),
+                                Optional.of(targetEntity.getUUID()), group.order().formation(),
+                                group.order().spacing()));
+                if (!success && target == null) {
+                    reason = selectionReason(!targets.isEmpty(), secondaryTargetId.isEmpty());
+                }
+            } else if (buttonId == SET_SQUAD_RALLY) {
+                success = group != null && data.configureArmyGroup(
+                        player.getUUID(), group.id(), group.name(), markedTarget,
+                        group.patrolRoute(), group.defendedClaimId());
             } else {
                 success = group != null && data.issueArmyOrder(player.getUUID(), group.id(),
                         ArmyGroupOrder.follow(group.order().formation()));
             }
+            if (!success && reason.equals("action_rejected") && group == null
+                    && buttonId != CREATE_SQUAD) {
+                reason = selectionReason(!groups.isEmpty(), primaryTargetId.isEmpty());
+            }
+        } else if (buttonId == RESUME_WORKER
+                || buttonId == RECALL_WORKER
+                || buttonId == PAUSE_WORKER) {
+            var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
+            if (kingdom == null || !hall.canUse(player,
+                    galacticwars.clonewars.kingdom.KingdomPermission.MANAGE_WORKSITES)) {
+                return report(serverPlayer, false, "permission_denied");
+            }
+            List<WorkerSummary> workers = loadedWorkers(level, player, kingdom);
+            WorkerSummary selected = selectTarget(workers, primaryTargetId, WorkerSummary::entityId);
+            galacticwars.clonewars.entity.GalacticRecruitEntity worker = selected == null ? null
+                    : level.getEntity(selected.entityId())
+                    instanceof galacticwars.clonewars.entity.GalacticRecruitEntity recruit ? recruit : null;
+            success = worker != null && switch (buttonId) {
+                case RESUME_WORKER -> worker.resumeWorkFromCommandCenter(serverPlayer);
+                case RECALL_WORKER -> worker.recallWorkerToCommandCenter(serverPlayer, hallPos);
+                case PAUSE_WORKER -> worker.pauseWorkerFromCommandCenter(serverPlayer);
+                default -> false;
+            };
+            if (!success && worker == null) {
+                reason = selectionReason(!workers.isEmpty(), primaryTargetId.isEmpty());
+            }
+        } else if (buttonId >= PREPARE_PROJECTOR_FIRST
+                && buttonId < PREPARE_PROJECTOR_FIRST + 4) {
+            var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
+            if (kingdom == null
+                    || !hall.canUse(player, galacticwars.clonewars.kingdom.KingdomPermission.BUILD)
+                    || !hall.canUse(player,
+                    galacticwars.clonewars.kingdom.KingdomPermission.MANAGE_WORKSITES)) {
+                return report(serverPlayer, false, "permission_denied");
+            }
+            var blueprints = List.copyOf(GameplayDataManager.snapshot().blueprints().values());
+            var blueprint = selectTarget(blueprints, primaryTargetId,
+                    value -> CommandCenterDashboardState.BlueprintSummary.targetId(value.id()));
+            List<UUID> builders = kingdom.npcRoster().stream()
+                    .map(galacticwars.clonewars.kingdom.KingdomNpcRecord::recruitId)
+                    .filter(id -> level.getEntity(id)
+                            instanceof galacticwars.clonewars.entity.GalacticRecruitEntity recruit
+                            && recruit.isAlive()
+                            && recruit.getRecruitDuty()
+                            != galacticwars.clonewars.recruitment.RecruitDuty.COMMANDER)
+                    .toList();
+            UUID builderId = selectTarget(builders, secondaryTargetId, Function.identity());
+            int rotationSteps = buttonId - PREPARE_PROJECTOR_FIRST;
+            if (blueprint == null || builderId == null) {
+                return report(serverPlayer, false, selectionReason(
+                        !blueprints.isEmpty() && !builders.isEmpty(),
+                        primaryTargetId.isEmpty() || secondaryTargetId.isEmpty()));
+            }
+            if (!blueprint.supportsRotationSteps(rotationSteps)) {
+                return report(serverPlayer, false, "rotation_unavailable");
+            }
+            ItemStack projector = ItemStack.EMPTY;
+            for (int slot = 0; slot < serverPlayer.getInventory().getContainerSize(); slot++) {
+                ItemStack candidate = serverPlayer.getInventory().getItem(slot);
+                if (candidate.is(ModItems.BLUEPRINT_PROJECTOR.get())) {
+                    projector = candidate;
+                    break;
+                }
+            }
+            if (projector.isEmpty()) {
+                projector = new ItemStack(ModItems.BLUEPRINT_PROJECTOR.get());
+                projector.set(ModDataComponents.CONSTRUCTION_PLAN.get(), new ConstructionPlan(
+                        blueprint.id(), rotationSteps, builderId, kingdom.id()));
+                if (!serverPlayer.getInventory().add(projector)) {
+                    serverPlayer.drop(projector, false);
+                }
+            } else {
+                projector.set(ModDataComponents.CONSTRUCTION_PLAN.get(), new ConstructionPlan(
+                        blueprint.id(), rotationSteps, builderId, kingdom.id()));
+            }
+            report(serverPlayer, true, "projector_prepared");
+            serverPlayer.closeContainer();
+            return true;
+        } else if (buttonId == CANCEL_BUILD_PROJECT) {
+            var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
+            List<BuildProject> projects = kingdom == null ? List.of()
+                    : kingdom.settlement().buildProjects().stream()
+                    .filter(project -> project.state() == BuildProjectState.ACTIVE
+                            || project.state() == BuildProjectState.BLOCKED)
+                    .toList();
+            BuildProject project = selectTarget(projects, primaryTargetId, BuildProject::id);
+            var cancelled = project == null
+                    ? null : ConstructionProjectService.cancel(level, serverPlayer, project.id());
+            success = cancelled != null && cancelled.accepted();
+            if (cancelled != null) {
+                reason = cancelled.reason();
+            } else {
+                reason = selectionReason(!projects.isEmpty(), primaryTargetId.isEmpty());
+            }
         } else if (buttonId == REGISTER_OUTPOST) {
             var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
-            BuildProject project = kingdom == null ? null : kingdom.settlement().buildProjects().stream()
+            List<BuildProject> candidates = kingdom == null ? List.of()
+                    : kingdom.settlement().buildProjects().stream()
                     .filter(candidate -> candidate.state() == BuildProjectState.COMPLETED)
                     .filter(candidate -> KingdomBaseBlueprint.path(candidate.blueprintId())
                             .equals("forward_base"))
@@ -174,40 +410,69 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
                                     && settlement.hallY() == candidate.originY()
                                     && settlement.hallZ() == candidate.originZ()))
                     .filter(candidate -> completedProjectStillExists(level, candidate))
-                    .findFirst().orElse(null);
+                    .toList();
+            BuildProject project = selectTarget(candidates, primaryTargetId, BuildProject::id);
             success = project != null && data.addOutpost(player.getUUID(), SettlementRecord.create(
                     project.dimensionId(), project.originX(), project.originY(), project.originZ())).isPresent();
-            if (!success) reason = "completed_forward_base_required";
+            if (!success) {
+                reason = candidates.size() > 1 && primaryTargetId.isEmpty()
+                        ? "selection_required" : "completed_forward_base_required";
+            }
         } else if (buttonId == INVITE_NEAREST) {
-            ServerPlayer target = nearestOtherPlayer(serverPlayer);
+            var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
+            List<ServerPlayer> candidates = nearbyInvitePlayers(
+                    level, serverPlayer, kingdom, data);
+            ServerPlayer target = selectTarget(candidates, primaryTargetId, ServerPlayer::getUUID);
             success = target != null && data.inviteMember(player.getUUID(), target.getUUID(),
                     KingdomMemberRole.MEMBER, level.getGameTime() + 12000L).isPresent();
+            if (!success && target == null) {
+                reason = selectionReason(!candidates.isEmpty(), primaryTargetId.isEmpty());
+            }
         } else if (buttonId == ACCEPT_INVITE || buttonId == REJECT_INVITE) {
-            var invite = data.pendingInvites().stream()
-                    .filter(candidate -> candidate.targetPlayerId().equals(player.getUUID())).findFirst().orElse(null);
+            var invites = data.pendingInvites().stream()
+                    .filter(candidate -> candidate.targetPlayerId().equals(player.getUUID()))
+                    .filter(candidate -> candidate.expiresGameTime() >= level.getGameTime()).toList();
+            var invite = selectTarget(invites, primaryTargetId,
+                    galacticwars.clonewars.kingdom.KingdomInvite::id);
             String faction = ProgressionSavedData.get(level).state(player.getUUID()).factionId();
             success = invite != null && data.respondToInvite(player.getUUID(), invite.id(),
                     buttonId == ACCEPT_INVITE,
                     faction, level.getGameTime());
+            if (!success && invite == null) {
+                reason = selectionReason(!invites.isEmpty(), primaryTargetId.isEmpty());
+            }
         } else if (buttonId == CYCLE_MEMBER_ROLE || buttonId == REMOVE_MEMBER) {
             var kingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
-            var member = kingdom == null ? null : kingdom.members().stream()
+            var members = kingdom == null ? List.<galacticwars.clonewars.kingdom.KingdomMember>of()
+                    : kingdom.members().stream()
                     .filter(candidate -> !candidate.playerId().equals(kingdom.ownerId())
-                            && !candidate.playerId().equals(player.getUUID())).findFirst().orElse(null);
+                            && !candidate.playerId().equals(player.getUUID())).toList();
+            var member = selectTarget(members, primaryTargetId,
+                    galacticwars.clonewars.kingdom.KingdomMember::playerId);
             success = member != null && (buttonId == REMOVE_MEMBER
                     ? data.removeMember(player.getUUID(), member.playerId())
                     : data.updateMemberRole(player.getUUID(), member.playerId(), nextRole(member.role())));
+            if (!success && member == null) {
+                reason = selectionReason(!members.isEmpty(), primaryTargetId.isEmpty());
+            }
         } else {
             var own = data.kingdomForPlayer(player.getUUID()).orElse(null);
-            var other = data.kingdoms().stream().filter(kingdom -> own != null && !kingdom.id().equals(own.id()))
-                    .findFirst().orElse(null);
+            var others = data.kingdoms().stream()
+                    .filter(kingdom -> own != null && !kingdom.id().equals(own.id())).toList();
+            var other = selectTarget(others, primaryTargetId,
+                    galacticwars.clonewars.kingdom.KingdomRecord::id);
             if (buttonId == ACCEPT_DIPLOMACY || buttonId == REJECT_DIPLOMACY) {
-                var proposal = data.pendingDiplomacy().stream()
+                var proposals = data.pendingDiplomacy().stream()
                         .filter(candidate -> own != null && candidate.targetKingdomId().equals(own.id()))
-                        .findFirst().orElse(null);
+                        .filter(candidate -> candidate.expiresGameTime() >= level.getGameTime()).toList();
+                var proposal = selectTarget(proposals, primaryTargetId,
+                        galacticwars.clonewars.kingdom.DiplomacyProposal::id);
                 success = proposal != null && data.respondToDiplomacy(player.getUUID(), proposal.id(),
                         buttonId == ACCEPT_DIPLOMACY,
                         level.getGameTime(), 2400L);
+                if (!success && proposal == null) {
+                    reason = selectionReason(!proposals.isEmpty(), primaryTargetId.isEmpty());
+                }
             } else if (buttonId == PROPOSE_ALLIANCE) {
                 success = other != null && data.proposeAlliance(player.getUUID(), other.id(),
                         level.getGameTime(), 24000L, 12000L).isPresent();
@@ -218,9 +483,83 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
                 success = other != null && data.setEmbargo(player.getUUID(), other.id(), true,
                         level.getGameTime(), 2400L);
             } else return false;
+            if (!success && reason.equals("action_rejected") && other == null
+                    && buttonId != ACCEPT_DIPLOMACY && buttonId != REJECT_DIPLOMACY) {
+                reason = selectionReason(!others.isEmpty(), primaryTargetId.isEmpty());
+            }
         }
         if (success && reason.equals("action_rejected")) reason = "accepted";
         return report(serverPlayer, success, reason);
+    }
+
+    public CommandCenterDashboardState dashboardState() {
+        return dashboardState;
+    }
+
+    public void applyClientDashboard(CommandCenterDashboardState state) {
+        if (state.generatedGameTime() >= dashboardState.generatedGameTime()) {
+            this.dashboardState = state;
+            this.dashboardRevision++;
+        }
+    }
+
+    public int dashboardRevision() {
+        return dashboardRevision;
+    }
+
+    private void refreshDashboard(ServerPlayer player) {
+        this.dashboardState = captureDashboard(player.getInventory(), hallPos);
+        GalacticNetwork.CHANNEL.sendToPlayer(
+                () -> player,
+                new CommandCenterStatePayload(containerId, dashboardState));
+    }
+
+    private static CommandCenterDashboardState captureDashboard(
+            Inventory inventory,
+            BlockPos hallPos
+    ) {
+        Player player = inventory.player;
+        if (!(player instanceof ServerPlayer serverPlayer)
+                || !(serverPlayer.level() instanceof ServerLevel level)
+                || !(level.getBlockEntity(hallPos) instanceof CommandCenterBlockEntity hall)
+                || hall.ownerId() == null) {
+            return CommandCenterDashboardState.empty(player.getUUID(),
+                    Math.max(0L, player.level().getGameTime()));
+        }
+        KingdomSavedData data = KingdomSavedData.get(level);
+        var kingdom = data.kingdomForOwner(hall.ownerId()).orElse(null);
+        if (kingdom == null) {
+            return CommandCenterDashboardState.empty(player.getUUID(), level.getGameTime());
+        }
+        List<UUID> commandCandidates = kingdom.npcRoster().stream()
+                .filter(npc -> npc.serviceBranch()
+                        == galacticwars.clonewars.recruitment.NpcServiceBranch.MILITARY)
+                .map(galacticwars.clonewars.kingdom.KingdomNpcRecord::recruitId)
+                .filter(id -> level.getEntity(id) != null)
+                .filter(id -> data.armyGroupForRecruit(id).isEmpty())
+                .toList();
+        List<UUID> constructionBuilders = kingdom.npcRoster().stream()
+                .map(galacticwars.clonewars.kingdom.KingdomNpcRecord::recruitId)
+                .filter(id -> level.getEntity(id) instanceof galacticwars.clonewars.entity.GalacticRecruitEntity recruit
+                        && recruit.isAlive()
+                        && recruit.getRecruitDuty()
+                                != galacticwars.clonewars.recruitment.RecruitDuty.COMMANDER)
+                .toList();
+        return CommandCenterDashboardState.capture(
+                player.getUUID(), kingdom, data.armyGroupsForKingdom(kingdom.id()), commandCandidates,
+                nearbyCombatTargets(level, player, kingdom),
+                loadedWorkers(level, player, kingdom),
+                constructionBuilders,
+                List.copyOf(GameplayDataManager.snapshot().blueprints().values()),
+                nearbyInvitePlayers(level, serverPlayer, kingdom, data).stream()
+                        .map(target -> new NearbyPlayerSummary(
+                                target.getUUID(), target.getDisplayName().getString(),
+                                Math.max(0, (int) Math.round(Math.sqrt(
+                                        player.distanceToSqr(target))))))
+                        .toList(),
+                ProgressionSavedData.get(level).state(player.getUUID()), hall.treasuryCredits(),
+                hall.upkeepPaid(), data.kingdoms(), data.pendingInvites(), data.pendingDiplomacy(),
+                level.getGameTime());
     }
 
     @Override
@@ -269,14 +608,126 @@ public final class CommandCenterOperationsMenu extends AbstractContainerMenu {
         player.sendSystemMessage(Component.translatable(
                 success ? "message.galacticwars.operations.accepted"
                         : "message.galacticwars.operations.rejected",
-                reason));
+                Component.translatable("reason.galacticwars.operations." + reason)));
         return success;
     }
 
-    private static ServerPlayer nearestOtherPlayer(ServerPlayer player) {
-        return ((ServerLevel) player.level()).players().stream().filter(other -> other != player)
-                .min(java.util.Comparator.comparingDouble((ServerPlayer other) -> player.distanceToSqr(other)))
-                .orElse(null);
+    private static List<ServerPlayer> nearbyInvitePlayers(
+            ServerLevel level,
+            ServerPlayer player,
+            KingdomRecord kingdom,
+            KingdomSavedData data
+    ) {
+        if (kingdom == null) {
+            return List.of();
+        }
+        return level.players().stream()
+                .filter(other -> other != player && other.isAlive() && !other.isSpectator())
+                .filter(other -> player.distanceToSqr(other) <= INVITE_RANGE_SQUARED)
+                .filter(other -> kingdom.member(other.getUUID()).isEmpty())
+                .filter(other -> data.kingdomForPlayer(other.getUUID()).isEmpty())
+                .sorted(Comparator.comparingDouble((ServerPlayer other) -> player.distanceToSqr(other))
+                        .thenComparing(ServerPlayer::getUUID))
+                .limit(16)
+                .toList();
+    }
+
+    private static <T> T selectTarget(
+            List<T> candidates,
+            Optional<UUID> requestedId,
+            Function<T, UUID> id
+    ) {
+        return CommandTargetResolver.resolve(candidates, requestedId, id).target().orElse(null);
+    }
+
+    private static String selectionReason(boolean hasCandidates, boolean selectionMissing) {
+        return hasCandidates && selectionMissing ? "selection_required" : "target_unavailable";
+    }
+
+    private static boolean isDirectSquadAction(int buttonId) {
+        return buttonId >= HOLD_SQUAD && buttonId <= SET_SQUAD_RALLY;
+    }
+
+    private static List<CombatTargetSummary> nearbyCombatTargets(
+            ServerLevel level,
+            Player player,
+            KingdomRecord kingdom
+    ) {
+        java.util.Set<UUID> ownRecruitIds = kingdom.npcRoster().stream()
+                .map(galacticwars.clonewars.kingdom.KingdomNpcRecord::recruitId)
+                .collect(java.util.stream.Collectors.toSet());
+        List<galacticwars.clonewars.entity.GalacticRecruitEntity> ownedMilitary = ownRecruitIds.stream()
+                .map(level::getEntity)
+                .filter(galacticwars.clonewars.entity.GalacticRecruitEntity.class::isInstance)
+                .map(galacticwars.clonewars.entity.GalacticRecruitEntity.class::cast)
+                .filter(recruit -> recruit.isAlive()
+                        && recruit.getServiceBranch()
+                        == galacticwars.clonewars.recruitment.NpcServiceBranch.MILITARY)
+                .toList();
+        return level.getEntitiesOfClass(
+                        LivingEntity.class,
+                        player.getBoundingBox().inflate(32.0D),
+                        target -> target != player && target.isAlive() && !target.isInvulnerable())
+                .stream()
+                .filter(target -> !ownRecruitIds.contains(target.getUUID()))
+                .filter(target -> target instanceof Monster
+                        || target instanceof galacticwars.clonewars.entity.GalacticRecruitEntity recruit
+                        && ownedMilitary.stream().anyMatch(source ->
+                        source.isHostileFactionRecruit(recruit)))
+                .sorted(Comparator.comparingDouble(
+                                (LivingEntity target) -> player.distanceToSqr(target))
+                        .thenComparing(LivingEntity::getUUID))
+                .limit(32)
+                .map(target -> new CombatTargetSummary(
+                        target.getUUID(), target.getDisplayName().getString(),
+                        target instanceof galacticwars.clonewars.entity.GalacticRecruitEntity recruit
+                                ? recruit.getRecruitFactionId() : "minecraft:hostile",
+                        Math.max(0, (int) Math.round(Math.sqrt(player.distanceToSqr(target))))))
+                .toList();
+    }
+
+    private static List<WorkerSummary> loadedWorkers(
+            ServerLevel level,
+            Player player,
+            KingdomRecord kingdom
+    ) {
+        String dimensionId = level.dimension().identifier().toString();
+        return kingdom.npcRoster().stream()
+                .map(galacticwars.clonewars.kingdom.KingdomNpcRecord::recruitId)
+                .map(level::getEntity)
+                .filter(galacticwars.clonewars.entity.GalacticRecruitEntity.class::isInstance)
+                .map(galacticwars.clonewars.entity.GalacticRecruitEntity.class::cast)
+                .filter(recruit -> recruit.isAlive() && recruit.getWorkerProfession().isPresent())
+                .map(recruit -> {
+                    var assignment = recruit.getWorkerAssignment();
+                    var status = recruit.getWorkerStatus();
+                    Optional<PositionSummary> worksite = assignment.map(value -> new PositionSummary(
+                            value.dimensionId(), value.workX(), value.workY(), value.workZ()));
+                    Optional<PositionSummary> storage = Optional.ofNullable(recruit.getStorageTarget())
+                            .map(pos -> new PositionSummary(
+                                    dimensionId, pos.getX(), pos.getY(), pos.getZ()));
+                    Optional<PositionSummary> activeTarget = status.target()
+                            .map(target -> new PositionSummary(
+                                    target.dimensionId(), target.x(), target.y(), target.z()));
+                    return new WorkerSummary(
+                            recruit.getUUID(), recruit.getDisplayName().getString(),
+                            recruit.getWorkerProfession().orElseThrow().id(),
+                            recruit.getRecruitCommand().name(), status.phase().id(), status.reasonCode(),
+                            worksite, assignment.map(value -> value.radius()).orElse(0),
+                            storage, activeTarget, assignment.flatMap(value -> value.workOrderId()),
+                            recruit.getWorkerCarriedItemCount(), recruit.getWorkerStorageItemCount(),
+                            Math.max(0, (int) Math.round(Math.sqrt(player.distanceToSqr(recruit)))));
+                })
+                .toList();
+    }
+
+    private static Optional<ArmyLocation> selectedCommandLocation(
+            ServerLevel level,
+            ServerPlayer player
+    ) {
+        return CommandTargetSelection.blockFromInventory(player).map(pos -> new ArmyLocation(
+                level.dimension().identifier().toString(),
+                pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D));
     }
 
     private static KingdomMemberRole nextRole(KingdomMemberRole role) {

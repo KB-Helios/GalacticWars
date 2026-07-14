@@ -6,14 +6,32 @@ instance and YACL plus GeckoLib enabled.
 
 ## Automated gates
 
-- `clean build --no-daemon`: passed on 2026-07-13.
-- `runGameTestServer --no-daemon`: 29/29 required GameTests passed.
+- `clean build`: passed on 2026-07-14.
+- `runGameTestServer`: 46/46 required GameTests passed, including direct
+  Command Center player interaction, all five campaign paths, NPC brains,
+  vehicles, Force abilities, multiplayer authority, travel, and persistence.
 - Spawn eggs: all 20 registry entries passed player-game-mode interaction,
   entity-type component, persistence, loadout/archetype, creative/survival,
   replaceable-block, custom-name, stack-consumption, and spawner checks.
 - Assets: every authored item model has a modern item definition and every
   inherited model texture resolves to a PNG.
 - Client log: no `galacticwars` missing-model or missing-texture warning.
+
+## Command Center client acceptance
+
+The 2026-07-14 fresh creative-world pass used a 571x350 client window to stress
+the responsive layout. The Command Center rendered with its directional model,
+opened the five-faction pledge screen on placement, committed a Galactic
+Republic pledge, and reopened into the synchronized operations dashboard.
+
+- Overview, Campaign, Construction, Squads, Workforce, Kingdom, Diplomacy, and
+  Storage tabs rendered and remained usable at the small viewport.
+- Multi-page action controls advanced and returned without overlapping the
+  dashboard frame.
+- Campaign Chapter 1 showed the pledged and Command Center requirements as
+  complete and named the physical Clone Trooper hiring objective.
+- World save, integrated-server shutdown, and client exit completed cleanly.
+- Labels found too long during the pass were shortened before the final build.
 
 ## Lightsaber acceptance
 
