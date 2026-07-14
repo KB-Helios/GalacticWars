@@ -64,10 +64,7 @@ public record CommandTargetSelection(
         if (level.getEntity(targetId) instanceof LivingEntity living && living.isAlive()) {
             return Optional.of(living);
         }
-        for (var entity : level.getAllEntities()) {
-            if (entity.getUUID().equals(targetId) && entity instanceof LivingEntity living && living.isAlive()) {
-                return Optional.of(living);
-            }
+        return Optional.empty();
         }
         return Optional.empty();
     }
