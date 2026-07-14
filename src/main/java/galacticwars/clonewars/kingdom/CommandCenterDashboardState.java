@@ -557,9 +557,7 @@ public record CommandCenterDashboardState(
             Objects.requireNonNull(playerId, "playerId");
             displayName = Objects.requireNonNullElse(displayName, "").trim();
             if (displayName.isEmpty() || displayName.length() > 64
-                    || distanceBlocks < 0 || distanceBlocks > 16) {
-                throw new IllegalArgumentException("invalid nearby player dashboard summary");
-            }
+                    || distanceBlocks < 0) {
         }
     }
 
