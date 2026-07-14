@@ -20,7 +20,7 @@ public final class AssetReferenceIntegrityTest {
     private static final Path RESOURCE_ROOT = Path.of("src/main/resources");
     private static final Path MOD_ASSET_ROOT = RESOURCE_ROOT.resolve("assets/galacticwars");
     private static final Path MOD_DATA_ROOT = RESOURCE_ROOT.resolve("data/galacticwars");
-    private static final Path BUILT_JAR = Path.of("build/libs/galacticwars-1.0.0.jar");
+    private static final Path GRADLE_PROPERTIES = Path.of("gradle.properties");
     private static final Pattern MOD_REFERENCE = Pattern.compile("\"(galacticwars:(?:block|item)/[^\"]+)\"");
     private static final Pattern TEXTURES_OBJECT = Pattern.compile(
             "\"textures\"\\s*:\\s*\\{([^}]*)}", Pattern.DOTALL);
@@ -128,14 +128,24 @@ public final class AssetReferenceIntegrityTest {
     }
 
     private static void builtJarContainsModAssetsAndData() throws IOException {
-        assertRegularFile(BUILT_JAR, "built mod jar");
-        try (ZipFile jar = new ZipFile(BUILT_JAR.toFile())) {
+        Path builtJar = builtJar();
+        assertRegularFile(builtJar, "built mod jar");
+        try (ZipFile jar = new ZipFile(builtJar.toFile())) {
             for (String entry : sourceResourceEntries()) {
                 if (jar.getEntry(entry) == null) {
                     throw new AssertionError("built jar missing resource <" + entry + ">");
                 }
             }
         }
+    }
+
+    private static Path builtJar() throws IOException {
+        String version = Files.readAllLines(GRADLE_PROPERTIES).stream()
+                .filter(line -> line.startsWith("mod_version="))
+                .map(line -> line.substring("mod_version=".length()).trim())
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("mod_version missing from " + GRADLE_PROPERTIES));
+        return Path.of("build/libs/galacticwars-" + version + ".jar");
     }
 
     private static Set<String> sourceResourceEntries() throws IOException {
