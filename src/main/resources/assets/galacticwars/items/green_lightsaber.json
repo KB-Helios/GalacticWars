@@ -1,1 +1,9 @@
-{"model":{"type":"minecraft:model","model":"galacticwars:item/green_lightsaber"}}
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "galacticwars:item/green_lightsaber",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
-  "parent": "minecraft:item/generated",
+  "parent": "galacticwars:item/spawn_capsule_base",
   "textures": {
-    "layer0": "galacticwars:item/clone_trooper_spawn_egg"
+    "particle": "galacticwars:item/clone_trooper_spawn_egg"
   }
 }

@@ -24,6 +24,9 @@ ENTITY_TEXTURES = ASSETS / "textures/entity"
 ARMOR_MODELS = ASSETS / "geckolib/models/armor"
 ARMOR_ANIMATIONS = ASSETS / "geckolib/animations/armor"
 ARMOR_TEXTURES = ASSETS / "textures/armor"
+ITEM_GEO_MODELS = ASSETS / "geckolib/models/item"
+ITEM_GEO_ANIMATIONS = ASSETS / "geckolib/animations/item"
+SPAWN_CAPSULE_TEXTURES = ASSETS / "textures/item/spawn_capsule"
 ITEM_DEFINITIONS = ASSETS / "items"
 ITEM_MODELS = ASSETS / "models/item"
 ITEM_TEXTURES = ASSETS / "textures/item"
@@ -799,39 +802,155 @@ def armor_bones(builder: ModelBuilder) -> None:
     builder.bone("armorLeftBoot", [1.9, 12, 0], "bipedLeftLeg")
 
 
-def add_armor_layering(
+def add_common_armor(
         builder: ModelBuilder,
         primary_plate: str,
         secondary_plate: str,
 ) -> None:
-    """Break the vanilla cuboid silhouette into readable overlapping armor plates."""
+    """Author a segmented suit around the exact GeckoLib humanoid armor anchors."""
+    builder.cube("armorBody", "torso_undersuit", [-4, 12, -2], [8, 12, 4], "dark", inflate=0.2)
+    builder.cube("armorBody", "collar", [-4.35, 21.5, -2.45], [8.7, 1.8, 4.9], primary_plate)
     builder.cube(
-        "armorHead", "helmet_brow", [-3.8, 28.65, -5.05], [7.6, 0.75, 0.65],
-        primary_plate)
+        "armorBody", "right_pectoral", [-4.25, 17.7, -2.9], [3.95, 4.1, 1.05],
+        primary_plate, rotation=[0, 0, -5], pivot=[-2.15, 20.0, -2.5])
     builder.cube(
-        "armorHead", "right_cheek_plate", [-3.55, 24.55, -4.98], [2.5, 2.75, 0.62],
-        primary_plate, rotation=[0, 0, 7], pivot=[-2.2, 25.8, -4.7])
+        "armorBody", "left_pectoral", [0.3, 17.7, -2.9], [3.95, 4.1, 1.05],
+        primary_plate, rotation=[0, 0, 5], pivot=[2.15, 20.0, -2.5])
+    builder.cube("armorBody", "sternum_insert", [-0.65, 17.2, -3.02], [1.3, 4.6, 1.1], "accent")
+    builder.cube("armorBody", "upper_abdomen", [-3.5, 15.0, -2.75], [7, 2.4, 0.9], secondary_plate)
+    builder.cube("armorBody", "lower_abdomen", [-3.15, 12.9, -2.65], [6.3, 1.9, 0.8], "shadow")
+    builder.cube("armorBody", "backplate", [-4.2, 14.2, 1.85], [8.4, 7.9, 1.15], primary_plate)
+    builder.cube("armorBody", "back_spine", [-0.7, 14.8, 2.9], [1.4, 6.4, 0.65], "accent")
+    builder.cube("armorBody", "utility_belt", [-4.55, 11.35, -2.55], [9.1, 1.75, 5.1], "shadow")
+    builder.cube("armorBody", "belt_buckle", [-1.15, 11.15, -2.92], [2.3, 2.0, 0.65], "accent")
+    builder.cube("armorBody", "right_belt_pouch", [-4.7, 11.1, -2.9], [2.05, 2.15, 1.0], secondary_plate)
+    builder.cube("armorBody", "left_belt_pouch", [2.65, 11.1, -2.9], [2.05, 2.15, 1.0], secondary_plate)
+    builder.cube("armorBody", "codpiece", [-1.8, 9.25, -2.68], [3.6, 2.2, 0.85], secondary_plate)
+
+    for side, bone, x, direction in (
+            ("right", "armorRightArm", -8.0, -1),
+            ("left", "armorLeftArm", 4.0, 1)):
+        builder.cube(bone, f"{side}_arm_undersuit", [x, 12, -2], [4, 12, 4], "dark", inflate=0.2)
+        builder.cube(
+            bone, f"{side}_shoulder_bell", [x - 0.55, 18.8, -2.65], [5.1, 4.5, 5.3],
+            primary_plate, rotation=[0, 0, direction * 5], pivot=[x + 2.0, 21.2, 0])
+        builder.cube(bone, f"{side}_bicep_plate", [x - 0.1, 16.8, -2.45], [4.2, 2.2, 4.9], secondary_plate)
+        builder.cube(bone, f"{side}_elbow_guard", [x - 0.28, 15.0, -2.92], [4.55, 2.0, 1.05], "accent")
+        builder.cube(bone, f"{side}_forearm_bracer", [x - 0.22, 12.15, -2.52], [4.45, 3.25, 5.05], primary_plate)
+        builder.cube(bone, f"{side}_wrist_cuff", [x - 0.1, 11.75, -2.3], [4.2, 1.15, 4.6], "shadow")
+
+    for side, leg_bone, boot_bone, x in (
+            ("right", "armorRightLeg", "armorRightBoot", -4.0),
+            ("left", "armorLeftLeg", "armorLeftBoot", 0.0)):
+        builder.cube(leg_bone, f"{side}_leg_undersuit", [x, 0, -2], [4, 12, 4], "dark", inflate=0.18)
+        builder.cube(leg_bone, f"{side}_thigh_shell", [x - 0.12, 6.3, -2.42], [4.25, 5.2, 4.85], primary_plate)
+        builder.cube(leg_bone, f"{side}_thigh_front", [x + 0.35, 7.0, -2.92], [3.3, 3.8, 0.65], secondary_plate)
+        builder.cube(leg_bone, f"{side}_knee_guard", [x - 0.28, 4.1, -2.95], [4.55, 2.3, 1.2], "accent")
+        builder.cube(boot_bone, f"{side}_shin_guard", [x - 0.15, 0.5, -2.55], [4.3, 3.8, 5.1], primary_plate)
+        builder.cube(boot_bone, f"{side}_boot_shell", [x - 0.3, -0.05, -2.85], [4.6, 2.0, 5.7], secondary_plate)
+        builder.cube(boot_bone, f"{side}_boot_toe", [x - 0.38, -0.35, -3.35], [4.75, 1.3, 6.7], "shadow")
+
+
+def add_republic_helmet(builder: ModelBuilder) -> None:
+    """Original white legion helmet with a clone-infantry silhouette and true layered depth."""
+    builder.cube("armorHead", "helmet_shell", [-4, 24, -4], [8, 8, 8], "light", inflate=0.42)
+    builder.cube("armorHead", "helmet_crown", [-3.55, 31.45, -3.55], [7.1, 1.25, 7.1], "light")
+    builder.cube("armorHead", "helmet_fin", [-0.65, 31.8, -3.2], [1.3, 1.25, 6.4], "accent")
+    builder.cube("armorHead", "helmet_brow", [-3.8, 28.7, -4.72], [7.6, 0.75, 0.75], "light")
+    builder.cube("armorHead", "visor_bar", [-3.45, 27.75, -4.82], [6.9, 1.05, 0.72], "dark")
+    builder.cube("armorHead", "visor_nose", [-0.58, 25.95, -4.88], [1.16, 1.9, 0.78], "dark")
     builder.cube(
-        "armorHead", "left_cheek_plate", [1.05, 24.55, -4.98], [2.5, 2.75, 0.62],
-        primary_plate, rotation=[0, 0, -7], pivot=[2.2, 25.8, -4.7])
+        "armorHead", "right_cheek_plate", [-3.72, 24.75, -4.9], [2.72, 2.8, 0.72],
+        "light", rotation=[0, 0, 8], pivot=[-2.2, 26.0, -4.6])
     builder.cube(
-        "armorBody", "right_pectoral", [-4.15, 18.0, -3.08], [3.85, 4.25, 0.58],
-        primary_plate, rotation=[0, 0, -6], pivot=[-2.2, 20.2, -2.8])
+        "armorHead", "left_cheek_plate", [1.0, 24.75, -4.9], [2.72, 2.8, 0.72],
+        "light", rotation=[0, 0, -8], pivot=[2.2, 26.0, -4.6])
+    builder.cube("armorHead", "mouth_grille", [-2.25, 24.25, -5.0], [4.5, 1.35, 0.82], "shadow")
+    for index, x in enumerate((-1.55, -0.55, 0.45, 1.45)):
+        builder.cube("armorHead", f"mouth_vent_{index}", [x, 24.4, -5.12], [0.35, 1.0, 0.28], "light")
+    builder.cube("armorHead", "chin_plate", [-1.65, 23.85, -4.82], [3.3, 0.8, 1.0], "light")
+    builder.cube("armorHead", "right_ear_module", [-4.82, 26.1, -2.2], [1.05, 3.4, 4.4], "base")
+    builder.cube("armorHead", "left_ear_module", [3.77, 26.1, -2.2], [1.05, 3.4, 4.4], "base")
+    builder.cube("armorHead", "rear_filter", [-2.7, 24.5, 3.85], [5.4, 2.2, 0.9], "shadow")
+    builder.cube("armorHead", "command_stripe", [-0.6, 28.9, -4.9], [1.2, 3.0, 0.4], "accent")
+
+
+def add_mandalorian_helmet(builder: ModelBuilder, *, heavy: bool = False) -> None:
+    shell_material = "light" if heavy else "base"
+    builder.cube("armorHead", "helmet_shell", [-4, 24, -4], [8, 8, 8], shell_material, inflate=0.4)
+    builder.cube("armorHead", "helmet_crown", [-3.55, 31.45, -3.55], [7.1, 1.2, 7.1], shell_material)
+    builder.cube("armorHead", "helmet_brow", [-3.75, 28.65, -4.75], [7.5, 0.8, 0.78], shell_material)
+    builder.cube("armorHead", "visor_bar", [-3.45, 27.7, -4.86], [6.9, 1.05, 0.72], "dark")
+    builder.cube("armorHead", "vertical_visor", [-0.65, 24.45, -4.9], [1.3, 3.4, 0.76], "dark")
     builder.cube(
-        "armorBody", "left_pectoral", [0.3, 18.0, -3.08], [3.85, 4.25, 0.58],
-        primary_plate, rotation=[0, 0, 6], pivot=[2.2, 20.2, -2.8])
+        "armorHead", "right_cheek_plate", [-3.65, 24.45, -4.84], [2.7, 3.2, 0.72],
+        shell_material, rotation=[0, 0, 7], pivot=[-2.25, 26.0, -4.5])
     builder.cube(
-        "armorBody", "sternum_insert", [-0.7, 17.1, -3.2], [1.4, 4.9, 0.72],
-        "accent")
-    builder.cube(
-        "armorBody", "codpiece", [-1.8, 9.45, -2.75], [3.6, 2.55, 0.85],
-        secondary_plate)
-    builder.cube(
-        "armorRightArm", "right_elbow_guard", [-8.35, 15.4, -3.0], [4.7, 2.0, 1.05],
-        primary_plate)
-    builder.cube(
-        "armorLeftArm", "left_elbow_guard", [3.65, 15.4, -3.0], [4.7, 2.0, 1.05],
-        primary_plate)
+        "armorHead", "left_cheek_plate", [0.95, 24.45, -4.84], [2.7, 3.2, 0.72],
+        shell_material, rotation=[0, 0, -7], pivot=[2.25, 26.0, -4.5])
+    builder.cube("armorHead", "right_ear_module", [-4.8, 26.0, -2.0], [1.0, 3.5, 4.0], "shadow")
+    builder.cube("armorHead", "left_ear_module", [3.8, 26.0, -2.0], [1.0, 3.5, 4.0], "shadow")
+    builder.cube("armorHead", "rear_filter", [-2.6, 24.6, 3.9], [5.2, 2.1, 0.8], "shadow")
+    if not heavy:
+        builder.cube("armorHead", "rangefinder_stem", [4.35, 27.0, -0.65], [0.75, 5.0, 1.1], "accent")
+        builder.cube("armorHead", "rangefinder_sensor", [3.75, 31.0, -3.75], [1.8, 1.2, 3.2], "dark")
+
+
+def add_separatist_helmet(builder: ModelBuilder) -> None:
+    builder.cube("armorHead", "helmet_shell", [-4, 24, -4], [8, 8, 8], "base", inflate=0.48)
+    builder.cube("armorHead", "helmet_crown", [-3.6, 31.45, -3.6], [7.2, 1.3, 7.2], "shadow")
+    builder.cube("armorHead", "crown_reinforcement", [-1.5, 31.9, -3.2], [3, 1.0, 6.4], "base")
+    builder.cube("armorHead", "sensor_visor", [-3.5, 27.6, -4.9], [7, 1.35, 0.85], "accent")
+    builder.cube("armorHead", "face_guard", [-2.8, 24.2, -4.86], [5.6, 3.25, 0.82], "shadow")
+    builder.cube("armorHead", "chin_filter", [-1.8, 23.8, -4.75], [3.6, 1.0, 1.0], "base")
+    builder.cube("armorHead", "right_sensor_pod", [-4.9, 26.4, -2.2], [1.2, 3.1, 4.4], "base")
+    builder.cube("armorHead", "left_sensor_pod", [3.7, 26.4, -2.2], [1.2, 3.1, 4.4], "base")
+    builder.cube("armorHead", "rear_power_node", [-2.2, 25.0, 3.9], [4.4, 2.8, 0.9], "accent")
+
+
+def add_nightsister_helmet(builder: ModelBuilder) -> None:
+    builder.cube("armorHead", "helmet_shell", [-3.75, 24.2, -3.75], [7.5, 7.6, 7.5], "shadow", inflate=0.3)
+    builder.cube("armorHead", "mask_brow", [-3.25, 28.1, -4.55], [6.5, 0.9, 0.75], "base")
+    builder.cube("armorHead", "mask_visor", [-2.9, 27.2, -4.68], [5.8, 0.95, 0.7], "dark")
+    builder.cube("armorHead", "mask_spine", [-0.6, 24.4, -4.72], [1.2, 2.9, 0.72], "accent")
+    builder.cube("armorHead", "mask_chin", [-1.8, 23.95, -4.62], [3.6, 0.8, 0.9], "base")
+    builder.cube("armorHead", "hood_crown", [-4.6, 30.1, -4.55], [9.2, 2.8, 9.1], "cloth")
+    builder.cube("armorHead", "hood_back", [-4.65, 23.7, 3.6], [9.3, 6.7, 1.15], "cloth")
+    builder.cube("armorHead", "hood_right", [-4.65, 23.7, -4.55], [1.25, 6.7, 8.3], "cloth")
+    builder.cube("armorHead", "hood_left", [3.4, 23.7, -4.55], [1.25, 6.7, 8.3], "cloth")
+    builder.cube("armorHead", "hood_brow", [-3.4, 29.45, -4.75], [6.8, 1.0, 0.8], "cloth")
+
+
+def add_family_armor_details(builder: ModelBuilder, family: str) -> None:
+    if family == "republic_plastoid":
+        add_republic_helmet(builder)
+        builder.cube("armorBody", "chest_command_stripe", [-0.55, 18.0, -3.15], [1.1, 3.6, 0.4], "accent")
+        builder.cube("armorRightArm", "right_rank_plate", [-8.35, 18.3, -2.9], [4.7, 2.4, 0.45], "accent")
+    elif family == "separatist_alloy":
+        add_separatist_helmet(builder)
+        builder.cube("armorBody", "power_cell", [-2.4, 16.5, -3.18], [4.8, 2.8, 0.55], "accent")
+        builder.cube("armorBody", "rear_reactor", [-2.6, 15.2, 2.9], [5.2, 5.4, 1.4], "accent")
+    elif family == "mandalorian_alloy":
+        add_mandalorian_helmet(builder)
+        builder.cube("armorBody", "compact_pack", [-2.8, 15.0, 2.8], [5.6, 7.1, 2.0], "shadow")
+        builder.cube("armorBody", "pack_light", [-1.2, 17.2, 4.75], [2.4, 2.0, 0.45], "accent")
+    elif family == "nightsister_weave":
+        add_nightsister_helmet(builder)
+        builder.cube(
+            "armorBody", "ritual_sash", [-4.45, 14.6, -3.0], [8.9, 1.35, 5.7],
+            "cloth", rotation=[0, 0, -11], pivot=[0, 15.2, 0])
+        builder.cube("armorBody", "right_skirt", [-4.2, 7.0, -2.35], [3.7, 4.6, 4.7], "cloth")
+        builder.cube("armorBody", "left_skirt", [0.5, 7.0, -2.35], [3.7, 4.6, 4.7], "cloth")
+        builder.cube("armorBody", "front_tabard", [-1.55, 6.7, -2.8], [3.1, 5.0, 0.65], "accent")
+        builder.cube("armorBody", "back_tabard", [-1.55, 6.7, 2.15], [3.1, 5.0, 0.65], "cloth")
+    elif family == "beskar":
+        add_mandalorian_helmet(builder, heavy=True)
+        builder.cube("armorBody", "heavy_collar", [-5, 20.5, -2.8], [10, 2.8, 5.6], "light")
+        builder.cube("armorRightArm", "right_heavy_pauldron", [-9.4, 18.0, -3.1], [6, 5.8, 6.2], "light")
+        builder.cube("armorLeftArm", "left_heavy_pauldron", [3.4, 18.0, -3.1], [6, 5.8, 6.2], "light")
+        builder.cube("armorBody", "beskar_spine", [-0.7, 14.5, 3.2], [1.4, 7.0, 0.65], "accent")
+    else:
+        raise ValueError(f"Unknown armor family: {family}")
 
 
 def build_armor(family: str, palette: Palette) -> None:
@@ -848,53 +967,8 @@ def build_armor(family: str, palette: Palette) -> None:
         "nightsister_weave": "base",
     }.get(family, "light")
     secondary_plate = "dark" if family == "nightsister_weave" else "base"
-    builder.cube("armorHead", "helmet_shell", [-4, 24, -4], [8, 8, 8], "base", inflate=0.72)
-    builder.cube("armorHead", "helmet_crown", [-3.5, 31.6, -3.5], [7, 1.2, 7], "light")
-    builder.cube("armorHead", "visor", [-3.55, 27, -4.85], [7.1, 1.45, 0.85], "accent")
-    builder.cube("armorHead", "face_guard", [-3.0, 24.2, -4.75], [6, 2.6, 0.8], "shadow")
-    builder.cube("armorBody", "chest_shell", [-4, 12, -2], [8, 12, 4], "dark", inflate=0.36)
-    builder.cube("armorBody", "breastplate", [-4.35, 17.3, -2.65], [8.7, 6.0, 1.3], primary_plate)
-    builder.cube("armorBody", "abdomen_plate", [-3.75, 13.1, -2.55], [7.5, 4.0, 1.0], secondary_plate)
-    builder.cube("armorBody", "backplate", [-4.3, 14.5, 1.8], [8.6, 8.4, 1.1], primary_plate)
-    builder.cube("armorBody", "belt", [-4.6, 11.5, -2.6], [9.2, 2.0, 5.2], "shadow")
-    for side, bone, x in (("right", "armorRightArm", -8.0), ("left", "armorLeftArm", 4.0)):
-        builder.cube(bone, f"{side}_arm_shell", [x, 12, -2], [4, 12, 4], "dark", inflate=0.38)
-        builder.cube(bone, f"{side}_pauldron", [x - 0.55, 18.4, -2.65], [5.1, 4.8, 5.3], primary_plate)
-        builder.cube(bone, f"{side}_gauntlet", [x - 0.2, 12.1, -2.45], [4.4, 4.8, 4.9], "base")
-    for side, leg_bone, boot_bone, x in (
-            ("right", "armorRightLeg", "armorRightBoot", -4.0),
-            ("left", "armorLeftLeg", "armorLeftBoot", 0.0)):
-        builder.cube(leg_bone, f"{side}_leg_shell", [x, 0, -2], [4, 12, 4], "dark", inflate=0.34)
-        builder.cube(leg_bone, f"{side}_thigh", [x - 0.15, 6.2, -2.45], [4.3, 5.4, 4.9], "base")
-        builder.cube(leg_bone, f"{side}_knee", [x - 0.25, 4.1, -2.95], [4.5, 2.4, 1.3], "accent")
-        builder.cube(boot_bone, f"{side}_shin", [x - 0.15, 0.1, -2.5], [4.3, 4.2, 5], primary_plate)
-        builder.cube(boot_bone, f"{side}_boot", [x - 0.35, -0.25, -3.0], [4.7, 2.2, 6], "shadow")
-    add_armor_layering(builder, primary_plate, secondary_plate)
-    if family == "republic_plastoid":
-        builder.cube("armorHead", "helmet_crest", [-0.75, 29.0, -4.95], [1.5, 3.8, 0.9], "accent")
-        builder.cube("armorBody", "chest_rank", [-1.5, 18.5, -2.85], [3, 1.0, 0.6], "accent")
-    elif family == "separatist_alloy":
-        builder.cube("armorBody", "power_cell", [-2.5, 16.0, -3.0], [5, 3.2, 0.8], "accent")
-        builder.cube("armorHead", "sensor_block", [2.6, 29.0, -4.9], [1.5, 1.5, 0.9], "accent")
-    elif family == "mandalorian_alloy":
-        builder.cube("armorHead", "vertical_visor", [-0.7, 24.5, -4.95], [1.4, 4.0, 0.9], "accent")
-        builder.cube("armorHead", "rangefinder", [4.4, 27.0, -0.7], [0.8, 5.0, 1.2], "accent")
-        builder.cube("armorBody", "compact_pack", [-2.8, 15.0, 2.1], [5.6, 7.2, 2.3], "shadow")
-    elif family == "nightsister_weave":
-        builder.cube("armorHead", "woven_hood_crown", [-4.55, 30.3, -4.55], [9.1, 2.55, 9.1], "cloth")
-        builder.cube("armorHead", "woven_hood_back", [-4.55, 23.8, 3.45], [9.1, 6.8, 1.1], "cloth")
-        builder.cube("armorHead", "woven_hood_right", [-4.55, 23.8, -4.55], [1.25, 6.8, 8.4], "cloth")
-        builder.cube("armorHead", "woven_hood_left", [3.3, 23.8, -4.55], [1.25, 6.8, 8.4], "cloth")
-        builder.cube("armorHead", "woven_hood_brow", [-3.35, 29.55, -4.7], [6.7, 0.9, 0.7], "cloth")
-        builder.cube(
-            "armorBody", "ritual_sash", [-4.45, 14.6, -3.0], [8.9, 1.35, 5.7],
-            "cloth", rotation=[0, 0, -11], pivot=[0, 15.2, 0])
-        builder.cube("armorBody", "right_skirt", [-4.2, 7.2, -2.3], [3.7, 4.5, 4.6], "cloth")
-        builder.cube("armorBody", "left_skirt", [0.5, 7.2, -2.3], [3.7, 4.5, 4.6], "cloth")
-    elif family == "beskar":
-        builder.cube("armorBody", "heavy_collar", [-5, 20.5, -2.8], [10, 2.8, 5.6], "light")
-        builder.cube("armorRightArm", "right_heavy_pauldron", [-9.4, 18.0, -3.1], [6, 5.8, 6.2], "light")
-        builder.cube("armorLeftArm", "left_heavy_pauldron", [3.4, 18.0, -3.1], [6, 5.8, 6.2], "light")
+    add_common_armor(builder, primary_plate, secondary_plate)
+    add_family_armor_details(builder, family)
     builder.write(ARMOR_MODELS / f"{family}.geo.json", ARMOR_TEXTURES / f"{family}.png")
     # GeckoLib parses the declared animation resource even though armor pose
     # comes from the wearer. Keep one valid no-op clip instead of an empty
@@ -914,45 +988,145 @@ def build_armor(family: str, palette: Palette) -> None:
 
 
 def write_spawn_egg(design: RecruitDesign) -> None:
+    """Build a shared 3D recruitment capsule with a material set for this recruit."""
+    builder = ModelBuilder(
+        "item.spawn_capsule",
+        design.palette,
+        atlas_size=512,
+        texel_density=4,
+    )
+    builder.bone("root", [0, 0, 0])
+    builder.bone("shell", [0, 0, 0], "root")
+    builder.bone("core", [0, 0, 0], "root")
+    builder.cube("shell", "capsule_core", [-3.5, -3.5, -3.5], [7, 7, 7], "dark")
+    builder.cube("shell", "front_shell", [-3.3, -2.8, -4.15], [6.6, 5.6, 0.85], "base")
+    builder.cube("shell", "rear_shell", [-3.3, -2.8, 3.3], [6.6, 5.6, 0.85], "base")
+    builder.cube("shell", "right_shell", [-4.15, -2.8, -3.3], [0.85, 5.6, 6.6], "base")
+    builder.cube("shell", "left_shell", [3.3, -2.8, -3.3], [0.85, 5.6, 6.6], "base")
+    builder.cube("shell", "top_cap", [-3.15, 3.2, -3.15], [6.3, 1.0, 6.3], "light")
+    builder.cube("shell", "top_step", [-2.45, 4.1, -2.45], [4.9, 0.8, 4.9], "base")
+    builder.cube("shell", "top_node", [-1.3, 4.8, -1.3], [2.6, 0.75, 2.6], "accent")
+    builder.cube("shell", "bottom_cap", [-3.15, -4.2, -3.15], [6.3, 1.0, 6.3], "light")
+    builder.cube("shell", "bottom_step", [-2.45, -5.0, -2.45], [4.9, 0.8, 4.9], "base")
+    builder.cube("shell", "front_band", [-3.65, -0.7, -4.3], [7.3, 1.4, 0.65], "shadow")
+    builder.cube("shell", "rear_band", [-3.65, -0.7, 3.65], [7.3, 1.4, 0.65], "shadow")
+    builder.cube("shell", "right_band", [-4.3, -0.7, -3.65], [0.65, 1.4, 7.3], "shadow")
+    builder.cube("shell", "left_band", [3.65, -0.7, -3.65], [0.65, 1.4, 7.3], "shadow")
+    builder.cube("core", "front_status_light", [-1.0, -1.0, -4.55], [2.0, 2.0, 0.55], "accent")
+    builder.cube("core", "rear_status_light", [-1.0, -1.0, 4.0], [2.0, 2.0, 0.55], "accent")
+    builder.cube("core", "right_status_light", [-4.55, -1.0, -1.0], [0.55, 2.0, 2.0], "accent")
+    builder.cube("core", "left_status_light", [4.0, -1.0, -1.0], [0.55, 2.0, 2.0], "accent")
+
+    texture_path = SPAWN_CAPSULE_TEXTURES / f"{design.id}.png"
+    builder.write(ITEM_GEO_MODELS / "spawn_capsule.geo.json", texture_path)
+    write_spawn_capsule_glowmask(texture_path, design.palette)
+    write_spawn_capsule_icon(design)
+    write_spawn_capsule_item_files(design.id)
+
+
+def write_spawn_capsule_glowmask(texture_path: Path, palette: Palette) -> None:
+    source = Image.open(texture_path).convert("RGBA")
+    glowmask = Image.new("RGBA", source.size, (0, 0, 0, 0))
+    competing = (
+        palette.skin, palette.shadow, palette.dark, palette.base,
+        palette.light, palette.cloth,
+    )
+    accent = palette.accent
+    for y in range(source.height):
+        for x in range(source.width):
+            red, green, blue, alpha = source.getpixel((x, y))
+            if alpha == 0:
+                continue
+            color = red, green, blue
+            accent_distance = sum((left - right) ** 2 for left, right in zip(color, accent))
+            other_distance = min(
+                sum((left - right) ** 2 for left, right in zip(color, candidate))
+                for candidate in competing)
+            if accent_distance <= other_distance:
+                glowmask.putpixel((x, y), (red, green, blue, alpha))
+    glowmask.save(texture_path.with_name(texture_path.stem + "_glowmask.png"))
+
+
+def write_spawn_capsule_icon(design: RecruitDesign) -> None:
     image = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     outline = (*design.palette.dark, 255)
+    shadow = (*design.palette.shadow, 255)
     base = (*design.palette.base, 255)
     light = (*design.palette.light, 255)
     accent = (*design.palette.accent, 255)
-    silhouette = (
-        (6, 1, 9, 1), (4, 2, 11, 3), (3, 4, 12, 6),
-        (2, 7, 13, 10), (3, 11, 12, 12), (5, 13, 10, 14),
-    )
-    for bounds in silhouette:
-        draw.rectangle(bounds, fill=outline)
-    draw.ellipse((3, 2, 12, 13), fill=base, outline=outline)
-    draw.arc((4, 3, 11, 10), 190, 330, fill=light, width=2)
-    seed = int(hashlib.sha256(design.id.encode("utf-8")).hexdigest()[:8], 16)
-    for index in range(7):
-        x = 4 + (seed + index * 5) % 8
-        y = 4 + (seed // 7 + index * 3) % 7
-        draw.rectangle((x, y, min(12, x + index % 2), min(12, y + index % 2)), fill=accent)
+    draw.rectangle((5, 1, 10, 1), fill=outline)
+    draw.rectangle((4, 2, 11, 3), fill=light, outline=outline)
+    draw.rectangle((3, 4, 12, 11), fill=base, outline=outline)
+    draw.rectangle((2, 6, 13, 9), fill=shadow, outline=outline)
+    draw.rectangle((4, 12, 11, 13), fill=light, outline=outline)
+    draw.rectangle((5, 14, 10, 14), fill=outline)
+    draw.rectangle((6, 6, 9, 9), fill=outline)
+    draw.rectangle((7, 7, 8, 8), fill=accent)
+    draw.point((4, 5), fill=(*clamp_color(design.palette.base, 28), 255))
     ITEM_TEXTURES.mkdir(parents=True, exist_ok=True)
     image.save(ITEM_TEXTURES / f"{design.id}_spawn_egg.png")
 
 
-def write_civilian_item_assets() -> None:
-    civilians = (
-        "republic_civilian", "separatist_technician", "mandalorian_clansperson",
-        "hutt_civilian", "nightsister_civilian",
-    )
-    for civilian in civilians:
-        item_id = f"{civilian}_spawn_egg"
-        ITEM_DEFINITIONS.mkdir(parents=True, exist_ok=True)
-        ITEM_MODELS.mkdir(parents=True, exist_ok=True)
-        (ITEM_DEFINITIONS / f"{item_id}.json").write_text(json.dumps({
-            "model": {"type": "minecraft:model", "model": f"galacticwars:item/{item_id}"},
-        }, indent=2) + "\n", encoding="utf-8")
-        (ITEM_MODELS / f"{item_id}.json").write_text(json.dumps({
-            "parent": "minecraft:item/generated",
-            "textures": {"layer0": f"galacticwars:item/{item_id}"},
-        }, indent=2) + "\n", encoding="utf-8")
+def write_spawn_capsule_item_files(visual_id: str) -> None:
+    item_id = f"{visual_id}_spawn_egg"
+    ITEM_DEFINITIONS.mkdir(parents=True, exist_ok=True)
+    ITEM_MODELS.mkdir(parents=True, exist_ok=True)
+    (ITEM_MODELS / "spawn_capsule_base.json").write_text(json.dumps({
+        "parent": "builtin/entity",
+        "ambientocclusion": False,
+        "gui_light": "front",
+        "textures": {
+            "particle": "galacticwars:item/clone_trooper_spawn_egg",
+        },
+        "display": {
+            "thirdperson_righthand": {
+                "rotation": [0, -35, 20], "translation": [0, 2.5, 0], "scale": [0.72, 0.72, 0.72]},
+            "thirdperson_lefthand": {
+                "rotation": [0, 35, -20], "translation": [0, 2.5, 0], "scale": [0.72, 0.72, 0.72]},
+            "firstperson_righthand": {
+                "rotation": [0, -35, 12], "translation": [1.0, 3.0, 1.0], "scale": [0.7, 0.7, 0.7]},
+            "firstperson_lefthand": {
+                "rotation": [0, 35, -12], "translation": [-1.0, 3.0, 1.0], "scale": [0.7, 0.7, 0.7]},
+            "gui": {
+                "rotation": [24, 225, 0], "translation": [0, 0, 0], "scale": [0.9, 0.9, 0.9]},
+            "ground": {
+                "rotation": [0, 0, 0], "translation": [0, 2.0, 0], "scale": [0.55, 0.55, 0.55]},
+            "fixed": {
+                "rotation": [0, 180, 0], "translation": [0, 0, 0], "scale": [0.75, 0.75, 0.75]},
+        },
+    }, indent=2) + "\n", encoding="utf-8")
+    (ITEM_MODELS / f"{item_id}.json").write_text(json.dumps({
+        "parent": "galacticwars:item/spawn_capsule_base",
+        "textures": {
+            "particle": f"galacticwars:item/{item_id}",
+        },
+    }, indent=2) + "\n", encoding="utf-8")
+    (ITEM_DEFINITIONS / f"{item_id}.json").write_text(json.dumps({
+        "model": {
+            "type": "minecraft:special",
+            "base": f"galacticwars:item/{item_id}",
+            "model": {"type": "geckolib:geckolib"},
+        },
+    }, indent=2) + "\n", encoding="utf-8")
+    (ITEM_GEO_ANIMATIONS / "spawn_capsule.animation.json").write_text(json.dumps({
+        "format_version": "1.8.0",
+        "animations": {
+            "animation.spawn_capsule.idle": {
+                "loop": True,
+                "animation_length": 1.0,
+                "bones": {
+                    "core": {
+                        "scale": {
+                            "0.0": [1.0, 1.0, 1.0],
+                            "0.5": [1.06, 1.06, 1.06],
+                            "1.0": [1.0, 1.0, 1.0],
+                        },
+                    },
+                },
+            },
+        },
+    }, indent=2) + "\n", encoding="utf-8")
 
 
 def ensure_civilian_animations() -> None:
@@ -967,13 +1141,13 @@ def main() -> None:
     for directory in (
             ENTITY_MODELS, ENTITY_ANIMATIONS, ENTITY_TEXTURES,
             ARMOR_MODELS, ARMOR_ANIMATIONS, ARMOR_TEXTURES,
+            ITEM_GEO_MODELS, ITEM_GEO_ANIMATIONS, SPAWN_CAPSULE_TEXTURES,
             ITEM_DEFINITIONS, ITEM_MODELS, ITEM_TEXTURES):
         directory.mkdir(parents=True, exist_ok=True)
     for design in RECRUITS:
         build_recruit(design)
     for family, palette in ARMOR_PALETTES.items():
         build_armor(family, palette)
-    write_civilian_item_assets()
     ensure_civilian_animations()
     print(f"Generated {len(RECRUITS)} recruit sets and {len(ARMOR_PALETTES)} armor sets")
 

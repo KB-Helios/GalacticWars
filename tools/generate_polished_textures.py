@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageOps
@@ -109,41 +108,6 @@ def generated_lightsaber(name):
     icon.alpha_composite(subject, ((16 - subject.width) // 2, (16 - subject.height) // 2))
     icon.putalpha(icon.getchannel("A").point(lambda alpha: 0 if alpha < 48 else alpha))
     icon.save(TEXTURES / f"item/{name}_lightsaber.png")
-
-
-def lightsaber_model_textures(name, blade, glow, hilt_dark, hilt_metal):
-    """Create compact hilt materials and a four-frame energy shimmer for 3D models."""
-    output = TEXTURES / "item/lightsaber"
-    output.mkdir(parents=True, exist_ok=True)
-
-    hilt = Image.new("RGBA", (16, 16), (*hilt_dark, 255))
-    draw = ImageDraw.Draw(hilt)
-    draw.rectangle((0, 0, 15, 2), fill=(*hilt_metal, 255))
-    draw.rectangle((0, 13, 15, 15), fill=(*darken(hilt_metal, 30), 255))
-    for x in (2, 6, 10, 14):
-        draw.line((x, 3, x, 12), fill=(*darken(hilt_dark, 18), 255))
-    draw.rectangle((5, 5, 10, 8), fill=(*darken(hilt_metal, 18), 255))
-    draw.rectangle((6, 6, 9, 7), fill=(*glow[:3], 255))
-    draw.line((1, 1, 14, 1), fill=(*lighten(hilt_metal, 35), 255))
-    hilt.save(output / f"{name}_hilt.png")
-
-    blade_sheet = Image.new("RGBA", (16, 64), (0, 0, 0, 0))
-    for frame in range(4):
-        frame_image = Image.new("RGBA", (16, 16), (*glow[:3], 255))
-        frame_draw = ImageDraw.Draw(frame_image)
-        edge = mix(glow[:3], blade[:3], 0.45 + frame * 0.08)
-        core = mix((255, 255, 255), blade[:3], frame * 0.035)
-        frame_draw.rectangle((0, 0, 2, 15), fill=(*edge, 255))
-        frame_draw.rectangle((13, 0, 15, 15), fill=(*edge, 255))
-        frame_draw.rectangle((3, 0, 12, 15), fill=(*core, 255))
-        if frame in (1, 3):
-            frame_draw.line((3, 2 + frame, 12, 2 + frame), fill=(255, 255, 255, 255))
-        blade_sheet.alpha_composite(frame_image, (0, frame * 16))
-    blade_path = output / f"{name}_blade.png"
-    blade_sheet.save(blade_path)
-    blade_path.with_suffix(".png.mcmeta").write_text(json.dumps({
-        "animation": {"frametime": 2, "interpolate": True},
-    }, indent=2) + "\n", encoding="utf-8")
 
 
 def armor_texture(path, palette, family):
@@ -354,14 +318,10 @@ if __name__ == "__main__":
     lightsaber("red", (255, 104, 96, 255), (211, 31, 39, 255))
     for color in ("purple", "yellow", "white"):
         generated_lightsaber(color)
-    for args in (
-            ("blue", (84, 188, 255, 255), (28, 111, 231, 255), (31, 37, 45), (181, 190, 195)),
-            ("green", (102, 244, 145, 255), (20, 166, 84, 255), (29, 38, 35), (171, 190, 182)),
-            ("red", (255, 104, 96, 255), (211, 31, 39, 255), (43, 31, 32), (188, 176, 176)),
-            ("purple", (221, 136, 255, 255), (132, 43, 218, 255), (30, 29, 40), (179, 170, 198)),
-            ("yellow", (255, 232, 92, 255), (225, 160, 25, 255), (55, 39, 31), (177, 161, 138)),
-            ("white", (244, 250, 255, 255), (151, 199, 235, 255), (34, 37, 45), (205, 215, 225)),
-    ):
-        lightsaber_model_textures(*args)
+    # The GeckoLib geometry, UV layout, animated material atlases, and item definitions
+    # are one contract. Regenerate them together rather than reviving the legacy split
+    # hilt/blade textures above.
+    from generate_lightsaber_model import generate_all as generate_lightsaber_assets
+    generate_lightsaber_assets()
     armor_families()
     armor_item_icons()

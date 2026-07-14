@@ -1,6 +1,9 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "galacticwars:item/commando_droid_spawn_egg"
+    "type": "minecraft:special",
+    "base": "galacticwars:item/commando_droid_spawn_egg",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
   }
 }
