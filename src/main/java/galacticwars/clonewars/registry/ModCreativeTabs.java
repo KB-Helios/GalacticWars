@@ -38,6 +38,8 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.LAAT_GUNSHIP_DEPLOYMENT_KIT.get());
                         output.accept(ModItems.HYPERSPACE_NAVIGATOR.get());
                         output.accept(ModItems.CLAIM_TRANSPONDER.get());
+                        output.accept(ModItems.BLUEPRINT_PROJECTOR.get());
+                        output.accept(ModItems.COMMAND_MARKER.get());
                         output.accept(ModItems.REPUBLIC_PLASTOID_INGOT.get());
                         output.accept(ModItems.MANDALORIAN_FIBER.get());
                         output.accept(ModItems.MANDALORIAN_ALLOY_INGOT.get());

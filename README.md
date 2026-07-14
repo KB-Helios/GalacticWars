@@ -27,9 +27,11 @@ This is a clean-break conversion. Existing KingdomWars-Middle-Earth worlds and r
 - Place a Command Center to open the faction picker. Choosing a faction atomically creates and pledges your kingdom; the Command Center, recruitment rules, alignment, and progression all use that saved choice.
 - Interact with a recruit to open the command screen. Hire first, then choose combat orders, formations, a worksite, storage, a profession, or construction controls.
 - Use a blaster to fire; each accepted shot consumes one Energy Cell, applies weapon durability and a short server-authoritative cooldown.
-- Place blueprint structures through the recruit command screen. Builders withdraw real blocks from Command Center or linked storage before placing them.
+- Interact with an active Command Center for the keyboard-focusable Overview, Campaign, Construction, Squads, Workforce, Kingdom, Diplomacy, and Storage dashboard. Sneak-interact for planetary navigation.
+- Craft a Tactical Command Marker and use it on an entity or block before issuing explicit attack, move, rally, patrol, worksite, or storage orders. Prepare a Blueprint Projector in the Construction tab, then place the projection in-world; builders withdraw real blocks from Command Center or linked storage.
 - After pledging and completing a Forward Base, sneak-use your active Command Center to open planetary navigation. Craft and carry a Hyperspace Navigator to reopen the console away from home. Every jump still requires your active Command Center and paid upkeep, and prepares a reusable non-destructive arrival platform.
-- Vehicle and Force bindings are tracked below and are not presented as playable controls until their runtime milestones are complete.
+- Deploy a fabricated vehicle kit in-world. Use movement keys to drive, Jump/Crouch to climb or descend in flight vehicles, and `R` to fire the mounted weapon. Use an Energy Cell to refuel and Duracrete to repair an authorized vehicle.
+- Republic and Nightsister campaign paths activate Force abilities with `Z`, `X`, and `C`. The HUD reports energy and per-slot cooldowns; targeting, costs, replay protection, PvP policy, and effects are server authoritative.
 
 ## Core gameplay loop
 
@@ -61,11 +63,12 @@ Credits, unlocks, quest milestones, vehicles, Force choices, and conquest use an
 - [x] Register and data-drive all fifteen launch-unit IDs while retaining formation, command, hiring, worker, commander, and persistence foundations.
 - [x] Finish player-facing blaster heat feedback and autonomous ranged AI goals: held blasters expose a synchronized segmented heat HUD and action-bar failures, player fire is server-authoritative, and grouped or local-order recruits use blasters and Nightsister bows without bypassing cooldown, PvP, faction, or owner protections.
 - [x] Finish planetary respawn and cross-dimension squad transfer: successful jumps bind respawn to the reusable safe-arrival platform, and nearby follow/protect squads are preflight-snapshotted, transactionally virtualized, relocated, and rematerialized without leaving source duplicates or corrupting the group when teleport fails.
-- [ ] Implement drivable runtime entities, controls, persistence, and combat for all five vehicles; authoritative ownership, allied boarding, seat limits, fuel, damage/destruction, and safe dimension-transfer policies are implemented and tested.
-- [ ] Implement runtime Force input, targeting, persistence/sync, effects, and accessibility feedback; unlock validation, path/quest gates, energy, cooldown replay protection, regeneration, and PvP policy are implemented and tested.
-- [ ] Load the fifteen quest, trade, vehicle, planet, Force, and conquest definitions through the atomic datapack manager and persist player progress.
-- [ ] Connect conquest capture zones to faction spawns, merchant stock, travel safety, rewards, and protected-build rules.
-- [ ] Complete multiplayer balance, accessibility, visual QA, dedicated-server testing, GameTests, and a fresh-world acceptance playthrough.
+- [x] Implement drivable runtime entities, controls, persistence, combat, repair, and destruction for all five vehicles with authoritative ownership, allied boarding, seat limits, fuel, and dimension-transfer policy.
+- [x] Implement runtime Force input, targeting, persistence/sync, effects, HUD feedback, unlock gates, energy, cooldown replay protection, regeneration, allied-NPC protection, and PvP policy.
+- [x] Load the fifteen quest, trade, vehicle, planet, Force, and conquest definitions through the atomic datapack manager and persist player progress.
+- [x] Connect physical conquest capture to controlling-faction patrols, regional merchant stock, arrival safety, rewards, and protected-build placement.
+- [x] Complete automated dedicated-server, two-player authority, replay, persistence, codec, content-contract, and 46-GameTest runtime gates.
+- [x] Record the fresh-client Command Center visual acceptance pass and verify every faction campaign through the five-path runtime matrix.
 
 Post-release candidates: Dathomir, Naboo, Kashyyyk, additional unit families, more vehicles, free-flight space combat, capital ships, bosses, longer campaigns, and localization.
 

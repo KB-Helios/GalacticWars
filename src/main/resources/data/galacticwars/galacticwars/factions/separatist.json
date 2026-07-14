@@ -23,7 +23,7 @@
   },
   "pledge": {
     "token_item": "galacticwars:separatist_identity_chip",
-    "direct_delta": 10,
+    "direct_delta": 15,
     "ally_delta": 2,
     "enemy_delta": -5
   }

@@ -31,6 +31,9 @@ public final class GalacticNetwork {
             .registerPlayMessage("force_hud", ForceHudPayload.class,
                     ForceHudPayload.STREAM_CODEC, GalacticNetwork::handleForceHud,
                     PacketFlow.CLIENTBOUND)
+            .registerPlayMessage("command_center_state", CommandCenterStatePayload.class,
+                    CommandCenterStatePayload.STREAM_CODEC, GalacticNetwork::handleCommandCenterState,
+                    PacketFlow.CLIENTBOUND)
             .build();
 
     private GalacticNetwork() {
@@ -70,7 +73,9 @@ public final class GalacticNetwork {
                     return;
                 }
                 if (player.containerMenu instanceof CommandCenterOperationsMenu operations) {
-                    operations.handleReplayAction(player, payload.replayId(), payload.actionId());
+                    operations.handleReplayAction(
+                            player, payload.replayId(), payload.actionId(),
+                            payload.primaryTargetId(), payload.secondaryTargetId());
                 } else if (player.containerMenu instanceof MerchantTradeMenu merchant) {
                     merchant.handleReplayAction(player, payload.replayId(), payload.actionId());
                 }
@@ -81,6 +86,19 @@ public final class GalacticNetwork {
 
     private static void handleForceHud(ForceHudPayload payload, PlayMessageContext context) {
         context.execute(() -> ForceClientState.update(payload));
+        context.setHandled(true);
+    }
+
+    private static void handleCommandCenterState(
+            CommandCenterStatePayload payload,
+            PlayMessageContext context
+    ) {
+        context.execute(() -> context.getPlayer().ifPresent(player -> {
+            if (player.containerMenu instanceof CommandCenterOperationsMenu operations
+                    && operations.containerId == payload.containerId()) {
+                operations.applyClientDashboard(payload.state());
+            }
+        }));
         context.setHandled(true);
     }
 }

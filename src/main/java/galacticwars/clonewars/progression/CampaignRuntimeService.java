@@ -34,6 +34,22 @@ public final class CampaignRuntimeService {
                 }
             }
         } while (advanced);
+        if (!current.factionId().isEmpty()) {
+            String factionPath = current.factionId().contains(":")
+                    ? current.factionId().substring(current.factionId().indexOf(':') + 1)
+                    : current.factionId();
+            String campaignId = factionPath + "_campaign";
+            if (!current.hasSubject(ProgressionEventType.CAMPAIGN_COMPLETED, campaignId)) {
+                ProgressionEvent victory = new ProgressionEvent(
+                        deterministicCampaignEventId(current.playerId(), campaignId),
+                        current.playerId(), ProgressionEventType.CAMPAIGN_COMPLETED, campaignId, 1);
+                ProgressionDecision candidate = GalacticProgressionCoordinator.apply(current, victory);
+                if (candidate.accepted() && candidate.changed()) {
+                    current = candidate.state();
+                    changed = true;
+                }
+            }
+        }
         return new ProgressionDecision(true, changed,
                 changed ? "accepted" : "duplicate_event", current);
     }
@@ -48,6 +64,11 @@ public final class CampaignRuntimeService {
 
     public static UUID deterministicQuestEventId(UUID playerId, String questId) {
         return UUID.nameUUIDFromBytes(("campaign:quest:" + playerId + ":" + questId)
+                .getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static UUID deterministicCampaignEventId(UUID playerId, String campaignId) {
+        return UUID.nameUUIDFromBytes(("campaign:victory:" + playerId + ":" + campaignId)
                 .getBytes(StandardCharsets.UTF_8));
     }
 }

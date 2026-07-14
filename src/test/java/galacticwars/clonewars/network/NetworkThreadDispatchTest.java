@@ -11,7 +11,7 @@ public final class NetworkThreadDispatchTest {
         String source = Files.readString(Path.of(
                 "src/main/java/galacticwars/clonewars/network/GalacticNetwork.java"));
         int dispatches = source.split("context\\.execute", -1).length - 1;
-        if (dispatches != 4) {
+        if (dispatches != 5) {
             throw new AssertionError("Every Framework payload handler must dispatch to the main thread");
         }
         if (!source.contains("PacketFlow.SERVERBOUND")

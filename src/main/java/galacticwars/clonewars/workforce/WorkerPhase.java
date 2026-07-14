@@ -11,6 +11,7 @@ public enum WorkerPhase {
     NAVIGATE_STORAGE,
     DEPOSIT,
     COOLDOWN,
+    PAUSED,
     BLOCKED;
 
     public String id() {

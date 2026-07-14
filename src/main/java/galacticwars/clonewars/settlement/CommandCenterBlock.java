@@ -13,6 +13,7 @@ import galacticwars.clonewars.menu.FactionSelectionMenuProvider;
 import galacticwars.clonewars.menu.CommandCenterOperationsMenuProvider;
 import galacticwars.clonewars.menu.CommandCenterOperationsMenu;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,21 +22,28 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jspecify.annotations.Nullable;
 
 public final class CommandCenterBlock extends BaseEntityBlock {
     public static final MapCodec<CommandCenterBlock> CODEC = simpleCodec(CommandCenterBlock::new);
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
     public CommandCenterBlock(BlockBehaviour.Properties properties) {
         super(properties);
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
     @Override
@@ -51,6 +59,16 @@ public final class CommandCenterBlock extends BaseEntityBlock {
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new CommandCenterBlockEntity(pos, state);
+    }
+
+    @Override
+    public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
     }
 
     @Override
@@ -136,7 +154,7 @@ public final class CommandCenterBlock extends BaseEntityBlock {
             hall.setFaction(activated.orElseThrow().factionId());
         }
         if (player.isShiftKeyDown()) {
-            if (!hall.canUse(player, KingdomPermission.COMMAND_ARMY)) {
+            if (!hall.canUse(player, KingdomPermission.TRAVEL)) {
                 player.sendSystemMessage(Component.translatable("message.galacticwars.command_center.command_denied"));
                 return InteractionResult.FAIL;
             }
@@ -150,27 +168,10 @@ public final class CommandCenterBlock extends BaseEntityBlock {
             return InteractionResult.SUCCESS;
         }
 
-        KingdomRecord kingdom = activated.orElseThrow();
         hall.settlePendingCampaignRefunds(serverLevel);
-        if (player instanceof ServerPlayer serverPlayer) {
-            int claimed = ProgressionSavedData.get(serverLevel).claimCreditRewards(serverPlayer);
-            if (claimed > 0) {
-                player.sendSystemMessage(Component.translatable(
-                        "message.galacticwars.campaign.reward_claimed", claimed));
-            }
-        }
         if (player instanceof ServerPlayer serverPlayer) {
             serverPlayer.openMenu(new CommandCenterOperationsMenuProvider(pos));
         }
-        player.sendSystemMessage(Component.translatable(
-                "message.galacticwars.command_center.overview",
-                Component.literal(kingdom.factionId()),
-                kingdom.settlement().recruitIds().size(),
-                kingdom.settlement().housingCapacity(),
-                hall.treasuryCredits(),
-                kingdom.settlement().commanderId().isPresent()
-                        ? Component.translatable("message.galacticwars.command_center.commander.assigned")
-                        : Component.translatable("message.galacticwars.command_center.commander.unassigned")));
         return InteractionResult.SUCCESS;
     }
 

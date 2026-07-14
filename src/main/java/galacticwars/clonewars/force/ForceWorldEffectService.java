@@ -2,6 +2,8 @@ package galacticwars.clonewars.force;
 
 import galacticwars.clonewars.Config;
 import galacticwars.clonewars.data.LaunchContentDefinitions;
+import galacticwars.clonewars.entity.GalacticRecruitEntity;
+import galacticwars.clonewars.faction.FactionRelation;
 import galacticwars.clonewars.progression.ForceAbilityRuntimeService;
 import galacticwars.clonewars.progression.ForceSavedData;
 import galacticwars.clonewars.progression.LaunchContentCatalog;
@@ -62,6 +64,9 @@ public final class ForceWorldEffectService {
             ServerPlayer player, galacticwars.clonewars.progression.ForceRuntimeState state,
             String faction, long gameTime
     ) {
+        if (!GalacticNetwork.CHANNEL.isActive(player.connection.getConnection())) {
+            return;
+        }
         String[] abilities = faction.equals("republic")
                 ? new String[]{"light_push", "light_pull", "light_leap"}
                 : faction.equals("nightsister")
@@ -105,7 +110,8 @@ public final class ForceWorldEffectService {
         return player.level().getEntitiesOfClass(LivingEntity.class,
                         player.getBoundingBox().expandTowards(look.scale(range)).inflate(2.0D),
                         entity -> entity != player && entity.isAlive()
-                                && entity.distanceToSqr(player) <= range * range)
+                                && entity.distanceToSqr(player) <= range * range
+                                && canAffect(player, entity))
                 .stream()
                 .filter(entity -> {
                     Vec3 direction = entity.getEyePosition().subtract(eye);
@@ -114,6 +120,16 @@ public final class ForceWorldEffectService {
                 })
                 .min(Comparator.comparingDouble(player::distanceToSqr))
                 .orElse(null);
+    }
+
+    private static boolean canAffect(ServerPlayer player, LivingEntity target) {
+        if (!(target instanceof GalacticRecruitEntity recruit)) {
+            return true;
+        }
+        FactionRelation relation = recruit.factionRelationTo(player);
+        return !recruit.isOwnedBy(player)
+                && relation != FactionRelation.SAME
+                && relation != FactionRelation.ALLY;
     }
 
     private static boolean fail(ServerPlayer player, String reason) {

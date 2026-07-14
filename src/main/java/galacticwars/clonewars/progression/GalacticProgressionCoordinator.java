@@ -49,6 +49,12 @@ public final class GalacticProgressionCoordinator {
                 return questValidation;
             }
         }
+        if (event.type() == ProgressionEventType.CAMPAIGN_COMPLETED) {
+            ProgressionDecision campaignValidation = validateCampaign(state, event, faction);
+            if (campaignValidation != null) {
+                return campaignValidation;
+            }
+        }
         try {
             return ProgressionDecision.accepted(state, state.apply(event, faction, unlocks(state, event)));
         } catch (IllegalStateException exception) {
@@ -87,7 +93,32 @@ public final class GalacticProgressionCoordinator {
         return null;
     }
 
-    private static boolean objectiveComplete(ProgressionState state, String objective) {
+    private static ProgressionDecision validateCampaign(
+            ProgressionState state,
+            ProgressionEvent event,
+            String faction
+    ) {
+        String factionPath = faction.substring(faction.indexOf(':') + 1);
+        String campaignId = factionPath + "_campaign";
+        if (!event.subjectId().equals(campaignId)) {
+            return ProgressionDecision.rejected("wrong_faction_campaign", state);
+        }
+        Set<String> chapters = LaunchContentCatalog.quests().stream()
+                .filter(quest -> quest.startsWith(factionPath + "_chapter_"))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        if (chapters.isEmpty()) {
+            return ProgressionDecision.rejected("unknown_campaign", state);
+        }
+        if (chapters.stream().anyMatch(
+                chapter -> !state.hasSubject(ProgressionEventType.QUEST_ADVANCED, chapter))) {
+            return ProgressionDecision.rejected("campaign_chapter_missing", state);
+        }
+        return state.hasSubject(ProgressionEventType.CAMPAIGN_COMPLETED, campaignId)
+                ? ProgressionDecision.accepted(state, state) : null;
+    }
+
+    /** Shared authoritative predicate used by campaign commits and player-facing progress views. */
+    public static boolean objectiveComplete(ProgressionState state, String objective) {
         return switch (objective) {
             case "faction_pledged" -> !state.factionId().isEmpty();
             case "command_center", "forward_base", "supply_depot" ->
@@ -132,6 +163,8 @@ public final class GalacticProgressionCoordinator {
             case QUEST_ADVANCED -> unlocks.addAll(LaunchContentCatalog.questUnlocks(event.subjectId()));
             case VEHICLE_ACQUIRED -> unlocks.add("vehicle_control");
             case REGION_CAPTURED -> unlocks.add("veteran_trades");
+            case CAMPAIGN_COMPLETED -> unlocks.addAll(Set.of(
+                    "campaign_victory", "veteran_operations"));
             default -> {
             }
         }

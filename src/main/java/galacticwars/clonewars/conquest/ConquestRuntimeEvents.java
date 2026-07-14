@@ -6,10 +6,6 @@ import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.faction.FactionRelation;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.progression.LaunchContentCatalog;
-import galacticwars.clonewars.progression.GalacticSystemsService;
-import galacticwars.clonewars.progression.ProgressionSavedData;
-import galacticwars.clonewars.progression.ProgressionEvent;
-import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.registry.ModBlocks;
 import java.nio.charset.StandardCharsets;
@@ -68,52 +64,9 @@ public final class ConquestRuntimeEvents {
             data.put(created);
             return created;
         });
-        String normalizedFaction = namespacedFaction(state.controllingFaction());
-        if (!normalizedFaction.equals(state.controllingFaction())) {
-            state = state.withControllingFaction(normalizedFaction);
-            data.put(state);
-        }
         BlockPos beacon = new BlockPos(state.beaconX(), state.beaconY(), state.beaconZ());
         spawnControlPatrol(level, state, beacon);
-        ServerPlayer player = level.players().stream()
-                .filter(candidate -> candidate.blockPosition().distSqr(beacon)
-                        <= (double) region.captureRadius() * region.captureRadius())
-                .filter(candidate -> hasOwnedMilitaryRecruit(level, candidate, beacon, region.captureRadius()))
-                .findFirst().orElse(null);
-        if (player == null) {
-            if (state.progress() > 0) data.put(state.withProgress("", Math.max(0, state.progress() - 10)));
-            return;
-        }
-        String playerFaction = ProgressionSavedData.get(level).state(player.getUUID()).factionId();
-        String playerKingdom = KingdomSavedData.get(level).kingdomForPlayer(player.getUUID())
-                .map(record -> record.id().toString()).orElse("");
-        if ((!playerKingdom.isEmpty() && playerKingdom.equals(state.controllingKingdom()))
-                || (!playerFaction.isEmpty() && playerFaction.equals(state.controllingFaction()))) {
-            if (state.progress() > 0) data.put(state.withProgress("", 0));
-            return;
-        }
-        int friendly = ownedMilitaryStrength(level, player, beacon, region.captureRadius());
-        int defenders = defenderStrength(level, player, beacon, region.captureRadius());
-        if (defenders >= friendly) return;
-        int progress = Math.min(region.captureTicks(), state.progress() + (friendly - defenders) * 20);
-        ConquestControlState progressed = state.withProgress(player.getUUID().toString(), progress);
-        if (progress < region.captureTicks()) {
-            data.put(progressed);
-            return;
-        }
-        ConquestControlState captured = progressed.captured(playerFaction, playerKingdom);
-        UUID eventId = UUID.nameUUIDFromBytes(("conquest:" + region.id() + ":"
-                + player.getUUID() + ":" + captured.revision()).getBytes(StandardCharsets.UTF_8));
-        ProgressionSavedData progression = ProgressionSavedData.get(level);
-        GalacticSystemsService.SystemDecision gate = GalacticSystemsService.captureRegion(
-                progression.state(player.getUUID()), eventId, region.id());
-        if (!gate.accepted()) {
-            data.put(progressed.withProgress("", Math.max(0, region.captureTicks() - 20)));
-            return;
-        }
-        var committed = progression.apply(new ProgressionEvent(
-                eventId, player.getUUID(), ProgressionEventType.REGION_CAPTURED, region.id(), 1));
-        if (committed.accepted()) data.put(captured);
+        ConquestCaptureService.tick(level, region, beacon);
     }
 
     private static String namespacedFaction(String factionId) {
@@ -141,30 +94,6 @@ public final class ConquestRuntimeEvents {
         return new BlockPos(region.landmarkX(),
                 level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                         region.landmarkX(), region.landmarkZ()), region.landmarkZ());
-    }
-
-    private static boolean hasOwnedMilitaryRecruit(
-            ServerLevel level, ServerPlayer player, BlockPos beacon, int radius
-    ) {
-        return ownedMilitaryStrength(level, player, beacon, radius) > 0;
-    }
-
-    private static int ownedMilitaryStrength(
-            ServerLevel level, ServerPlayer player, BlockPos beacon, int radius
-    ) {
-        return level.getEntitiesOfClass(GalacticRecruitEntity.class,
-                        new net.minecraft.world.phys.AABB(beacon).inflate(radius),
-                        recruit -> recruit.isAlive() && recruit.isOwnedBy(player)
-                                && recruit.getServiceBranch() == NpcServiceBranch.MILITARY).size();
-    }
-
-    private static int defenderStrength(
-            ServerLevel level, ServerPlayer player, BlockPos beacon, int radius
-    ) {
-        return level.getEntitiesOfClass(GalacticRecruitEntity.class,
-                        new net.minecraft.world.phys.AABB(beacon).inflate(radius),
-                recruit -> recruit.isAlive() && recruit.getServiceBranch() == NpcServiceBranch.MILITARY
-                                && recruit.factionRelationTo(player) == FactionRelation.ENEMY).size();
     }
 
     public static boolean arrivalClear(ServerLevel level, ServerPlayer player, BlockPos arrival) {
