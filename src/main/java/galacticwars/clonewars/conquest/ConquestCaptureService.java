@@ -54,11 +54,8 @@ public final class ConquestCaptureService {
             }
             return CaptureResult.accepted(false, "awaiting_commander", state);
         }
-        String playerFaction = ProgressionSavedData.get(level).state(player.getUUID()).factionId();
-        String playerKingdom = KingdomSavedData.get(level).kingdomForPlayer(player.getUUID())
-                .map(record -> record.id().toString()).orElse("");
-        if ((!playerKingdom.isEmpty() && playerKingdom.equals(state.controllingKingdom()))
-                || (!playerFaction.isEmpty() && playerFaction.equals(state.controllingFaction()))) {
+        String playerFaction = namespacedFaction(
+                ProgressionSavedData.get(level).state(player.getUUID()).factionId());
             if (state.progress() > 0) {
                 state = state.withProgress("", 0);
                 data.put(state);
