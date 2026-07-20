@@ -32,6 +32,11 @@ public record ArmyCommand(
         return new ArmyCommand(ArmyCommandType.PROTECT_OWNER, issuedBy, groupId, null, null);
     }
 
+    public static ArmyCommand protectEntity(UUID issuedBy, UUID groupId, UUID targetEntityId) {
+        return new ArmyCommand(ArmyCommandType.PROTECT_ENTITY, issuedBy, groupId, null,
+                Objects.requireNonNull(targetEntityId, "targetEntityId"));
+    }
+
     public static ArmyCommand attackTarget(UUID issuedBy, UUID groupId, UUID targetEntityId) {
         return new ArmyCommand(ArmyCommandType.ATTACK_TARGET, issuedBy, groupId, null,
                 Objects.requireNonNull(targetEntityId, "targetEntityId"));
@@ -39,6 +44,10 @@ public record ArmyCommand(
 
     public static ArmyCommand clearTarget(UUID issuedBy, UUID groupId) {
         return new ArmyCommand(ArmyCommandType.CLEAR_TARGET, issuedBy, groupId, null, null);
+    }
+
+    public static ArmyCommand returnToRally(UUID issuedBy, UUID groupId) {
+        return new ArmyCommand(ArmyCommandType.RETURN_TO_RALLY, issuedBy, groupId, null, null);
     }
 
     public static ArmyCommand patrolRoute(UUID issuedBy, UUID groupId, ArmyPosition waypoint) {

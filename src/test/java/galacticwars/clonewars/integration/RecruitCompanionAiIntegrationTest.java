@@ -10,8 +10,9 @@ public final class RecruitCompanionAiIntegrationTest {
 
     public static void main(String[] args) throws IOException {
         recruitSeparatesGroupedAndLocalRuntimeControl();
-        controllerIntegratesExistingPlannerPipeline();
-        controllerUsesDataDrivenRangedCombat();
+        squadBrainIntegratesExistingPlannerPipeline();
+        patrolRetreatUsesTransientCohesiveAnchors();
+        squadBrainUsesDataDrivenRangedCombat();
         groupCommandsPersistBeforeRuntimeMutation();
         explicitAttackTargetsAreGuarded();
         missingGroupsReleaseStaleRuntimeOwnership();
@@ -27,11 +28,28 @@ public final class RecruitCompanionAiIntegrationTest {
     private static void recruitSeparatesGroupedAndLocalRuntimeControl() throws IOException {
         String entity = read("src/main/java/galacticwars/clonewars/entity/GalacticRecruitEntity.java");
         String brain = read("src/main/java/galacticwars/clonewars/entity/ai/RecruitBrain.java");
-        String armyBehaviour = read(
-                "src/main/java/galacticwars/clonewars/entity/ai/RecruitArmyRuntimeBehaviour.java");
+        String stateSensor = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/ArmyGroupStateSensor.java");
+        String threatSensor = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/ArmyThreatSensor.java");
+        String orderBehaviour = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/ArmyOrderBehaviour.java");
+        String brainSupport = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/ArmyBrainSupport.java");
+        String compatibilityController = read(
+                "src/main/java/galacticwars/clonewars/army/ArmyRecruitRuntimeController.java");
 
-        assertContains(entity, "ArmyRecruitRuntimeController", "army runtime controller");
-        assertContains(entity, "this.armyRuntimeController.tick(this, level)", "army runtime invocation");
+        assertNotContains(entity, "ArmyRecruitRuntimeController", "legacy army runtime controller");
+        assertNotContains(entity, "tickArmyRuntimeController", "legacy army runtime invocation");
+        assertContains(brain, "new ArmyGroupStateSensor()", "group-state sensor registration");
+        assertContains(brain, "new ArmyThreatSensor()", "threat sensor registration");
+        assertContains(brain, "new ArmyOrderBehaviour()", "group order behaviour registration");
+        assertContains(brain, "new ArmyCombatBehaviour()", "group combat behaviour registration");
+        assertContains(brainSupport, "KingdomSavedData.get(level)", "saved-data squad authority");
+        assertContains(stateSensor, "ArmyBrainMemoryTypes.ARMY_STATE", "ephemeral squad state memory");
+        assertContains(stateSensor, "scanRate(2)", "bounded squad state cadence");
+        assertContains(threatSensor, "scanRate(10)", "bounded squad threat cadence");
+        assertContains(orderBehaviour, "ArmyBrainMemoryTypes.PATH_STATUS", "ephemeral path status memory");
         assertContains(brain, "new RecruitMoveToCommandBehaviour(1.05D)",
                 "local move behaviour registration");
         assertContains(brain, "new RecruitCompanionBehaviour(1.0D)",
@@ -40,44 +58,78 @@ public final class RecruitCompanionAiIntegrationTest {
                 "shouldUseCompanionAi", "companion ownership guard");
         assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/RecruitMoveToCommandBehaviour.java"),
                 "shouldMoveToCommandTarget", "move command guard");
-        assertContains(armyBehaviour, "BrainUtil.clearMemories", "grouped local-memory cleanup");
-        assertContains(armyBehaviour, "recruit.tickArmyRuntimeController(level)",
-                "grouped controller behaviour");
+        String walkTargetBridge = read(
+                "src/main/java/galacticwars/clonewars/entity/ai/RecruitWalkTargetBehaviour.java");
+        assertContains(walkTargetBridge, "&& !recruit.hasAuthoritativeArmyGroup()",
+                "grouped hold formation bypasses only the local sit veto");
+        assertNotContains(walkTargetBridge, "releaseWithoutStopping(recruit);\n            return;",
+                "grouped walk-target bridge bypass");
+        assertContains(compatibilityController, "Compatibility facade",
+                "legacy controller is compatibility-only");
+        assertNotContains(compatibilityController, "void tick(",
+                "legacy controller runtime tick");
+        assertNotContains(compatibilityController, "getNavigation()",
+                "legacy controller navigation path");
+        assertNotContains(compatibilityController, "fireAt(",
+                "legacy controller firing path");
+        assertNotContains(compatibilityController, "doHurtTarget(",
+                "legacy controller melee path");
         assertNotContains(entity, "FollowOwnerGoal", "vanilla dog-like follow goal");
         assertNotContains(entity, "goalSelector.addGoal", "vanilla goal scheduling");
         assertContains(entity, "SmartBrainOwner<GalacticRecruitEntity>", "SmartBrain owner contract");
     }
 
-    private static void controllerIntegratesExistingPlannerPipeline() throws IOException {
-        String controller = read("src/main/java/galacticwars/clonewars/army/ArmyRecruitRuntimeController.java");
+    private static void squadBrainIntegratesExistingPlannerPipeline() throws IOException {
+        String support = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyBrainSupport.java");
+        String order = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyOrderBehaviour.java");
+        String combat = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyCombatBehaviour.java");
 
-        assertContains(controller, "ArmyGroupOrderPlanner.plan", "formation planner");
-        assertContains(controller, "ArmyBehaviorPlanner.plan", "behavior planner");
-        assertContains(controller, "ArmyEngagementPlanner.plan", "engagement planner");
-        assertContains(controller, "ArmyTacticalPlanner.plan", "tactical planner");
-        assertContains(controller, "TARGET_INTERVAL = 20", "bounded target cadence");
-        assertContains(controller, "BEHAVIOR_INTERVAL = 2", "responsive bounded behavior cadence");
-        assertContains(controller, "recruit.isWithinMeleeAttackRange(target)", "runtime melee range");
-        assertContains(controller, "recruit.doHurtTarget(level, target)", "runtime melee execution");
+        assertContains(support, "ArmyGroupOrderPlanner.plan", "formation planner");
+        assertContains(order, "ArmyBehaviorPlanner.plan", "behavior planner");
+        assertContains(support, "ArmyEngagementPlanner.plan", "engagement planner");
+        assertContains(order, "ArmyTacticalPlanner.plan", "tactical planner");
+        assertContains(order, "STALL_TIMEOUT = 200", "bounded group movement recovery");
+        assertContains(order, "ArmyBrainSupport.shouldMaintainFormation",
+                "hold formation target arbitration");
+        assertContains(combat, "ArmyBrainSupport.shouldMaintainFormation",
+                "hold formation prevents pursuit");
+        assertContains(combat, "recruit.isWithinMeleeAttackRange(target)", "runtime melee range");
+        assertContains(combat, "recruit.doHurtTarget(level, target)", "runtime melee execution");
     }
 
-    private static void controllerUsesDataDrivenRangedCombat() throws IOException {
-        String controller = read("src/main/java/galacticwars/clonewars/army/ArmyRecruitRuntimeController.java");
+    private static void patrolRetreatUsesTransientCohesiveAnchors() throws IOException {
+        String order = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyOrderBehaviour.java");
+        String retreatPlanner = read("src/main/java/galacticwars/clonewars/army/ArmyPatrolRetreatPlanner.java");
+
+        assertContains(order, "ArmyPatrolRetreatPlanner.retreatPosition",
+                "loaded patrol retreat formation placement");
+        assertContains(retreatPlanner, "ArmyGroupOrderPlanner.formationPositionForMember",
+                "retreat preserves member formation slots");
+        assertContains(order, "never persisted as an order",
+                "retreat remains one-shot runtime state");
+    }
+
+    private static void squadBrainUsesDataDrivenRangedCombat() throws IOException {
+        String combat = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyCombatBehaviour.java");
         String events = read("src/main/java/galacticwars/clonewars/combat/BlasterCombatEvents.java");
 
-        assertContains(controller, "FactionRangedWeaponService.supportsRecruitRangedCombat",
+        assertContains(combat, "FactionRangedWeaponService.supportsRecruitRangedCombat",
                 "loadout-driven faction ranged-weapon detection");
-        assertContains(controller, "blaster.fireAt(level, recruit, target", "server-authoritative ranged attack");
-        assertContains(controller, "BlasterHeatPolicy.canFire", "ranged heat gate");
-        assertContains(controller, "ArmySupplyPolicy::canFireBlaster", "persisted squad supply gate");
-        assertContains(controller, "data.changeArmySupply(", "authoritative shot supply transaction");
-        assertBefore(controller, "trySpendBlasterSupply(data, group)",
+        assertContains(combat, "ArmyBrainSupport.canUseRangedFire",
+                "server-side ranged doctrine gate");
+        assertContains(read("src/main/java/galacticwars/clonewars/entity/ai/ArmyBrainSupport.java"),
+                "allowsRangedFire(returnFireTarget, commandTarget)", "ranged policy resolution");
+        assertContains(combat, "blaster.fireAt(level, recruit, target", "server-authoritative ranged attack");
+        assertContains(combat, "BlasterHeatPolicy.canFire", "ranged heat gate");
+        assertContains(combat, "ArmySupplyPolicy::canFireBlaster", "persisted squad supply gate");
+        assertContains(combat, "data.changeArmySupply(", "authoritative shot supply transaction");
+        assertBefore(combat, "trySpendBlasterSupply(data, group)",
                 "blaster.fireAt(level, recruit, target", "supply spend before accepted blaster shot");
-        assertContains(controller, "meleeOrClose(recruit, level, target, combatBalance)",
+        assertContains(combat, "meleeOrClose(recruit, level, data, group, state, target)",
                 "empty-supply melee fallback");
-        assertContains(controller, "FactionRangedWeaponService.supportsRecruitRangedCombat",
+        assertContains(combat, "FactionRangedWeaponService.supportsRecruitRangedCombat",
                 "data-driven blaster and Nightsister bow detection");
-        assertContains(controller, "FactionRangedWeaponService.fireNightsisterBow",
+        assertContains(combat, "FactionRangedWeaponService.fireNightsisterBow",
                 "Nightsister archer ranged execution");
         assertContains(events, "projectile.getOwner() instanceof LivingEntity shooter",
                 "recruit projectile filtering");
@@ -109,8 +161,8 @@ public final class RecruitCompanionAiIntegrationTest {
         assertContains(entity, "KingdomFactionRelations.resolve", "dynamic kingdom diplomacy resolver");
         assertContains(validation, "target instanceof Monster", "non-faction hostile target rule");
 
-        String controller = read("src/main/java/galacticwars/clonewars/army/ArmyRecruitRuntimeController.java");
-        assertContains(controller, "recruit.canAttackFactionPlayer(player)", "retaliatory player diplomacy guard");
+        String support = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyBrainSupport.java");
+        assertContains(support, "recruit.canAttackFactionPlayer(player)", "retaliatory player diplomacy guard");
     }
 
     private static void missingGroupsReleaseStaleRuntimeOwnership() throws IOException {
@@ -127,10 +179,11 @@ public final class RecruitCompanionAiIntegrationTest {
     }
 
     private static void groupedNavigationDoesNotDependOnWorksiteState() throws IOException {
-        String controller = read("src/main/java/galacticwars/clonewars/army/ArmyRecruitRuntimeController.java");
+        String stateSensor = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyGroupStateSensor.java");
+        String order = read("src/main/java/galacticwars/clonewars/entity/ai/ArmyOrderBehaviour.java");
 
-        assertContains(controller, "group.order().type()", "persisted group order");
-        assertNotContains(controller, "workTarget", "worksite-independent army control");
+        assertContains(stateSensor, "resolveState", "persisted group order projection");
+        assertNotContains(order, "workTarget", "worksite-independent army control");
     }
 
     private static void workOrdersStayServerSide() throws IOException {
@@ -172,12 +225,17 @@ public final class RecruitCompanionAiIntegrationTest {
 
     private static void walkTargetsRespectTheirArrivalRadius() throws IOException {
         String behaviour = read(
-                "src/main/java/galacticwars/clonewars/entity/ai/RecruitWalkTargetBehaviour.java");
+                "src/main/java/galacticwars/clonewars/entity/ai/RecruitWalkTargetBehaviour.java")
+                .replace("\r\n", "\n");
 
-        assertContains(behaviour, "createPath(targetPos, walkTarget.getCloseEnoughDist())",
-                "walk-target pathfinding arrival radius");
-        assertNotContains(behaviour, "createPath(targetPos, 0)",
-                "exact-block walk-target pathfinding");
+        assertContains(behaviour,
+                "targetPos.distManhattan(recruit.blockPosition())\n                <= walkTarget.getCloseEnoughDist()",
+                "walk-target arrival radius guard");
+        assertContains(behaviour,
+                "recruit.getNavigation().moveTo(\n                targetPos.getX() + 0.5D,",
+                "coordinate walk-target navigation bridge");
+        assertNotContains(behaviour, "createPath(targetPos,",
+                "precomputed walk-target path bridge");
     }
 
     private static String read(String relativePath) throws IOException {

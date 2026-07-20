@@ -14,6 +14,8 @@ object ClientPacketBridge {
     private val classHudHandler = AtomicReference(noClassHudHandler)
     private val noGameplayCatalogHandler = Consumer<GameplayCatalogPayload> { }
     private val gameplayCatalogHandler = AtomicReference(noGameplayCatalogHandler)
+    private val noFieldCommandStateHandler = Consumer<FieldCommandStatePayload> { }
+    private val fieldCommandStateHandler = AtomicReference(noFieldCommandStateHandler)
 
     @JvmStatic
     fun installForceHudHandler(handler: Consumer<ForceHudPayload>) {
@@ -46,9 +48,20 @@ object ClientPacketBridge {
     }
 
     @JvmStatic
+    fun installFieldCommandStateHandler(handler: Consumer<FieldCommandStatePayload>) {
+        fieldCommandStateHandler.set(handler)
+    }
+
+    @JvmStatic
+    fun handleFieldCommandState(payload: FieldCommandStatePayload) {
+        fieldCommandStateHandler.get().accept(payload)
+    }
+
+    @JvmStatic
     fun clearClientHandlers() {
         forceHudHandler.set(noForceHudHandler)
         classHudHandler.set(noClassHudHandler)
         gameplayCatalogHandler.set(noGameplayCatalogHandler)
+        fieldCommandStateHandler.set(noFieldCommandStateHandler)
     }
 }

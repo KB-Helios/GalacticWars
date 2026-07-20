@@ -1,6 +1,7 @@
 package galacticwars.clonewars.army;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public final class ArmyGroupOrderPlannerTest {
@@ -10,12 +11,17 @@ public final class ArmyGroupOrderPlannerTest {
     private static final UUID SECOND_RECRUIT_ID = UUID.fromString("00000000-0000-0000-0000-000000000304");
     private static final UUID THIRD_RECRUIT_ID = UUID.fromString("00000000-0000-0000-0000-000000000305");
     private static final UUID TARGET_ID = UUID.fromString("00000000-0000-0000-0000-000000000306");
+    private static final UUID KINGDOM_ID = UUID.fromString("00000000-0000-0000-0000-000000000307");
+    private static final UUID COMMANDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000308");
 
     private ArmyGroupOrderPlannerTest() {
     }
 
     public static void main(String[] args) {
         assignsMoveOrdersToLineFormationPositions();
+        preservesPersistedSlotsWhenRotatingFormationPositions();
+        appliesPersistedTacticsYawToRecordPlanning();
+        preservesPersistedSlotsThroughRematerializationPlacement();
         assignsHoldOrdersToColumnFormationPositions();
         assignsPatrolOrdersToFormationPositions();
         assignsFollowAndProtectOrdersToOwnerRelativeFormationPositions();
@@ -40,6 +46,107 @@ public final class ArmyGroupOrderPlannerTest {
         assertAssignment(assignments.get(2), THIRD_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
                 new ArmyPosition(12, 64, 20), new FormationSlot(2, 2, 0), "move third");
         assertEquals("move_group_order", assignments.get(0).reasonCode(), "move reason");
+    }
+
+    private static void preservesPersistedSlotsWhenRotatingFormationPositions() {
+        ArmyPosition anchor = new ArmyPosition(10, 64, 20);
+        ArmyGroupState group = populatedGroup()
+                .applyCommand(ArmyCommand.moveToPosition(OWNER_ID, GROUP_ID, anchor));
+
+        List<ArmyGroupOrderAssignment> assignments = ArmyGroupOrderPlanner.plan(
+                group,
+                ArmyFormation.LINE,
+                2,
+                null,
+                90.0F,
+                List.of(
+                        new ArmyFormationSlotAssignment(FIRST_RECRUIT_ID, 2),
+                        new ArmyFormationSlotAssignment(SECOND_RECRUIT_ID, 0),
+                        new ArmyFormationSlotAssignment(THIRD_RECRUIT_ID, 1)));
+
+        assertAssignment(assignments.get(0), SECOND_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(10, 64, 18), new FormationSlot(0, -2, 0), "yaw slot zero");
+        assertAssignment(assignments.get(1), THIRD_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(10, 64, 20), new FormationSlot(1, 0, 0), "yaw slot one");
+        assertAssignment(assignments.get(2), FIRST_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(10, 64, 22), new FormationSlot(2, 2, 0), "yaw slot two");
+    }
+
+    private static void appliesPersistedTacticsYawToRecordPlanning() {
+        ArmyLocation anchor = new ArmyLocation("minecraft:overworld", 10, 64, 20);
+        ArmyGroupRecord group = new ArmyGroupRecord(
+                GROUP_ID,
+                OWNER_ID,
+                KINGDOM_ID,
+                Optional.of(COMMANDER_ID),
+                List.of(FIRST_RECRUIT_ID, SECOND_RECRUIT_ID, THIRD_RECRUIT_ID),
+                new ArmyGroupOrder(
+                        ArmyCommandType.MOVE_TO_POSITION,
+                        Optional.of(anchor),
+                        Optional.empty(),
+                        ArmyFormation.LINE,
+                        2),
+                new ArmyGroupSimulation(ArmyGroupLifecycleState.LIVE, anchor, 0L, 0L, 0L, ""),
+                List.of(),
+                "Yaw squad",
+                Optional.of(anchor),
+                List.of(),
+                Optional.empty(),
+                0,
+                Optional.of(List.of(
+                        new ArmyFormationSlotAssignment(FIRST_RECRUIT_ID, 2),
+                        new ArmyFormationSlotAssignment(SECOND_RECRUIT_ID, 0),
+                        new ArmyFormationSlotAssignment(THIRD_RECRUIT_ID, 1))),
+                Optional.empty(),
+                Optional.of(ArmyGroupTactics.DEFAULT.withFormationYaw(90.0F)));
+
+        List<ArmyGroupOrderAssignment> assignments = ArmyGroupOrderPlanner.plan(group, null);
+
+        assertAssignment(assignments.get(0), SECOND_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(10, 64, 18), new FormationSlot(0, -2, 0), "record yaw slot zero");
+        assertAssignment(assignments.get(1), THIRD_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(10, 64, 20), new FormationSlot(1, 0, 0), "record yaw slot one");
+        assertAssignment(assignments.get(2), FIRST_RECRUIT_ID, ArmyCommandType.MOVE_TO_POSITION,
+                new ArmyPosition(10, 64, 22), new FormationSlot(2, 2, 0), "record yaw slot two");
+    }
+
+    private static void preservesPersistedSlotsThroughRematerializationPlacement() {
+        ArmyLocation anchor = new ArmyLocation("minecraft:overworld", 10, 64, 20);
+        ArmyGroupRecord group = new ArmyGroupRecord(
+                GROUP_ID,
+                OWNER_ID,
+                KINGDOM_ID,
+                Optional.of(COMMANDER_ID),
+                List.of(FIRST_RECRUIT_ID, SECOND_RECRUIT_ID, THIRD_RECRUIT_ID),
+                new ArmyGroupOrder(
+                        ArmyCommandType.MOVE_TO_POSITION,
+                        Optional.of(anchor),
+                        Optional.empty(),
+                        ArmyFormation.LINE,
+                        2),
+                new ArmyGroupSimulation(ArmyGroupLifecycleState.VIRTUAL, anchor, 0L, 0L, 1L, ""),
+                List.of(),
+                "Yaw squad",
+                Optional.of(anchor),
+                List.of(),
+                Optional.empty(),
+                0,
+                Optional.of(List.of(
+                        new ArmyFormationSlotAssignment(FIRST_RECRUIT_ID, 2),
+                        new ArmyFormationSlotAssignment(SECOND_RECRUIT_ID, 0),
+                        new ArmyFormationSlotAssignment(THIRD_RECRUIT_ID, 1))),
+                Optional.empty(),
+                Optional.of(ArmyGroupTactics.DEFAULT.withFormationYaw(90.0F)));
+
+        ArmyPosition anchorPosition = anchor.blockPosition();
+        assertEquals(anchorPosition, ArmyGroupOrderPlanner.formationPositionForMember(
+                group, COMMANDER_ID, anchorPosition), "commander remains at formation anchor");
+        assertEquals(new ArmyPosition(10, 64, 18), ArmyGroupOrderPlanner.formationPositionForMember(
+                group, SECOND_RECRUIT_ID, anchorPosition), "slot zero respawn position");
+        assertEquals(new ArmyPosition(10, 64, 20), ArmyGroupOrderPlanner.formationPositionForMember(
+                group, THIRD_RECRUIT_ID, anchorPosition), "slot one respawn position");
+        assertEquals(new ArmyPosition(10, 64, 22), ArmyGroupOrderPlanner.formationPositionForMember(
+                group, FIRST_RECRUIT_ID, anchorPosition), "slot two respawn position");
     }
 
     private static void assignsHoldOrdersToColumnFormationPositions() {

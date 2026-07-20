@@ -3,6 +3,7 @@ package galacticwars.clonewars.item;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import galacticwars.clonewars.registry.ModDataComponents;
+import galacticwars.clonewars.registry.ModItems;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,6 +87,9 @@ public record CommandTargetSelection(
     }
 
     private static CommandTargetSelection validSelection(ItemStack stack, ServerLevel level) {
+        if (!stack.is(ModItems.COMMAND_MARKER.get())) {
+            return null;
+        }
         CommandTargetSelection selection = stack.get(ModDataComponents.COMMAND_TARGET.get());
         return selection != null && selection.isIn(level) ? selection : null;
     }

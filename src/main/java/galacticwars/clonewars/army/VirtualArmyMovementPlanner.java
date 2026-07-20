@@ -28,9 +28,24 @@ public final class VirtualArmyMovementPlanner {
             Optional<ArmyLocation> onlineOwnerLocation,
             double slowestMovementSpeed
     ) {
+        return decide(order, anchor, onlineOwnerLocation, Optional.empty(), slowestMovementSpeed);
+    }
+
+    /**
+     * Durable rally orders require the group's persisted rally point. The
+     * legacy overload intentionally has no rally point and remains unchanged.
+     */
+    public static VirtualArmyMovementDecision decide(
+            ArmyGroupOrder order,
+            ArmyLocation anchor,
+            Optional<ArmyLocation> onlineOwnerLocation,
+            Optional<ArmyLocation> rallyPoint,
+            double slowestMovementSpeed
+    ) {
         Objects.requireNonNull(order, "order");
         Objects.requireNonNull(anchor, "anchor");
         onlineOwnerLocation = onlineOwnerLocation == null ? Optional.empty() : onlineOwnerLocation;
+        rallyPoint = rallyPoint == null ? Optional.empty() : rallyPoint;
 
         if (order.type() == ArmyCommandType.HOLD_POSITION) {
             return new VirtualArmyMovementDecision(anchor, HOLDING_POSITION);
@@ -42,7 +57,8 @@ public final class VirtualArmyMovementPlanner {
         Optional<ArmyLocation> destination = switch (order.type()) {
             case MOVE_TO_POSITION, ATTACK_TARGET, PATROL_ROUTE -> order.targetPosition();
             case FOLLOW_OWNER, PROTECT_OWNER -> onlineOwnerLocation;
-            case HOLD_POSITION, CLEAR_TARGET -> Optional.empty();
+            case RETURN_TO_RALLY -> rallyPoint;
+            case PROTECT_ENTITY, HOLD_POSITION, CLEAR_TARGET -> Optional.empty();
         };
         if (destination.isEmpty()) {
             String reason = order.type() == ArmyCommandType.FOLLOW_OWNER
@@ -83,19 +99,40 @@ public final class VirtualArmyMovementPlanner {
         if (gameTime < 0L) {
             throw new IllegalArgumentException("gameTime cannot be negative");
         }
+        if (group.order().type() == ArmyCommandType.PATROL_ROUTE
+                && group.effectivePatrolPlan()
+                        .map(ArmyPatrolPlan::state)
+                        .map(ArmyPatrolState::status)
+                        .filter(status -> status != ArmyPatrolStatus.ACTIVE)
+                        .isPresent()) {
+            ArmyPatrolStatus status = group.effectivePatrolPlan().orElseThrow().state().status();
+            return status == ArmyPatrolStatus.PAUSED
+                    ? advancePausedPatrolClock(group, gameTime)
+                    : pause(group, "patrol_stopped", gameTime);
+        }
+
+        double effectiveSpeed = group.order().type() == ArmyCommandType.PATROL_ROUTE
+                ? slowestMovementSpeed * group.effectivePatrolPlan()
+                        .map(ArmyPatrolPlan::movementSpeed)
+                        .orElse(ArmyPatrolPlan.DEFAULT_MOVEMENT_SPEED)
+                : slowestMovementSpeed;
         VirtualArmyMovementDecision decision = decide(
-                group.order(), group.simulation().anchor(), onlineOwnerLocation, slowestMovementSpeed);
+                group.order(), group.simulation().anchor(), onlineOwnerLocation, group.rallyPoint(), effectiveSpeed);
+        boolean patrolReachedWaypoint = group.order().type() == ArmyCommandType.PATROL_ROUTE
+                && decision.pauseReason().equals(DESTINATION_REACHED);
         if (decision.anchor().equals(group.simulation().anchor())
-                && decision.pauseReason().equals(group.simulation().blockedReason())) {
+                && decision.pauseReason().equals(group.simulation().blockedReason())
+                && !patrolReachedWaypoint) {
             return group;
         }
         ArmyGroupSimulation simulation = group.simulation().advance(
                 decision.anchor(), gameTime, decision.pauseReason());
         ArmyGroupRecord advanced = group.withSimulation(simulation, group.snapshots());
-        if (group.order().type() == ArmyCommandType.PATROL_ROUTE
-                && decision.pauseReason().equals(DESTINATION_REACHED)
-                && group.patrolRoute().size() >= 2) {
-            return advancePatrolWaypoint(advanced, decision.anchor());
+        if (patrolReachedWaypoint) {
+            return advancePatrolWaypoint(
+                    advanced,
+                    decision.anchor(),
+                    elapsedTicksSinceLastSimulation(group, gameTime));
         }
         return advanced;
     }
@@ -117,9 +154,35 @@ public final class VirtualArmyMovementPlanner {
                 group.snapshots());
     }
 
-    private static ArmyGroupRecord advancePatrolWaypoint(ArmyGroupRecord group, ArmyLocation currentLocation) {
-        ArmyGroupOrder nextOrder = ArmyPatrolOrderPlanner.nextOrder(
-                group, currentLocation.blockPosition());
-        return nextOrder.equals(group.order()) ? group : group.withOrder(nextOrder);
+    private static ArmyGroupRecord advancePatrolWaypoint(
+            ArmyGroupRecord group,
+            ArmyLocation currentLocation,
+            int elapsedTicks
+    ) {
+        return ArmyPatrolOrderPlanner.advance(group, currentLocation.blockPosition(), elapsedTicks)
+                .map(decision -> group.withPatrolPlanAndOrder(decision.nextPlan(), decision.nextOrder()))
+                .orElse(group);
+    }
+
+    private static int elapsedTicksSinceLastSimulation(ArmyGroupRecord group, long gameTime) {
+        long elapsedTicks = Math.max(0L, gameTime - group.simulation().lastSimulationGameTime());
+        return (int)Math.min(Integer.MAX_VALUE, elapsedTicks);
+    }
+
+    /**
+     * A paused virtual patrol must preserve its route state but still record
+     * wall-clock progress. Otherwise a later resume would treat the entire
+     * pause duration as active dwell time. Stopped patrols deliberately use
+     * {@link #pause(ArmyGroupRecord, String, long)} and remain stable instead.
+     */
+    private static ArmyGroupRecord advancePausedPatrolClock(ArmyGroupRecord group, long gameTime) {
+        ArmyGroupSimulation simulation = group.simulation();
+        if (gameTime <= simulation.lastSimulationGameTime()
+                && simulation.blockedReason().equals("patrol_paused")) {
+            return group;
+        }
+        return group.withSimulation(
+                simulation.advance(simulation.anchor(), gameTime, "patrol_paused"),
+                group.snapshots());
     }
 }

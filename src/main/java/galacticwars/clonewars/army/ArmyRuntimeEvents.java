@@ -201,11 +201,7 @@ public final class ArmyRuntimeEvents {
         if (snapshots.isEmpty()) {
             return;
         }
-        List<ArmyPosition> positions = FormationPlanner.planPositions(
-                group.simulation().anchor().blockPosition(),
-                group.order().formation(),
-                snapshots.size(),
-                group.order().spacing());
+        ArmyPosition anchor = group.simulation().anchor().blockPosition();
         boolean complete = true;
         for (int index = 0; index < snapshots.size(); index++) {
             ArmyMemberSnapshot snapshot = snapshots.get(index);
@@ -217,7 +213,8 @@ public final class ArmyRuntimeEvents {
             if (existing != null) {
                 existing.discard();
             }
-            ArmyPosition planned = positions.get(index);
+            ArmyPosition planned = ArmyGroupOrderPlanner.formationPositionForMember(
+                    group, snapshot.recruitId(), anchor);
             GalacticRecruitEntity recruit = createRecruit(level, snapshot, group.id(), planned);
             if (recruit == null) {
                 complete = false;

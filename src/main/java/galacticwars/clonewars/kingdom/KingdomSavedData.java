@@ -607,6 +607,54 @@ public final class KingdomSavedData extends SavedData {
         return true;
     }
 
+    /**
+     * Applies a bounded set of already-validated squad replacements as one
+     * SavedData transaction. The caller supplies the revision observed for
+     * every group; no update is written unless every selected group still
+     * belongs to the issuing player's kingdom and matches that revision.
+     */
+    public boolean replaceArmyGroupsAtomically(
+            UUID actorId,
+            List<ArmyGroupRecord> replacements,
+            Map<UUID, Long> expectedRevisions
+    ) {
+        Objects.requireNonNull(actorId, "actorId");
+        Objects.requireNonNull(replacements, "replacements");
+        Objects.requireNonNull(expectedRevisions, "expectedRevisions");
+        if (replacements.isEmpty() || replacements.size() > 8
+                || expectedRevisions.size() != replacements.size()) {
+            return false;
+        }
+
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        if (kingdom == null || !kingdom.allows(actorId, KingdomPermission.COMMAND_ARMY)) {
+            return false;
+        }
+
+        LinkedHashMap<UUID, ArmyGroupRecord> updates = new LinkedHashMap<>();
+        for (ArmyGroupRecord replacement : replacements) {
+            if (replacement == null || updates.putIfAbsent(replacement.id(), replacement) != null) {
+                return false;
+            }
+            Long expectedRevision = expectedRevisions.get(replacement.id());
+            ArmyGroupRecord current = armyGroupsById.get(replacement.id());
+            if (expectedRevision == null || current == null
+                    || current.simulation().revision() != expectedRevision
+                    || replacement.simulation().revision() != expectedRevision + 1L
+                    || !current.ownerId().equals(replacement.ownerId())
+                    || !current.kingdomId().equals(kingdom.id())
+                    || !current.kingdomId().equals(replacement.kingdomId())
+                    || !current.commanderId().equals(replacement.commanderId())
+                    || !current.memberIds().equals(replacement.memberIds())) {
+                return false;
+            }
+        }
+
+        updates.forEach(armyGroupsById::put);
+        this.setDirty();
+        return true;
+    }
+
     public boolean upsertArmySnapshot(UUID groupId, ArmyMemberSnapshot snapshot) {
         ArmyGroupRecord current = armyGroupsById.get(groupId);
         if (current == null || !current.contains(snapshot.recruitId())) {

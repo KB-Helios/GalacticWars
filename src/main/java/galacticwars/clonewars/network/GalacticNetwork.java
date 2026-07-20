@@ -1,7 +1,9 @@
 package galacticwars.clonewars.network;
 
+import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.networking.NetworkManager;
 import galacticwars.clonewars.GalacticWars;
+import galacticwars.clonewars.army.ArmyFieldCommandService;
 import galacticwars.clonewars.force.ForceWorldEffectService;
 import galacticwars.clonewars.classes.PlayerClassRuntime;
 import galacticwars.clonewars.menu.CommandCenterOperationsMenu;
@@ -50,6 +52,10 @@ public final class GalacticNetwork {
                 MenuActionPayload.TYPE,
                 MenuActionPayload.STREAM_CODEC,
                 GalacticNetwork::handleMenuAction);
+        NetworkManager.registerC2S(
+                FieldCommandRequestPayload.TYPE,
+                FieldCommandRequestPayload.STREAM_CODEC,
+                GalacticNetwork::handleFieldCommand);
         NetworkManager.registerS2C(
                 ForceHudPayload.TYPE,
                 ForceHudPayload.STREAM_CODEC,
@@ -63,9 +69,14 @@ public final class GalacticNetwork {
                 CommandCenterStatePayload.STREAM_CODEC,
                 GalacticNetwork::handleCommandCenterState);
         NetworkManager.registerS2C(
+                FieldCommandStatePayload.TYPE,
+                FieldCommandStatePayload.STREAM_CODEC,
+                GalacticNetwork::handleFieldCommandState);
+        NetworkManager.registerS2C(
                 GameplayCatalogPayload.TYPE,
                 GameplayCatalogPayload.STREAM_CODEC,
                 GalacticNetwork::handleGameplayCatalog);
+        PlayerEvent.PLAYER_QUIT.register(player -> ArmyFieldCommandService.clearReplayHistory(player.getUUID()));
         GameplayCatalogSync.register();
     }
 
@@ -156,6 +167,17 @@ public final class GalacticNetwork {
         });
     }
 
+    private static void handleFieldCommand(
+            FieldCommandRequestPayload payload,
+            NetworkManager.PacketContext context
+    ) {
+        if (context.getPlayer() instanceof ServerPlayer player) {
+            context.queue(() -> CHANNEL.sendToPlayer(
+                    () -> player,
+                    ArmyFieldCommandService.execute(player, payload)));
+        }
+    }
+
     private static void handleForceHud(
             ForceHudPayload payload,
             NetworkManager.PacketContext context
@@ -184,6 +206,13 @@ public final class GalacticNetwork {
                 operations.applyClientDashboard(payload.state());
             }
         });
+    }
+
+    private static void handleFieldCommandState(
+            FieldCommandStatePayload payload,
+            NetworkManager.PacketContext context
+    ) {
+        context.queue(() -> ClientPacketBridge.handleFieldCommandState(payload));
     }
 
     private static void handleGameplayCatalog(

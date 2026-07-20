@@ -15,8 +15,8 @@ import net.tslat.smartbrainlib.util.BrainUtil;
  * Consumes SmartBrain walk memories while keeping non-brain navigation controllers independent.
  *
  * <p>SmartBrainLib's stock mover does not start its computed path on Minecraft 26.2, so this
- * behaviour supplies the same memory-to-navigation bridge without moving command-specific state
- * out of the behaviours that publish the target.</p>
+ * behaviour dispatches the published memory through Minecraft navigation without moving
+ * command-specific state out of the behaviours that publish the target.</p>
  */
 public final class RecruitWalkTargetBehaviour
         extends ExtendedBehaviour<GalacticRecruitEntity> {
@@ -48,11 +48,11 @@ public final class RecruitWalkTargetBehaviour
 
     @Override
     protected void tick(GalacticRecruitEntity recruit) {
-        if (recruit.hasAuthoritativeArmyGroup()) {
-            releaseWithoutStopping(recruit);
-            return;
-        }
-        if (recruit.isTame() && recruit.isOrderedToSit()) {
+        // Group orders reuse the legacy HOLD_POSITION command for UI/state
+        // compatibility, which marks the recruit as sitting. The group brain
+        // still needs to publish its formation target before it can hold it.
+        if (recruit.isTame() && recruit.isOrderedToSit()
+                && !recruit.hasAuthoritativeArmyGroup()) {
             BrainUtil.clearMemory(recruit, MemoryModuleType.WALK_TARGET);
             stopOwnedNavigation(recruit);
             return;
@@ -95,23 +95,27 @@ public final class RecruitWalkTargetBehaviour
             WalkTarget walkTarget,
             BlockPos targetPos
     ) {
-        Path path = recruit.getNavigation().createPath(targetPos, walkTarget.getCloseEnoughDist());
         lastTargetPos = targetPos.immutable();
         nextRepathTick = recruit.tickCount + REPATH_INTERVAL;
+        boolean wasControllingNavigation = controlsNavigation;
+        // The coordinate overload owns path construction and installs its move-control state in
+        // one operation. Re-submitting a precomputed Path can leave that state idle on 26.2.
+        controlsNavigation = recruit.getNavigation().moveTo(
+                targetPos.getX() + 0.5D,
+                targetPos.getY(),
+                targetPos.getZ() + 0.5D,
+                walkTarget.getSpeedModifier());
+        Path path = controlsNavigation ? recruit.getNavigation().getPath() : null;
         if (path == null) {
-            if (controlsNavigation) {
+            if (wasControllingNavigation) {
                 recruit.getNavigation().stop();
             }
             controlsNavigation = false;
             BrainUtil.clearMemory(recruit, MemoryModuleType.PATH);
             return;
         }
-
-        controlsNavigation = recruit.getNavigation().moveTo(
-                path,
-                walkTarget.getSpeedModifier());
         BrainUtil.setOrClearMemory(recruit.getBrain(), MemoryModuleType.PATH,
-                controlsNavigation ? path : null);
+                path);
     }
 
     private void stopOwnedNavigation(GalacticRecruitEntity recruit) {

@@ -7,14 +7,25 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import galacticwars.clonewars.army.ArmyFormation;
+import galacticwars.clonewars.army.ArmyFormationSlotAssignment;
+import galacticwars.clonewars.army.ArmyGroupTactics;
 import galacticwars.clonewars.army.ArmyGroupLifecycleState;
 import galacticwars.clonewars.army.ArmyGroupOrder;
 import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyGroupSimulation;
 import galacticwars.clonewars.army.ArmyLocation;
 import galacticwars.clonewars.army.ArmyMemberSnapshot;
+import galacticwars.clonewars.army.ArmyPatrolEnemyPolicy;
+import galacticwars.clonewars.army.ArmyPatrolMode;
+import galacticwars.clonewars.army.ArmyPatrolPlan;
+import galacticwars.clonewars.army.ArmyPatrolState;
+import galacticwars.clonewars.army.ArmyPatrolStatus;
+import galacticwars.clonewars.army.ArmyPatrolWaypoint;
+import galacticwars.clonewars.army.ArmyRangedFirePolicy;
 import galacticwars.clonewars.army.ArmySnapshotEquipment;
 import galacticwars.clonewars.army.ArmyCommandType;
+import galacticwars.clonewars.army.ArmyEngagementStance;
+import galacticwars.clonewars.army.ArmyTargetPriority;
 import galacticwars.clonewars.recruitment.RecruitDuty;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.workforce.WorkerProfession;
@@ -155,6 +166,68 @@ final class KingdomCodecs {
             Codec.STRING.optionalFieldOf("blocked_reason", "").forGetter(ArmyGroupSimulation::blockedReason)
     ).apply(instance, ArmyGroupSimulation::new));
 
+    static final Codec<ArmyFormationSlotAssignment> ARMY_FORMATION_SLOT = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("member_id").forGetter(ArmyFormationSlotAssignment::memberId),
+            Codec.intRange(0, 8192).fieldOf("slot").forGetter(ArmyFormationSlotAssignment::slotIndex)
+    ).apply(instance, ArmyFormationSlotAssignment::new));
+
+    static final Codec<ArmyPatrolWaypoint> ARMY_PATROL_WAYPOINT = RecordCodecBuilder.create(instance -> instance.group(
+            ARMY_LOCATION.fieldOf("location").forGetter(ArmyPatrolWaypoint::location),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("wait_ticks", 0)
+                    .forGetter(ArmyPatrolWaypoint::waitTicks)
+    ).apply(instance, ArmyPatrolWaypoint::new));
+
+    static final Codec<ArmyPatrolStatus> ARMY_PATROL_STATUS = Codec.STRING.xmap(
+            value -> ArmyPatrolStatus.valueOf(value.toUpperCase()),
+            value -> value.name().toLowerCase());
+
+    static final Codec<ArmyPatrolState> ARMY_PATROL_STATE = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.intRange(0, 31).optionalFieldOf("waypoint_index", 0).forGetter(ArmyPatrolState::waypointIndex),
+            Codec.INT.optionalFieldOf("direction", 1).forGetter(ArmyPatrolState::direction),
+            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("wait_ticks_remaining", 0)
+                    .forGetter(ArmyPatrolState::waitTicksRemaining),
+            ARMY_PATROL_STATUS.optionalFieldOf("status", ArmyPatrolStatus.ACTIVE).forGetter(ArmyPatrolState::status)
+    ).apply(instance, ArmyPatrolState::new));
+
+    static final Codec<ArmyPatrolPlan> ARMY_PATROL_PLAN = RecordCodecBuilder.create(instance -> instance.group(
+            ARMY_PATROL_WAYPOINT.listOf().fieldOf("waypoints").forGetter(ArmyPatrolPlan::waypoints),
+            Codec.STRING.xmap(value -> ArmyPatrolMode.valueOf(value.toUpperCase()), value -> value.name().toLowerCase())
+                    .optionalFieldOf("mode", ArmyPatrolMode.LOOP).forGetter(ArmyPatrolPlan::mode),
+            ARMY_PATROL_STATE.optionalFieldOf("state", ArmyPatrolState.start()).forGetter(ArmyPatrolPlan::state),
+            Codec.intRange(0, 64).optionalFieldOf("arrival_distance", ArmyPatrolPlan.DEFAULT_ARRIVAL_DISTANCE)
+                    .forGetter(ArmyPatrolPlan::arrivalDistance),
+            Codec.DOUBLE.optionalFieldOf("movement_speed", ArmyPatrolPlan.DEFAULT_MOVEMENT_SPEED)
+                    .forGetter(ArmyPatrolPlan::movementSpeed),
+            Codec.STRING.xmap(
+                            value -> ArmyPatrolEnemyPolicy.valueOf(value.toUpperCase()),
+                            value -> value.name().toLowerCase())
+                    .optionalFieldOf("enemy_policy", ArmyPatrolEnemyPolicy.ENGAGE_HOSTILES)
+                    .forGetter(ArmyPatrolPlan::enemyPolicy),
+            Codec.STRING.optionalFieldOf("name", ArmyPatrolPlan.DEFAULT_NAME)
+                    .forGetter(ArmyPatrolPlan::name)
+    ).apply(instance, ArmyPatrolPlan::new));
+
+    static final Codec<ArmyGroupTactics> ARMY_GROUP_TACTICS = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.FLOAT.optionalFieldOf("formation_yaw_degrees").forGetter(ArmyGroupTactics::formationYawDegrees),
+            Codec.BOOL.optionalFieldOf("hold_formation", false).forGetter(ArmyGroupTactics::holdFormation),
+            Codec.BOOL.optionalFieldOf("tight_formation", false).forGetter(ArmyGroupTactics::tightFormation),
+            Codec.STRING.xmap(
+                            value -> ArmyEngagementStance.valueOf(value.toUpperCase()),
+                            value -> value.name().toLowerCase())
+                    .optionalFieldOf("engagement_stance", ArmyEngagementStance.DEFENSIVE)
+                    .forGetter(ArmyGroupTactics::engagementStance),
+            Codec.STRING.xmap(
+                            value -> ArmyTargetPriority.valueOf(value.toUpperCase()),
+                            value -> value.name().toLowerCase())
+                    .optionalFieldOf("target_priority", ArmyTargetPriority.COMMAND_TARGET)
+                    .forGetter(ArmyGroupTactics::targetPriority),
+            Codec.STRING.xmap(
+                            value -> ArmyRangedFirePolicy.valueOf(value.toUpperCase()),
+                            value -> value.name().toLowerCase())
+                    .optionalFieldOf("ranged_fire_policy", ArmyRangedFirePolicy.FREE_FIRE)
+                    .forGetter(ArmyGroupTactics::rangedFirePolicy)
+    ).apply(instance, ArmyGroupTactics::new));
+
     static final Codec<ArmyGroupRecord> ARMY_GROUP = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("id").forGetter(ArmyGroupRecord::id),
             UUIDUtil.CODEC.fieldOf("owner_id").forGetter(ArmyGroupRecord::ownerId),
@@ -169,7 +242,11 @@ final class KingdomCodecs {
             ARMY_LOCATION.listOf().optionalFieldOf("patrol_route", List.of()).forGetter(ArmyGroupRecord::patrolRoute),
             UUIDUtil.CODEC.optionalFieldOf("defended_claim_id").forGetter(ArmyGroupRecord::defendedClaimId),
             Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("supply_units", 0)
-                    .forGetter(ArmyGroupRecord::supplyUnits)
+                    .forGetter(ArmyGroupRecord::supplyUnits),
+            ARMY_FORMATION_SLOT.listOf().optionalFieldOf("formation_slots")
+                    .forGetter(ArmyGroupRecord::formationSlotAssignments),
+            ARMY_PATROL_PLAN.optionalFieldOf("patrol_plan").forGetter(ArmyGroupRecord::patrolPlan),
+            ARMY_GROUP_TACTICS.optionalFieldOf("tactics").forGetter(ArmyGroupRecord::tactics)
     ).apply(instance, ArmyGroupRecord::new));
 
     static final Codec<CommanderPolicy> COMMANDER_POLICY = RecordCodecBuilder.create(instance -> instance.group(

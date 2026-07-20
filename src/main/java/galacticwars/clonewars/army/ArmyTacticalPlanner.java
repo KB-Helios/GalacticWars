@@ -36,4 +36,28 @@ public final class ArmyTacticalPlanner {
 
         return ArmyTacticalDecision.execute(behaviorDecision);
     }
+
+    /**
+     * Doctrine-aware tactical entry point. The existing overload remains the
+     * compatibility path; default tactics are defensive only for voluntary
+     * attacks and otherwise preserve all historical vital checks.
+     */
+    public static ArmyTacticalDecision plan(
+            ArmyBehaviorDecision behaviorDecision,
+            RecruitVitals vitals,
+            ArmyPosition fallbackPosition,
+            ArmyGroupTactics tactics
+    ) {
+        Objects.requireNonNull(tactics, "tactics");
+        ArmyTacticalDecision baseline = plan(behaviorDecision, vitals, fallbackPosition);
+        if (baseline.intent() != ArmyTacticalIntent.EXECUTE_ORDER
+                || behaviorDecision.intent() != ArmyBehaviorIntent.ATTACK_TARGET) {
+            return baseline;
+        }
+        return switch (tactics.engagementStance()) {
+            case PASSIVE -> ArmyTacticalDecision.hold(behaviorDecision, fallbackPosition, "passive_stance");
+            case DEFENSIVE -> ArmyTacticalDecision.regroup(behaviorDecision, fallbackPosition, "defensive_stance");
+            case AGGRESSIVE -> baseline;
+        };
+    }
 }

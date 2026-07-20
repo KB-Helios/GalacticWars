@@ -284,7 +284,9 @@ public final class PlanetFactionEcologyResourcesTest {
         if (!Files.isRegularFile(path)) {
             throw new AssertionError("Required planet ecology resource missing <" + path + ">");
         }
-        return Files.readString(path);
+        // Source-contract expectations deliberately use LF. Normalise Windows checkouts so
+        // the contract validates source content rather than line-ending configuration.
+        return Files.readString(path).replace("\r\n", "\n");
     }
 
     private static String section(String content, String start, String end) {

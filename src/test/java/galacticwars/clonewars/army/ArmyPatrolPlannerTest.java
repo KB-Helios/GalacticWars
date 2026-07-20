@@ -18,6 +18,10 @@ public final class ArmyPatrolPlannerTest {
         loopsFromLastWaypointToFirst();
         pingPongReversesAtEndWaypoint();
         waitsBeforeMovingToNextWaypoint();
+        exposesSafeLoadedMovementSpeed();
+        editsNamedRouteAndIndividualWaypointWaitsWithoutLosingProgress();
+        derivesBoundedRetreatAnchorsAwayFromThreats();
+        preservesFormationSlotsDuringTransientPatrolRetreat();
         persistedPatrolOrdersAdvanceAndLoopAtArrival();
         persistedPatrolOrdersHoldUntilArrivalAndRecoverInvalidTargets();
         rejectsInvalidInputs();
@@ -83,6 +87,101 @@ public final class ArmyPatrolPlannerTest {
         assertEquals("moving_to_waypoint", moving.reasonCode(), "post-wait reason");
     }
 
+    private static void exposesSafeLoadedMovementSpeed() {
+        ArmyLocation first = location(POINT_A);
+        ArmyLocation second = location(POINT_B);
+        ArmyPatrolPlan fieldSpeed = new ArmyPatrolPlan(
+                List.of(ArmyPatrolWaypoint.immediate(first), ArmyPatrolWaypoint.immediate(second)),
+                ArmyPatrolMode.LOOP, ArmyPatrolState.start(), 2, 1.25D,
+                ArmyPatrolEnemyPolicy.ENGAGE_HOSTILES);
+        ArmyPatrolPlan extremeSpeed = new ArmyPatrolPlan(
+                List.of(ArmyPatrolWaypoint.immediate(first), ArmyPatrolWaypoint.immediate(second)),
+                ArmyPatrolMode.LOOP, ArmyPatrolState.start(), 2, 20.0D,
+                ArmyPatrolEnemyPolicy.ENGAGE_HOSTILES);
+
+        assertEquals(1.25F, fieldSpeed.loadedMovementSpeed(), "field speed reaches loaded pathing");
+        assertEquals(2.0F, extremeSpeed.loadedMovementSpeed(), "edited speed is bounded for loaded pathing");
+    }
+
+    private static void editsNamedRouteAndIndividualWaypointWaitsWithoutLosingProgress() {
+        ArmyLocation first = location(POINT_A);
+        ArmyLocation second = location(POINT_B);
+        ArmyPatrolState progress = new ArmyPatrolState(1, -1, 40, ArmyPatrolStatus.PAUSED);
+        ArmyPatrolPlan plan = new ArmyPatrolPlan(
+                List.of(new ArmyPatrolWaypoint(first, 0), new ArmyPatrolWaypoint(second, 20)),
+                ArmyPatrolMode.PING_PONG,
+                progress,
+                3,
+                1.25D,
+                ArmyPatrolEnemyPolicy.RETREAT_FROM_HOSTILES,
+                "Landing Pad Sweep");
+
+        ArmyPatrolPlan updated = plan.withName("Hangar Sweep").withWaypointWaitTicks(1, 180);
+
+        assertEquals("Hangar Sweep", updated.name(), "route name edit");
+        assertEquals(0, updated.waypoints().getFirst().waitTicks(), "first waypoint wait retained");
+        assertEquals(180, updated.waypoints().get(1).waitTicks(), "selected waypoint wait updated");
+        assertEquals(progress, updated.state(), "editing route metadata preserves patrol progress");
+        assertEquals(plan.mode(), updated.mode(), "editing route metadata preserves patrol mode");
+        assertEquals(plan.movementSpeed(), updated.movementSpeed(), "editing route metadata preserves speed");
+        assertEquals(plan.enemyPolicy(), updated.enemyPolicy(), "editing route metadata preserves enemy policy");
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.withWaypointWaitTicks(2, 0), "out-of-range waypoint edit");
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.withName(" "), "blank route name");
+    }
+
+    private static void derivesBoundedRetreatAnchorsAwayFromThreats() {
+        ArmyPosition anchor = new ArmyPosition(10, 64, 10);
+        ArmyPosition threat = new ArmyPosition(14, 64, 10);
+
+        ArmyPosition retreat = ArmyPatrolRetreatPlanner.retreatAnchor(anchor, threat, 0.0F);
+
+        assertEquals(new ArmyPosition(-2, 64, 10), retreat, "retreat moves away from threat");
+        assertTrue(horizontalDistanceSquared(retreat, threat) > horizontalDistanceSquared(anchor, threat),
+                "retreat increases threat separation");
+        assertTrue(horizontalDistanceSquared(retreat, anchor)
+                        <= ArmyPatrolRetreatPlanner.RETREAT_STEP_BLOCKS
+                                * ArmyPatrolRetreatPlanner.RETREAT_STEP_BLOCKS,
+                "retreat step is bounded");
+
+        ArmyPosition overlappingThreat = ArmyPatrolRetreatPlanner.retreatAnchor(anchor, anchor, 90.0F);
+        assertEquals(new ArmyPosition(22, 64, 10), overlappingThreat,
+                "overlapping threat uses formation-facing fallback");
+    }
+
+    private static void preservesFormationSlotsDuringTransientPatrolRetreat() {
+        UUID ownerId = new UUID(11L, 1L);
+        UUID kingdomId = new UUID(11L, 2L);
+        UUID commanderId = new UUID(11L, 3L);
+        UUID leftMemberId = new UUID(11L, 4L);
+        UUID rightMemberId = new UUID(11L, 5L);
+        ArmyLocation first = location(POINT_A);
+        ArmyLocation second = location(POINT_B);
+        ArmyGroupRecord group = new ArmyGroupRecord(
+                new UUID(11L, 6L), ownerId, kingdomId, Optional.of(commanderId),
+                List.of(leftMemberId, rightMemberId),
+                new ArmyGroupOrder(ArmyCommandType.PATROL_ROUTE, Optional.of(first), Optional.empty(),
+                        ArmyFormation.LINE, 2),
+                new ArmyGroupSimulation(ArmyGroupLifecycleState.LIVE, first, 0L, 0L, 0L, ""),
+                List.of(), "Retreat patrol", Optional.of(first), List.of(first, second), Optional.empty(), 0,
+                Optional.of(List.of(
+                        new ArmyFormationSlotAssignment(leftMemberId, 0),
+                        new ArmyFormationSlotAssignment(rightMemberId, 1))),
+                Optional.empty(), Optional.of(ArmyGroupTactics.DEFAULT.withFormationYaw(90.0F)));
+        ArmyPosition anchor = first.blockPosition();
+        ArmyPosition threat = new ArmyPosition(4, 64, 0);
+
+        assertEquals(new ArmyPosition(-12, 64, 0), ArmyPatrolRetreatPlanner.retreatPosition(
+                group, commanderId, anchor, threat), "commander takes shared retreat anchor");
+        assertEquals(new ArmyPosition(-12, 64, -1), ArmyPatrolRetreatPlanner.retreatPosition(
+                group, leftMemberId, anchor, threat), "left member keeps slot around retreat anchor");
+        assertEquals(new ArmyPosition(-12, 64, 1), ArmyPatrolRetreatPlanner.retreatPosition(
+                group, rightMemberId, anchor, threat), "right member keeps slot around retreat anchor");
+        assertEquals(ArmyCommandType.PATROL_ROUTE, group.order().type(),
+                "transient retreat does not replace patrol order");
+    }
+
     private static void persistedPatrolOrdersAdvanceAndLoopAtArrival() {
         ArmyLocation first = location(POINT_A);
         ArmyLocation second = location(POINT_B);
@@ -131,6 +230,12 @@ public final class ArmyPatrolPlannerTest {
 
     private static ArmyLocation location(ArmyPosition position) {
         return new ArmyLocation("minecraft:overworld", position.x(), position.y(), position.z());
+    }
+
+    private static long horizontalDistanceSquared(ArmyPosition first, ArmyPosition second) {
+        long x = (long) first.x() - second.x();
+        long z = (long) first.z() - second.z();
+        return x * x + z * z;
     }
 
     private static void rejectsInvalidInputs() {

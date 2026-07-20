@@ -9,7 +9,8 @@ public final class VehicleClientInputIntegrationTest {
 
     public static void main(String[] args) throws Exception {
         String input = Files.readString(Path.of(
-                "src/main/java/galacticwars/clonewars/client/ForceKeyMappings.java"));
+                "src/main/java/galacticwars/clonewars/client/ForceKeyMappings.java"))
+                .replace("\r\n", "\n");
         String language = Files.readString(Path.of(
                 "src/main/resources/assets/galacticwars/lang/en_us.json"));
 

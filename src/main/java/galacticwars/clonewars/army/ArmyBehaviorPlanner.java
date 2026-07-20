@@ -8,6 +8,20 @@ public final class ArmyBehaviorPlanner {
     }
 
     public static ArmyBehaviorDecision plan(RecruitState recruit, ArmyBehaviorContext context) {
+        return plan(recruit, context, null, null, null);
+    }
+
+    /**
+     * Extended pure context for durable protect/rally orders. Existing callers
+     * retain the two-argument overload and therefore legacy behavior.
+     */
+    public static ArmyBehaviorDecision plan(
+            RecruitState recruit,
+            ArmyBehaviorContext context,
+            ArmyPosition protectedEntityPosition,
+            UUID visibleThreatToProtectedEntity,
+            ArmyPosition rallyPosition
+    ) {
         Objects.requireNonNull(recruit, "recruit");
         Objects.requireNonNull(context, "context");
         ArmyCommand command = recruit.currentCommand();
@@ -17,8 +31,13 @@ public final class ArmyBehaviorPlanner {
             case MOVE_TO_POSITION -> ArmyBehaviorDecision.move(command.targetPosition(), "move_command");
             case HOLD_POSITION -> ArmyBehaviorDecision.hold(command.targetPosition(), "hold_command");
             case PROTECT_OWNER -> planProtectOwner(context);
+            case PROTECT_ENTITY -> planProtectEntity(
+                    protectedEntityPosition, visibleThreatToProtectedEntity, context.followRange());
             case ATTACK_TARGET -> planAttack(command.targetEntityId(), context);
             case CLEAR_TARGET -> ArmyBehaviorDecision.idle("target_cleared");
+            case RETURN_TO_RALLY -> rallyPosition == null
+                    ? ArmyBehaviorDecision.idle("rally_target_required")
+                    : ArmyBehaviorDecision.move(rallyPosition, "return_to_rally");
             case PATROL_ROUTE -> ArmyBehaviorDecision.move(command.targetPosition(), "patrol_route");
         };
     }
@@ -42,10 +61,33 @@ public final class ArmyBehaviorPlanner {
     }
 
     private static ArmyBehaviorDecision planAttack(UUID targetEntityId, ArmyBehaviorContext context) {
+        return planAttack(targetEntityId, context, "target_unavailable");
+    }
+
+    private static ArmyBehaviorDecision planAttack(
+            UUID targetEntityId,
+            ArmyBehaviorContext context,
+            String unavailableReason
+    ) {
         if (targetEntityId != null && context.commandTargetAlive()) {
             return ArmyBehaviorDecision.attack(targetEntityId, "attack_command");
         }
-        return ArmyBehaviorDecision.idle("target_unavailable");
+        return ArmyBehaviorDecision.idle(unavailableReason);
+    }
+
+    private static ArmyBehaviorDecision planProtectEntity(
+            ArmyPosition protectedEntityPosition,
+            UUID visibleThreat,
+            int followRange
+    ) {
+        if (visibleThreat != null) {
+            return ArmyBehaviorDecision.attack(visibleThreat, "protected_entity_threat_visible");
+        }
+        if (protectedEntityPosition == null) {
+            return ArmyBehaviorDecision.idle("protected_entity_unavailable");
+        }
+        return ArmyBehaviorDecision.protect(protectedEntityPosition,
+                followRange > 0 ? "protect_entity" : "protect_entity_stationary");
     }
 
     private static int horizontalDistanceSquared(ArmyPosition first, ArmyPosition second) {

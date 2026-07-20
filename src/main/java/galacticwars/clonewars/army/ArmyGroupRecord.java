@@ -19,7 +19,10 @@ public record ArmyGroupRecord(
         Optional<ArmyLocation> rallyPoint,
         List<ArmyLocation> patrolRoute,
         Optional<UUID> defendedClaimId,
-        int supplyUnits
+        int supplyUnits,
+        Optional<List<ArmyFormationSlotAssignment>> formationSlotAssignments,
+        Optional<ArmyPatrolPlan> patrolPlan,
+        Optional<ArmyGroupTactics> tactics
 ) {
     public ArmyGroupRecord {
         Objects.requireNonNull(id, "id");
@@ -49,6 +52,42 @@ public record ArmyGroupRecord(
         if (supplyUnits < 0) {
             throw new IllegalArgumentException("supplyUnits cannot be negative");
         }
+        formationSlotAssignments = normalizeFormationSlots(memberIds, formationSlotAssignments);
+        patrolPlan = normalizePatrolPlan(patrolRoute, patrolPlan);
+        tactics = tactics == null ? Optional.empty() : tactics;
+        if (patrolPlan.isPresent()) {
+            List<ArmyLocation> plannedLocations = patrolPlan.orElseThrow().locations();
+            if (patrolRoute.isEmpty()) {
+                patrolRoute = plannedLocations;
+            } else if (!patrolRoute.equals(plannedLocations)) {
+                throw new IllegalArgumentException("patrolPlan waypoints must match patrolRoute");
+            }
+        }
+    }
+
+    /**
+     * Compatibility constructor retained for existing codecs and save data.
+     * It assigns deterministic UUID slots and derives the legacy loop patrol
+     * plan (zero waits, active, default speed/enemy policy) when a route exists.
+     */
+    public ArmyGroupRecord(
+            UUID id,
+            UUID ownerId,
+            UUID kingdomId,
+            Optional<UUID> commanderId,
+            List<UUID> memberIds,
+            ArmyGroupOrder order,
+            ArmyGroupSimulation simulation,
+            List<ArmyMemberSnapshot> snapshots,
+            String name,
+            Optional<ArmyLocation> rallyPoint,
+            List<ArmyLocation> patrolRoute,
+            Optional<UUID> defendedClaimId,
+            int supplyUnits
+    ) {
+        this(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
+                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits,
+                Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     public ArmyGroupRecord(
@@ -80,7 +119,8 @@ public record ArmyGroupRecord(
                 ArmyGroupOrder.follow(formation),
                 new ArmyGroupSimulation(ArmyGroupLifecycleState.LIVE, anchor, gameTime, 0L, 0L, ""),
                 List.of(), "Squad " + id.toString().substring(0, 4), Optional.of(anchor), List.of(),
-                Optional.empty(), 0);
+                Optional.empty(), 0, Optional.of(ArmyFormationSlotAssignment.assignDeterministically(memberIds)),
+                Optional.empty(), Optional.empty());
     }
 
     public ArmyGroupState plannerState() {
@@ -110,7 +150,8 @@ public record ArmyGroupRecord(
             List<ArmyMemberSnapshot> nextSnapshots
     ) {
         return new ArmyGroupRecord(id, ownerId, kingdomId, commander, members, nextOrder, nextSimulation,
-                nextSnapshots, name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits);
+                nextSnapshots, name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits,
+                formationSlotAssignments, patrolPlan, tactics);
     }
 
     public ArmyGroupRecord withOrder(ArmyGroupOrder order) {
@@ -138,16 +179,23 @@ public record ArmyGroupRecord(
     }
 
     public ArmyGroupRecord withMembers(List<UUID> members) {
-        LinkedHashSet<UUID> retainedIds = new LinkedHashSet<>(members);
+        List<UUID> normalizedMembers = List.copyOf(new LinkedHashSet<>(members));
+        LinkedHashSet<UUID> retainedIds = new LinkedHashSet<>(normalizedMembers);
         commanderId.ifPresent(retainedIds::add);
         List<ArmyMemberSnapshot> retainedSnapshots = snapshots.stream()
                 .filter(snapshot -> retainedIds.contains(snapshot.recruitId()))
                 .toList();
-        return copy(commanderId, members, order,
+        boolean membershipChanged = !new LinkedHashSet<>(memberIds).equals(new LinkedHashSet<>(normalizedMembers));
+        Optional<List<ArmyFormationSlotAssignment>> nextAssignments = !membershipChanged
+                ? formationSlotAssignments
+                : Optional.of(ArmyFormationSlotAssignment.reconcile(
+                        normalizedMembers, effectiveFormationSlotAssignments()));
+        return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, normalizedMembers, order,
                 new ArmyGroupSimulation(
                         simulation.lifecycleState(), simulation.anchor(), simulation.lastSimulationGameTime(),
                         simulation.revision() + 1, simulation.snapshotGeneration(), simulation.blockedReason()),
-                retainedSnapshots);
+                retainedSnapshots, name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits,
+                nextAssignments, patrolPlan, tactics);
     }
 
     public ArmyGroupRecord withSimulation(ArmyGroupSimulation simulation, List<ArmyMemberSnapshot> snapshots) {
@@ -179,26 +227,114 @@ public record ArmyGroupRecord(
 
     public ArmyGroupRecord withName(String name) {
         return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
-                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits);
+                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits,
+                formationSlotAssignments, patrolPlan, tactics);
     }
 
     public ArmyGroupRecord withRallyPoint(ArmyLocation rallyPoint) {
         return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
-                name, Optional.of(rallyPoint), patrolRoute, defendedClaimId, supplyUnits);
+                name, Optional.of(rallyPoint), patrolRoute, defendedClaimId, supplyUnits,
+                formationSlotAssignments, patrolPlan, tactics);
     }
 
     public ArmyGroupRecord withPatrolRoute(List<ArmyLocation> patrolRoute) {
         return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
-                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits);
+                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits, formationSlotAssignments,
+                Optional.empty(), tactics);
+    }
+
+    public ArmyGroupRecord withPatrolPlan(ArmyPatrolPlan patrolPlan) {
+        return withPatrolPlanAndOrder(patrolPlan, order);
+    }
+
+    /**
+     * Updates patrol configuration and its active order in one revision. This
+     * keeps a field-command batch compare-and-swap atomic instead of creating
+     * an intermediate route state that another tick can observe.
+     */
+    public ArmyGroupRecord withPatrolPlanAndOrder(ArmyPatrolPlan patrolPlan, ArmyGroupOrder nextOrder) {
+        Objects.requireNonNull(patrolPlan, "patrolPlan");
+        Objects.requireNonNull(nextOrder, "nextOrder");
+        if (this.patrolPlan.filter(patrolPlan::equals).isPresent() && order.equals(nextOrder)) {
+            return this;
+        }
+        ArmyGroupSimulation nextSimulation = new ArmyGroupSimulation(
+                simulation.lifecycleState(), simulation.anchor(), simulation.lastSimulationGameTime(),
+                simulation.revision() + 1, simulation.snapshotGeneration(), simulation.blockedReason());
+        return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, nextOrder, nextSimulation, snapshots,
+                name, rallyPoint, patrolPlan.locations(), defendedClaimId, supplyUnits, formationSlotAssignments,
+                Optional.of(patrolPlan), tactics);
+    }
+
+    public ArmyGroupRecord pausePatrol() {
+        return effectivePatrolPlan().map(plan -> withPatrolPlan(plan.pause())).orElse(this);
+    }
+
+    public ArmyGroupRecord resumePatrol() {
+        return effectivePatrolPlan().map(plan -> withPatrolPlan(plan.resume())).orElse(this);
+    }
+
+    public ArmyGroupRecord stopPatrol() {
+        return effectivePatrolPlan().map(plan -> withPatrolPlan(plan.stop())).orElse(this);
+    }
+
+    public ArmyGroupRecord withFormationSlotAssignments(List<ArmyFormationSlotAssignment> assignments) {
+        return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
+                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits, Optional.of(List.copyOf(assignments)),
+                patrolPlan, tactics);
+    }
+
+    public ArmyGroupRecord withTactics(ArmyGroupTactics tactics) {
+        Objects.requireNonNull(tactics, "tactics");
+        return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
+                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits, formationSlotAssignments,
+                patrolPlan, Optional.of(tactics));
+    }
+
+    /** A runtime-only legacy derivation; it does not materialize a new saved field. */
+    public List<ArmyFormationSlotAssignment> effectiveFormationSlotAssignments() {
+        return formationSlotAssignments.orElseGet(
+                () -> ArmyFormationSlotAssignment.assignDeterministically(memberIds));
+    }
+
+    /** A runtime-only legacy derivation; it does not materialize a new saved field. */
+    public Optional<ArmyPatrolPlan> effectivePatrolPlan() {
+        return patrolPlan.or(() -> ArmyPatrolPlan.fromLegacyRoute(patrolRoute));
+    }
+
+    /** Legacy groups retain the existing balanced, free-fire doctrine. */
+    public ArmyGroupTactics effectiveTactics() {
+        return tactics.orElse(ArmyGroupTactics.DEFAULT);
     }
 
     public ArmyGroupRecord defendingClaim(UUID claimId) {
         return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
-                name, rallyPoint, patrolRoute, Optional.of(claimId), supplyUnits);
+                name, rallyPoint, patrolRoute, Optional.of(claimId), supplyUnits,
+                formationSlotAssignments, patrolPlan, tactics);
     }
 
     public ArmyGroupRecord withSupplyUnits(int supplyUnits) {
         return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
-                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits);
+                name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits,
+                formationSlotAssignments, patrolPlan, tactics);
+    }
+
+    private static Optional<List<ArmyFormationSlotAssignment>> normalizeFormationSlots(
+            List<UUID> memberIds,
+            Optional<List<ArmyFormationSlotAssignment>> assignments
+    ) {
+        Optional<List<ArmyFormationSlotAssignment>> normalized = assignments == null ? Optional.empty() : assignments;
+        if (normalized.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(ArmyFormationSlotAssignment.reconcile(memberIds, normalized.orElseThrow()));
+    }
+
+    private static Optional<ArmyPatrolPlan> normalizePatrolPlan(
+            List<ArmyLocation> patrolRoute,
+            Optional<ArmyPatrolPlan> patrolPlan
+    ) {
+        Optional<ArmyPatrolPlan> normalized = patrolPlan == null ? Optional.empty() : patrolPlan;
+        return normalized;
     }
 }

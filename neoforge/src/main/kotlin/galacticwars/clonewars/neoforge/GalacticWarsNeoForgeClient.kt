@@ -4,6 +4,7 @@ import dev.architectury.platform.Platform
 import dev.architectury.platform.client.ConfigurationScreenRegistry
 import galacticwars.clonewars.GalacticWars
 import galacticwars.clonewars.GalacticWarsClient
+import galacticwars.clonewars.client.ArmyFieldCommandKeyMappings
 import galacticwars.clonewars.client.ClassKeyMappings
 import galacticwars.clonewars.client.ForceKeyMappings
 import galacticwars.clonewars.client.gui.BlasterHeatHud
@@ -38,6 +39,7 @@ object GalacticWarsNeoForgeClient {
     fun registerKeyMappings(event: RegisterKeyMappingsEvent) {
         ForceKeyMappings.mappings().forEach { event.register(it) }
         ClassKeyMappings.mappings().forEach { event.register(it) }
+        ArmyFieldCommandKeyMappings.mappings().forEach { event.register(it) }
     }
 
     @SubscribeEvent

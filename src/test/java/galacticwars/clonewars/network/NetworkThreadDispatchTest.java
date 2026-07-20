@@ -11,14 +11,14 @@ public final class NetworkThreadDispatchTest {
         String source = Files.readString(Path.of(
                 "src/main/java/galacticwars/clonewars/network/GalacticNetwork.java"));
         int dispatches = source.split("context\\.queue", -1).length - 1;
-        if (dispatches != 9) {
+        if (dispatches != 11) {
             throw new AssertionError("Every Architectury payload handler must dispatch to the main thread");
         }
         int c2sRegistrations = source.split("NetworkManager\\.registerC2S", -1).length - 1;
         int s2cRegistrations = source.split("NetworkManager\\.registerS2C", -1).length - 1;
-        if (c2sRegistrations != 5 || s2cRegistrations != 4
+        if (c2sRegistrations != 6 || s2cRegistrations != 5
                 || !source.contains("CustomPacketPayload")) {
-            throw new AssertionError("Architectury networking must register all nine typed payload directions");
+            throw new AssertionError("Architectury networking must register all eleven typed payload directions");
         }
         System.out.println("NetworkThreadDispatchTest passed");
     }

@@ -22,7 +22,7 @@ public record ArmyGroupOrder(
         boolean positionRequired = type == ArmyCommandType.MOVE_TO_POSITION
                 || type == ArmyCommandType.HOLD_POSITION
                 || type == ArmyCommandType.PATROL_ROUTE;
-        boolean entityRequired = type == ArmyCommandType.ATTACK_TARGET;
+        boolean entityRequired = type == ArmyCommandType.ATTACK_TARGET || type == ArmyCommandType.PROTECT_ENTITY;
         boolean positionForbidden = !positionRequired && type != ArmyCommandType.ATTACK_TARGET;
         if ((positionRequired && targetPosition.isEmpty())
                 || (positionForbidden && targetPosition.isPresent())
@@ -41,8 +41,10 @@ public record ArmyGroupOrder(
             case HOLD_POSITION -> ArmyCommand.holdPosition(ownerId, groupId, targetPosition.orElseThrow().blockPosition());
             case MOVE_TO_POSITION -> ArmyCommand.moveToPosition(ownerId, groupId, targetPosition.orElseThrow().blockPosition());
             case PROTECT_OWNER -> ArmyCommand.protectOwner(ownerId, groupId);
+            case PROTECT_ENTITY -> ArmyCommand.protectEntity(ownerId, groupId, targetEntityId.orElseThrow());
             case ATTACK_TARGET -> ArmyCommand.attackTarget(ownerId, groupId, targetEntityId.orElseThrow());
             case CLEAR_TARGET -> ArmyCommand.clearTarget(ownerId, groupId);
+            case RETURN_TO_RALLY -> ArmyCommand.returnToRally(ownerId, groupId);
             case PATROL_ROUTE -> ArmyCommand.patrolRoute(
                     ownerId, groupId, targetPosition.orElseThrow().blockPosition());
         };

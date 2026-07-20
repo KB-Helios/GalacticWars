@@ -18,7 +18,6 @@ import galacticwars.clonewars.army.ArmyGroupOrderPlanner;
 import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyLocation;
 import galacticwars.clonewars.army.ArmyMemberSnapshot;
-import galacticwars.clonewars.army.ArmyRecruitRuntimeController;
 import galacticwars.clonewars.army.ArmySnapshotEquipment;
 import galacticwars.clonewars.army.ArmyUnitDefinition;
 import galacticwars.clonewars.army.RecruitVitals;
@@ -247,7 +246,6 @@ public class GalacticRecruitEntity extends TamableAnimal
     private ClassProgressState classProgressState = ClassProgressState.unassigned();
     private long armySnapshotGeneration;
     private long nextNaturalProductionGameTime;
-    private final ArmyRecruitRuntimeController armyRuntimeController = new ArmyRecruitRuntimeController();
 
     public GalacticRecruitEntity(EntityType<? extends TamableAnimal> entityType, Level level) {
         super(entityType, level);
@@ -1540,10 +1538,6 @@ public class GalacticRecruitEntity extends TamableAnimal
             return ownerAttacker;
         }
         return this.canUseLocalAttackTarget(sensedTarget) ? sensedTarget : null;
-    }
-
-    public void tickArmyRuntimeController(ServerLevel level) {
-        this.armyRuntimeController.tick(this, level);
     }
 
     @Override
@@ -4500,6 +4494,9 @@ public class GalacticRecruitEntity extends TamableAnimal
         ArmyGroupRecord group = groupOptional.orElseThrow();
         this.armyGroupId = group.id();
         RecruitmentAction action = recruitmentAction(group.order().type());
+        Optional<ArmyLocation> commandPosition = group.order().type() == ArmyCommandType.RETURN_TO_RALLY
+                ? group.rallyPoint()
+                : group.order().targetPosition();
         LivingEntity persistedTarget = group.order().type() == ArmyCommandType.ATTACK_TARGET
                 ? group.order().targetEntityId()
                         .map(level::getEntity)
@@ -4509,7 +4506,7 @@ public class GalacticRecruitEntity extends TamableAnimal
                         .orElse(null)
                 : null;
         if (this.getRecruitDuty() == RecruitDuty.COMMANDER) {
-            this.moveTarget = group.order().targetPosition().map(location -> location.blockPosition())
+            this.moveTarget = commandPosition.map(location -> location.blockPosition())
                     .map(position -> new BlockPos(position.x(), position.y(), position.z()))
                     .orElse(null);
             this.setRecruitCommand(action);
@@ -4518,8 +4515,7 @@ public class GalacticRecruitEntity extends TamableAnimal
             }
             return;
         }
-        List<ArmyGroupOrderAssignment> assignments = ArmyGroupOrderPlanner.plan(
-                group.plannerState(), group.order().formation(), group.order().spacing());
+        List<ArmyGroupOrderAssignment> assignments = ArmyGroupOrderPlanner.plan(group, null);
         assignments.stream()
                 .filter(assignment -> assignment.recruitId().equals(this.getUUID()))
                 .findFirst()
@@ -4530,7 +4526,7 @@ public class GalacticRecruitEntity extends TamableAnimal
                                 assignment.assignedPosition().y(),
                                 assignment.assignedPosition().z());
                     } else {
-                        this.moveTarget = group.order().targetPosition()
+                        this.moveTarget = commandPosition
                                 .map(ArmyLocation::blockPosition)
                                 .map(position -> new BlockPos(position.x(), position.y(), position.z()))
                                 .orElse(null);
@@ -4548,8 +4544,10 @@ public class GalacticRecruitEntity extends TamableAnimal
             case HOLD_POSITION -> RecruitmentAction.HOLD_POSITION;
             case MOVE_TO_POSITION -> RecruitmentAction.MOVE_TO_POSITION;
             case PROTECT_OWNER -> RecruitmentAction.PROTECT_OWNER;
+            case PROTECT_ENTITY -> RecruitmentAction.PROTECT_OWNER;
             case ATTACK_TARGET -> RecruitmentAction.ATTACK_TARGET;
             case CLEAR_TARGET -> RecruitmentAction.CLEAR_TARGET;
+            case RETURN_TO_RALLY -> RecruitmentAction.MOVE_TO_POSITION;
             case PATROL_ROUTE -> RecruitmentAction.PATROL_ROUTE;
         };
     }

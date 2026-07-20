@@ -41,11 +41,11 @@ public final class ArmyCommandPolicy {
 
     private static boolean hasValidPayload(ArmyCommand command) {
         return switch (command.type()) {
-            case FOLLOW_OWNER, PROTECT_OWNER, CLEAR_TARGET ->
+            case FOLLOW_OWNER, PROTECT_OWNER, CLEAR_TARGET, RETURN_TO_RALLY ->
                     command.targetPosition() == null && command.targetEntityId() == null;
             case HOLD_POSITION, MOVE_TO_POSITION, PATROL_ROUTE ->
                     command.targetPosition() != null && command.targetEntityId() == null;
-            case ATTACK_TARGET ->
+            case ATTACK_TARGET, PROTECT_ENTITY ->
                     command.targetPosition() == null && command.targetEntityId() != null;
         };
     }

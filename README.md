@@ -29,6 +29,7 @@ This is a clean-break conversion. Existing KingdomWars-Middle-Earth worlds and r
 - Use a blaster to fire; each accepted shot consumes one Energy Cell, applies weapon durability and a short server-authoritative cooldown.
 - Interact with an active Command Center for the keyboard-focusable Overview, Campaign, Construction, Squads, Workforce, Kingdom, Diplomacy, and Storage dashboard. Sneak-interact for planetary navigation.
 - Craft a Tactical Command Marker and use it on an entity or block before issuing explicit attack, move, rally, patrol, worksite, or storage orders. Prepare a Blueprint Projector in the Construction tab, then place the projection in-world; builders withdraw real blocks from Command Center or linked storage.
+- Press `G` to open the rebindable Field Command screen when you are near your squads. Select up to eight commandable squads and issue battlefield movement, combat, formation, and patrol orders through the same server-authoritative army state used by the Command Center.
 - After pledging and completing a Forward Base, sneak-use your active Command Center to open planetary navigation. Craft and carry a Hyperspace Navigator to reopen the console away from home. Every jump still requires your active Command Center and paid upkeep, and prepares a reusable non-destructive arrival platform.
 - Deploy a fabricated vehicle kit in-world. Use movement keys to drive, Jump/Crouch to climb or descend in flight vehicles, and `R` to fire the mounted weapon. Use an Energy Cell to refuel and Duracrete to repair an authorized vehicle.
 - Republic and Nightsister campaign paths activate Force abilities with `Z`, `X`, and `C`. The HUD reports energy and per-slot cooldowns; targeting, costs, replay protection, PvP policy, and effects are server authoritative.
@@ -88,4 +89,4 @@ Post-release candidates: Dathomir, Naboo, Kashyyyk, additional unit families, mo
 
 This is an unofficial fan project and is not affiliated with or endorsed by Lucasfilm or Disney. Star Wars names identify the fan setting; newly introduced code, textures, models, and writing are project-owned originals. GPL-derived historical code remains GPL-3.0-only and its required attribution is retained in `NOTICE.md`.
 
-`talhanation/recruits` remains a behavioral reference only. Its code and assets are not included.
+Authorized derivative code from the local `talhanation/recruits` checkout is used only where recorded in `docs/authorized-source-intake.md`; each retained or adapted unit remains provenance-tracked. Its legacy networking, global managers, medieval assets, and unrelated gameplay systems are not included.

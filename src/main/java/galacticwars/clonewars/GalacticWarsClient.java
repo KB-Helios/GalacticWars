@@ -5,9 +5,11 @@ import dev.architectury.registry.client.level.entity.EntityRendererRegistry;
 import dev.architectury.event.events.client.ClientPlayerEvent;
 import galacticwars.clonewars.client.ForceClientState;
 import galacticwars.clonewars.client.ForceKeyMappings;
+import galacticwars.clonewars.client.ArmyFieldCommandKeyMappings;
 import galacticwars.clonewars.client.ClassClientState;
 import galacticwars.clonewars.client.ClassKeyMappings;
 import galacticwars.clonewars.client.ClientGameplayCatalog;
+import galacticwars.clonewars.client.FieldCommandClientState;
 import galacticwars.clonewars.client.gui.CommandCenterNavigationScreen;
 import galacticwars.clonewars.client.gui.CommandCenterOperationsScreen;
 import galacticwars.clonewars.client.gui.FactionSelectionScreen;
@@ -48,6 +50,7 @@ public final class GalacticWarsClient {
 
         ForceKeyMappings.register();
         ClassKeyMappings.register();
+        ArmyFieldCommandKeyMappings.register();
 
         EntityRendererRegistry.register(
                 ModEntityTypes.BLASTER_BOLT,
@@ -84,9 +87,14 @@ public final class GalacticWarsClient {
         ClientPacketBridge.installForceHudHandler(ForceClientState::update);
         ClientPacketBridge.installClassHudHandler(ClassClientState::update);
         ClientPacketBridge.installGameplayCatalogHandler(ClientGameplayCatalog::replace);
-        ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> ClientGameplayCatalog.clear());
+        ClientPacketBridge.installFieldCommandStateHandler(FieldCommandClientState::update);
+        ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> {
+            ClientGameplayCatalog.clear();
+            FieldCommandClientState.clear();
+        });
         ForceKeyMappings.registerTickHandler();
         ClassKeyMappings.registerTickHandler();
+        ArmyFieldCommandKeyMappings.registerTickHandler();
 
         GalacticWars.LOGGER.info("Galactic Wars: Clone Wars client foundation loaded.");
     }

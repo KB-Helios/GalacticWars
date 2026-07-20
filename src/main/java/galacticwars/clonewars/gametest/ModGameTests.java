@@ -12,10 +12,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import galacticwars.clonewars.Config;
 import galacticwars.clonewars.GalacticWars;
+import galacticwars.clonewars.army.ArmyCommandType;
+import galacticwars.clonewars.army.ArmyFieldCommandService;
 import galacticwars.clonewars.army.ArmyFormation;
 import galacticwars.clonewars.army.ArmyGroupLifecycleState;
+import galacticwars.clonewars.army.ArmyGroupOrder;
 import galacticwars.clonewars.army.ArmyLocation;
+import galacticwars.clonewars.army.ArmyPatrolEnemyPolicy;
+import galacticwars.clonewars.army.ArmyPatrolMode;
+import galacticwars.clonewars.army.ArmyPatrolPlan;
+import galacticwars.clonewars.army.ArmyPatrolState;
+import galacticwars.clonewars.army.ArmyPatrolStatus;
+import galacticwars.clonewars.army.ArmyPatrolWaypoint;
 import galacticwars.clonewars.army.ArmyTravelService;
+import galacticwars.clonewars.army.FieldCommandAction;
+import galacticwars.clonewars.army.FieldCommandResult;
 import galacticwars.clonewars.combat.BlasterCombatEvents;
 import galacticwars.clonewars.combat.BlasterBoltEntity;
 import galacticwars.clonewars.combat.FactionRangedWeaponService;
@@ -31,6 +42,8 @@ import galacticwars.clonewars.data.GameplayDataManager;
 import galacticwars.clonewars.data.LaunchContentDefinitions;
 import galacticwars.clonewars.data.LaunchContentRuntime;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
+import galacticwars.clonewars.entity.ai.ArmyBrainMemoryTypes;
+import galacticwars.clonewars.entity.ai.ArmyBrainState;
 import galacticwars.clonewars.vehicle.GalacticVehicleEntity;
 import galacticwars.clonewars.conquest.ConquestCaptureService;
 import galacticwars.clonewars.conquest.ConquestControlState;
@@ -77,6 +90,7 @@ import galacticwars.clonewars.menu.MerchantTradeMenuProvider;
 import galacticwars.clonewars.network.ClassActivatePayload;
 import galacticwars.clonewars.network.ClassHudPayload;
 import galacticwars.clonewars.network.ClassSelectPayload;
+import galacticwars.clonewars.network.FieldCommandRequestPayload;
 import galacticwars.clonewars.progression.LaunchContentCatalog;
 import galacticwars.clonewars.progression.ProgressionEvent;
 import galacticwars.clonewars.progression.ProgressionDecision;
@@ -225,6 +239,15 @@ public final class ModGameTests {
         isolatedEnvironments.put(id("force_embodied_runtime"), event.registerEnvironment(
                         id("force_embodied_runtime_environment"),
                         new TestEnvironmentDefinition.AllOf(List.of())));
+        isolatedEnvironments.put(id("field_command_authority"), event.registerEnvironment(
+                        id("field_command_authority_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())));
+        isolatedEnvironments.put(id("grouped_patrol_pause_runtime"), event.registerEnvironment(
+                        id("grouped_patrol_pause_runtime_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())));
+        isolatedEnvironments.put(id("grouped_protect_entity_runtime"), event.registerEnvironment(
+                        id("grouped_protect_entity_runtime_environment"),
+                        new TestEnvironmentDefinition.AllOf(List.of())));
         isolatedEnvironments.put(id("planet_faction_outpost_runtime"), event.registerEnvironment(
                         id("planet_faction_outpost_runtime_environment"),
                         new TestEnvironmentDefinition.AllOf(List.of())));
@@ -243,6 +266,8 @@ public final class ModGameTests {
                 id("natural_civilian_brain_runtime"),
                 id("planet_faction_outpost_runtime"),
                 id("grouped_brain_authority"),
+                id("grouped_patrol_pause_runtime"),
+                id("grouped_protect_entity_runtime"),
                 id("local_recruit_protect_owner"),
                 id("command_marker_runtime"));
         for (Identifier testId : TESTS.keySet()) {
@@ -250,11 +275,13 @@ public final class ModGameTests {
                     ? 520
                     : Set.of(
                     id("smart_brain_move_command"),
-                    id("grouped_brain_authority")).contains(testId)
+                    id("grouped_brain_authority"),
+                    id("grouped_patrol_pause_runtime"),
+                    id("grouped_protect_entity_runtime")).contains(testId)
                     ? 260
                     : testId.equals(id("smart_brain_follow_and_sit"))
                             ? 720
-                            : testId.equals(id("command_marker_runtime"))
+                            : Set.of(id("command_marker_runtime"), id("field_command_authority")).contains(testId)
                                     ? 180
                                     : testId.equals(id("vehicle_embodied_runtime"))
                                             ? 260
@@ -347,6 +374,9 @@ public final class ModGameTests {
         tests.put(id("smart_brain_move_stall_recovery"), ModGameTests::smartBrainMoveStallRecovery);
         tests.put(id("natural_civilian_brain_runtime"), ModGameTests::naturalCivilianBrainRuntime);
         tests.put(id("grouped_brain_authority"), ModGameTests::groupedBrainAuthority);
+        tests.put(id("grouped_patrol_pause_runtime"), ModGameTests::groupedPatrolPauseRuntime);
+        tests.put(id("grouped_protect_entity_runtime"), ModGameTests::groupedProtectEntityRuntime);
+        tests.put(id("field_command_authority"), ModGameTests::fieldCommandAuthority);
         tests.put(id("external_library_runtime"), ModGameTests::externalLibraryRuntime);
         tests.put(id("planet_travel_failure_atomicity"), ModGameTests::planetTravelFailureAtomicity);
         tests.put(id("planet_arrival_runtime"), ModGameTests::planetArrivalRuntime);
@@ -677,6 +707,9 @@ public final class ModGameTests {
             helper.fail("Faction selection setup could not load the isolated Command Center chunk");
             return;
         }
+        // Embedded GameTest players do not acknowledge a same-dimension teleport, so their
+        // entity-ticking chunk ticket needs the same explicit update as SmartBrainTestArea.
+        helper.getLevel().getChunkSource().move(owner);
         if (!hall.claim(owner)) {
             helper.fail("Faction selection setup could not claim the Command Center");
             return;
@@ -1082,6 +1115,22 @@ public final class ModGameTests {
                     return;
                 }
                 owner.setPos(ownerPos.getX() + 0.5D, ownerPos.getY(), ownerPos.getZ() + 0.5D);
+                // Embedded GameTest players do not send the movement acknowledgement that
+                // normally advances their entity-ticking chunk ticket. Refresh it after the
+                // owner move and avoid starting the movement window until both entities tick.
+                helper.getLevel().getChunkSource().move(owner);
+                boolean ownerChunkTicking = helper.getLevel().areEntitiesActuallyLoadedAndTicking(
+                        ChunkPos.containing(owner.blockPosition()));
+                boolean recruitChunkTicking = helper.getLevel().areEntitiesActuallyLoadedAndTicking(
+                        ChunkPos.containing(recruit.blockPosition()));
+                if (!ownerChunkTicking || !recruitChunkTicking) {
+                    if (helper.getTick() - indexWaitStartedTick >= SMART_BRAIN_CHUNK_READY_TIMEOUT) {
+                        phase[0] = 4;
+                        helper.fail("SmartBrain companion chunks never became entity-ticking: owner="
+                                + ownerChunkTicking + ", recruit=" + recruitChunkTicking);
+                    }
+                    return;
+                }
                 invokeRecruitCommand(recruit, RecruitmentAction.FOLLOW_OWNER);
                 startingPosition[0] = recruit.position();
                 startingDistance[0] = recruit.distanceToSqr(owner);
@@ -1096,6 +1145,7 @@ public final class ModGameTests {
                         net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
                 if (!approachedOwner && !followedAnchor) {
                     phase[0] = 4;
+                    net.minecraft.world.level.pathfinder.Path activePath = recruit.getNavigation().getPath();
                     helper.fail("SmartBrain companion behaviour did not follow its owner: position="
                             + recruit.position() + ", owner=" + owner.position()
                             + ", start=" + startingPosition[0]
@@ -1105,9 +1155,26 @@ public final class ModGameTests {
                             net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
                             + ", pathMemory=" + BrainUtil.hasMemory(recruit,
                             net.minecraft.world.entity.ai.memory.MemoryModuleType.PATH)
+                            + ", noAi=" + recruit.isNoAi()
+                            + ", effectiveAi=" + recruit.isEffectiveAi()
+                            + ", ownerChunkTicking=" + helper.getLevel().areEntitiesActuallyLoadedAndTicking(
+                            ChunkPos.containing(owner.blockPosition()))
+                            + ", recruitChunkTicking=" + helper.getLevel().areEntitiesActuallyLoadedAndTicking(
+                            ChunkPos.containing(recruit.blockPosition()))
                             + ", navigationDone=" + recruit.getNavigation().isDone()
                             + ", recruitTicks=" + (recruit.tickCount - phaseStartedRecruitTick[0])
-                            + ", path=" + pathState(recruit, owner.blockPosition()));
+                            + ", path=" + pathState(recruit, owner.blockPosition())
+                            + ", activePath=" + (activePath == null ? "none" : "nodes="
+                            + activePath.getNodeCount() + ", index=" + activePath.getNextNodeIndex()
+                            + ", next=" + activePath.getNextNodePos() + ", target=" + activePath.getTarget())
+                            + ", navigationTarget=" + recruit.getNavigation().getTargetPos()
+                            + ", moveWanted=" + recruit.getMoveControl().hasWanted()
+                            + ", wanted=(" + recruit.getMoveControl().getWantedX()
+                            + "," + recruit.getMoveControl().getWantedY()
+                            + "," + recruit.getMoveControl().getWantedZ() + ")"
+                            + ", moveSpeed=" + recruit.getMoveControl().getSpeedModifier()
+                            + ", velocity=" + recruit.getDeltaMovement()
+                            + ", running=" + recruit.getBrain().getRunningBehaviors());
                     return;
                 }
                 recruit.setWorkerProfession(WorkerProfession.FARMER);
@@ -1256,51 +1323,593 @@ public final class ModGameTests {
         helper.succeed();
     }
 
+    /**
+     * Exercises the field-command service as the C2S authority boundary. The
+     * intruder can construct a request containing the owner's squad UUID, but
+     * only the server player passed to the service is considered for kingdom
+     * selection. The same scenario also proves that a marker whose selected
+     * entity has despawned fails closed and that a replay cannot mutate twice.
+     */
+    private static void fieldCommandAuthority(GameTestHelper helper) {
+        BlockPos commanderPosition = helper.absolutePos(new BlockPos(2, 1, 2));
+        BlockPos staleTargetPosition = helper.absolutePos(new BlockPos(4, 1, 2));
+        helper.getLevel().setBlockAndUpdate(commanderPosition.below(), Blocks.STONE.defaultBlockState());
+        helper.getLevel().setBlockAndUpdate(staleTargetPosition.below(), Blocks.STONE.defaultBlockState());
+
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        ServerPlayer intruder = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        GalacticRecruitEntity commander = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), commanderPosition);
+        GalacticRecruitEntity staleTarget = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), staleTargetPosition);
+        commander.setInvulnerable(true);
+        staleTarget.setInvulnerable(true);
+        staleTarget.setNoAi(true);
+        commander.tame(owner);
+        owner.setPos(commander.getX(), commander.getY(), commander.getZ());
+        intruder.setPos(commander.getX(), commander.getY(), commander.getZ());
+        helper.getLevel().getChunkSource().move(owner);
+        helper.getLevel().getChunkSource().move(intruder);
+
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        BlockPos ownerCapital = isolatedCapital(helper, 142);
+        BlockPos intruderCapital = isolatedCapital(helper, 143);
+        data.foundKingdom(owner.getUUID(), "galacticwars:republic",
+                helper.getLevel().dimension().identifier().toString(), ownerCapital);
+        data.foundKingdom(intruder.getUUID(), "galacticwars:separatist",
+                helper.getLevel().dimension().identifier().toString(), intruderCapital);
+        KingdomBaseBlueprint forwardBase = GameplayDataManager.snapshot()
+                .blueprint("galacticwars:forward_base").orElseThrow();
+        BuildProject forwardBaseProject = fullyProgressProject(
+                data, owner.getUUID(), forwardBase,
+                helper.getLevel().dimension().identifier().toString(), ownerCapital.offset(32, 0, 0));
+        if (!data.completeBuildProject(owner.getUUID(), forwardBaseProject, forwardBase)
+                || !data.registerRecruit(owner.getUUID(), commander.getUUID())
+                || !data.promoteCommander(owner.getUUID(), commander.getUUID())) {
+            helper.fail("Field command authority setup could not create an owner commander");
+            return;
+        }
+
+        ArmyLocation anchor = new ArmyLocation(
+                helper.getLevel().dimension().identifier().toString(),
+                commander.getX(), commander.getY(), commander.getZ());
+        var squad = data.createOrReclaimArmyGroup(
+                owner.getUUID(), commander.getUUID(), ArmyFormation.LINE,
+                anchor, helper.getLevel().getGameTime()).orElse(null);
+        if (squad == null) {
+            helper.fail("Field command authority setup could not create an owner squad");
+            return;
+        }
+
+        long indexWaitStartedTick = helper.getTick();
+        boolean[] complete = {false};
+        helper.onEachTick(() -> {
+            if (complete[0]) {
+                return;
+            }
+            boolean commanderIndexed = helper.getLevel().getEntity(commander.getUUID()) == commander;
+            boolean targetIndexed = helper.getLevel().getEntity(staleTarget.getUUID()) == staleTarget;
+            if (!commanderIndexed || !targetIndexed) {
+                if (helper.getTick() - indexWaitStartedTick >= 120L) {
+                    complete[0] = true;
+                    helper.fail("Field command authority entities never entered the server index: commander="
+                            + commanderIndexed + ", target=" + targetIndexed);
+                }
+                return;
+            }
+
+            complete[0] = true;
+            ArmyFieldCommandService.clearReplayHistory(owner.getUUID());
+            ArmyFieldCommandService.clearReplayHistory(intruder.getUUID());
+            var before = data.armyGroup(squad.id()).orElseThrow();
+            UUID replayId = UUID.randomUUID();
+            FieldCommandRequestPayload ownerRequest = new FieldCommandRequestPayload(
+                    replayId, FieldCommandAction.FOLLOW, List.of(squad.id()));
+            var accepted = ArmyFieldCommandService.execute(owner, ownerRequest);
+            var afterFirst = data.armyGroup(squad.id()).orElseThrow();
+            var replayed = ArmyFieldCommandService.execute(owner, ownerRequest);
+            var afterReplay = data.armyGroup(squad.id()).orElseThrow();
+
+            // The only spoofable selector in the payload is the UUID list. Passing the
+            // owner's live squad ID as another server player must not select it.
+            var spoofed = ArmyFieldCommandService.execute(intruder, new FieldCommandRequestPayload(
+                    UUID.randomUUID(), FieldCommandAction.HOLD, List.of(squad.id())));
+            var afterSpoofed = data.armyGroup(squad.id()).orElseThrow();
+
+            ItemStack marker = new ItemStack(ModItems.COMMAND_MARKER.get());
+            marker.set(ModDataComponents.COMMAND_TARGET,
+                    CommandTargetSelection.entity(helper.getLevel(), staleTarget));
+            owner.setItemInHand(InteractionHand.MAIN_HAND, marker);
+            staleTarget.discard();
+            var staleTargetResult = ArmyFieldCommandService.execute(owner, new FieldCommandRequestPayload(
+                    UUID.randomUUID(), FieldCommandAction.ATTACK_MARKED_TARGET, List.of(squad.id())));
+            var afterStaleTarget = data.armyGroup(squad.id()).orElseThrow();
+
+            boolean ownerAppliedOnce = accepted.result() == FieldCommandResult.ACCEPTED
+                    && afterFirst.simulation().revision() == before.simulation().revision() + 1L;
+            boolean replayRejectedWithoutMutation = replayed.result() == FieldCommandResult.REPLAY_REJECTED
+                    && afterReplay.equals(afterFirst);
+            boolean spoofRejectedWithoutMutation = spoofed.result() == FieldCommandResult.SQUAD_UNAVAILABLE
+                    && afterSpoofed.equals(afterFirst);
+            boolean staleMarkerRejectedWithoutMutation = staleTargetResult.result() == FieldCommandResult.TARGET_REQUIRED
+                    && afterStaleTarget.equals(afterFirst);
+            if (!ownerAppliedOnce || !replayRejectedWithoutMutation
+                    || !spoofRejectedWithoutMutation || !staleMarkerRejectedWithoutMutation) {
+                helper.fail("Field command service authority failure: accepted=" + accepted.result()
+                        + ", revisions=" + before.simulation().revision() + "/"
+                        + afterFirst.simulation().revision()
+                        + ", replay=" + replayed.result() + "/" + afterReplay.simulation().revision()
+                        + ", spoofed=" + spoofed.result() + "/" + afterSpoofed.simulation().revision()
+                        + ", staleMarker=" + staleTargetResult.result() + "/"
+                        + afterStaleTarget.simulation().revision());
+                return;
+            }
+
+            ArmyFieldCommandService.clearReplayHistory(owner.getUUID());
+            ArmyFieldCommandService.clearReplayHistory(intruder.getUUID());
+            commander.discard();
+            helper.succeed();
+        });
+    }
+
     private static void groupedBrainAuthority(GameTestHelper helper) {
         SmartBrainTestArea area = prepareSmartBrainTestArea(
-                helper, GameType.CREATIVE, 0, 4, 0, 4);
-        GalacticRecruitEntity recruit = spawnRecruitAt(
+                helper, GameType.CREATIVE, -4, 18, -4, 4);
+        ServerPlayer owner = area.player();
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        BlockPos capital = isolatedCapital(helper, 141);
+        KingdomRecord kingdom = data.foundKingdom(
+                owner.getUUID(), "galacticwars:republic",
+                helper.getLevel().dimension().identifier().toString(), capital);
+        KingdomBaseBlueprint forwardBase = GameplayDataManager.snapshot()
+                .blueprint("galacticwars:forward_base").orElseThrow();
+        BuildProject forwardBaseProject = fullyProgressProject(
+                data, owner.getUUID(), forwardBase,
+                helper.getLevel().dimension().identifier().toString(), capital.offset(32, 0, 0));
+        if (!data.completeBuildProject(owner.getUUID(), forwardBaseProject, forwardBase)) {
+            helper.fail("Grouped SmartBrain setup could not unlock a commander slot");
+            return;
+        }
+
+        GalacticRecruitEntity commander = spawnRecruitAt(
                 helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
-        GalacticRecruitEntity target = spawnRecruitAt(
-                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(2, 1, 1));
-        long indexWaitStartedTick = helper.getTick();
-        int[] phase = {0};
-        int[] scenarioStartedRecruitTick = {0};
+        GalacticRecruitEntity soldier = spawnRecruitAt(
+                helper, ModEntityTypes.ARC_TROOPER.get(), area.at(2, 1, 1));
+        commander.tame(owner);
+        soldier.tame(owner);
+        if (!data.registerRecruit(owner.getUUID(), commander.getUUID())
+                || !data.registerRecruit(owner.getUUID(), soldier.getUUID())
+                || !data.promoteCommander(owner.getUUID(), commander.getUUID())) {
+            helper.fail("Grouped SmartBrain setup could not register and promote the live squad");
+            return;
+        }
+
+        ArmyLocation anchor = new ArmyLocation(
+                helper.getLevel().dimension().identifier().toString(),
+                commander.getX(), commander.getY(), commander.getZ());
+        var squad = data.createOrReclaimArmyGroup(
+                owner.getUUID(), commander.getUUID(), ArmyFormation.LINE,
+                anchor, helper.getLevel().getGameTime()).orElse(null);
+        if (squad == null || !squad.kingdomId().equals(kingdom.id())
+                || !squad.contains(commander.getUUID()) || !squad.contains(soldier.getUUID())) {
+            helper.fail("Grouped SmartBrain setup did not create one authoritative live squad");
+            return;
+        }
+
+        // The persisted simulation anchor intentionally trails a live group until its next
+        // virtual/hibernate transition. A field Hold must therefore resolve the commander's
+        // current server position, rather than pulling a live squad back to that stale anchor.
+        BlockPos liveHoldPosition = area.at(5, 1, 1);
+        commander.setPos(liveHoldPosition.getX() + 0.5D, liveHoldPosition.getY(), liveHoldPosition.getZ() + 0.5D);
+        var holdState = ArmyFieldCommandService.execute(owner, new FieldCommandRequestPayload(
+                UUID.randomUUID(), FieldCommandAction.HOLD, List.of(squad.id())));
+        ArmyGroupOrder heldOrder = data.armyGroup(squad.id()).orElseThrow().order();
+        if (holdState.result() != FieldCommandResult.ACCEPTED
+                || heldOrder.type() != ArmyCommandType.HOLD_POSITION
+                || heldOrder.targetPosition().isEmpty()
+                || heldOrder.targetPosition().orElseThrow().blockPosition().x()
+                != commander.blockPosition().getX()
+                || heldOrder.targetPosition().orElseThrow().blockPosition().z()
+                != commander.blockPosition().getZ()) {
+            helper.fail("Field Hold did not use the live commander's server position: result="
+                    + holdState.result() + ", order=" + heldOrder + ", commander=" + commander.blockPosition());
+            return;
+        }
+
+        BlockPos moveTarget = area.at(14, 1, 1);
+        ArmyLocation moveLocation = new ArmyLocation(
+                helper.getLevel().dimension().identifier().toString(),
+                moveTarget.getX(), moveTarget.getY(), moveTarget.getZ());
+        ArmyGroupOrder moveOrder = new ArmyGroupOrder(
+                ArmyCommandType.MOVE_TO_POSITION,
+                Optional.of(moveLocation), Optional.empty(), squad.order().formation(), squad.order().spacing());
+        if (!data.issueArmyOrder(owner.getUUID(), squad.id(), moveOrder)) {
+            helper.fail("Grouped SmartBrain setup could not persist its move order");
+            return;
+        }
+
+        long startedAt = helper.getTick();
+        boolean[] complete = {false};
         helper.onEachTick(() -> {
-            if (phase[0] == 0) {
-                boolean recruitIndexed = helper.getLevel().getEntity(recruit.getUUID()) == recruit;
-                boolean targetIndexed = helper.getLevel().getEntity(target.getUUID()) == target;
-                if (!recruitIndexed || !targetIndexed) {
-                    if (helper.getTick() - indexWaitStartedTick >= 120L) {
-                        phase[0] = 2;
-                        helper.fail("Grouped SmartBrain entities never entered the server entity index: recruit="
-                                + recruitIndexed + ", target=" + targetIndexed);
+            if (complete[0]) {
+                return;
+            }
+            boolean commanderIndexed = helper.getLevel().getEntity(commander.getUUID()) == commander;
+            boolean soldierIndexed = helper.getLevel().getEntity(soldier.getUUID()) == soldier;
+            ArmyBrainState commanderState = BrainUtil.getMemory(commander, ArmyBrainMemoryTypes.ARMY_STATE);
+            ArmyBrainState soldierState = BrainUtil.getMemory(soldier, ArmyBrainMemoryTypes.ARMY_STATE);
+            net.minecraft.world.entity.ai.memory.WalkTarget commanderWalkTarget = BrainUtil.getMemory(
+                    commander, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+            net.minecraft.world.entity.ai.memory.WalkTarget soldierWalkTarget = BrainUtil.getMemory(
+                    soldier, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+            if (!commanderIndexed || !soldierIndexed || commanderState == null || soldierState == null
+                    || commanderWalkTarget == null || soldierWalkTarget == null) {
+                if (helper.getTick() - startedAt >= 180L) {
+                    complete[0] = true;
+                    helper.fail("Live grouped SmartBrain did not publish state and formation walk targets: indexed="
+                            + commanderIndexed + "/" + soldierIndexed
+                            + ", groupIds=" + commander.getArmyGroupId() + "/" + soldier.getArmyGroupId()
+                            + ", states=" + (commanderState != null) + "/" + (soldierState != null)
+                            + ", walkTargets=" + (commanderWalkTarget != null) + "/"
+                            + (soldierWalkTarget != null)
+                            + ", commanderRunning=" + commander.getBrain().getRunningBehaviors());
+                }
+                return;
+            }
+
+            boolean legacyRuntimeAttached = java.util.Arrays.stream(
+                    GalacticRecruitEntity.class.getDeclaredFields())
+                    .anyMatch(field -> field.getType().getName().endsWith("ArmyRecruitRuntimeController"));
+            BlockPos publishedCommanderTarget = commanderWalkTarget.getTarget().currentBlockPosition();
+            if (!squad.id().equals(commander.getArmyGroupId())
+                    || !squad.id().equals(soldier.getArmyGroupId())
+                    || !squad.id().equals(commanderState.group().id())
+                    || !squad.id().equals(soldierState.group().id())
+                    || commanderState.memberCommand().type() != ArmyCommandType.MOVE_TO_POSITION
+                    || soldierState.memberCommand().type() != ArmyCommandType.MOVE_TO_POSITION
+                    || publishedCommanderTarget.getX() != moveTarget.getX()
+                    || publishedCommanderTarget.getZ() != moveTarget.getZ()
+                    || commander.shouldMoveToCommandTarget()
+                    || soldier.shouldMoveToCommandTarget()
+                    || legacyRuntimeAttached) {
+                complete[0] = true;
+                helper.fail("Grouped SmartBrain execution bypassed its persisted order path: groupIds="
+                        + commander.getArmyGroupId() + "/" + soldier.getArmyGroupId()
+                        + ", commands=" + commanderState.memberCommand().type() + "/"
+                        + soldierState.memberCommand().type()
+                        + ", commanderTarget=" + publishedCommanderTarget
+                        + ", localMove=" + commander.shouldMoveToCommandTarget() + "/"
+                        + soldier.shouldMoveToCommandTarget()
+                        + ", legacyRuntimeAttached=" + legacyRuntimeAttached);
+                return;
+            }
+
+            complete[0] = true;
+            commander.discard();
+            soldier.discard();
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Runs a persisted waited patrol through the real field-command service
+     * and the loaded SmartBrain path. This catches a regression where pausing
+     * only changed the panel state while the commander kept consuming the
+     * waypoint dwell timer or retained a navigation target.
+     */
+    private static void groupedPatrolPauseRuntime(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.CREATIVE, -4, 20, -4, 4);
+        ServerPlayer owner = area.player();
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        BlockPos capital = isolatedCapital(helper, 147);
+        KingdomRecord kingdom = data.foundKingdom(
+                owner.getUUID(), "galacticwars:republic",
+                helper.getLevel().dimension().identifier().toString(), capital);
+        KingdomBaseBlueprint forwardBase = GameplayDataManager.snapshot()
+                .blueprint("galacticwars:forward_base").orElseThrow();
+        BuildProject forwardBaseProject = fullyProgressProject(
+                data, owner.getUUID(), forwardBase,
+                helper.getLevel().dimension().identifier().toString(), capital.offset(32, 0, 0));
+        if (!data.completeBuildProject(owner.getUUID(), forwardBaseProject, forwardBase)) {
+            helper.fail("Grouped patrol setup could not unlock a commander slot");
+            return;
+        }
+
+        GalacticRecruitEntity commander = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
+        GalacticRecruitEntity soldier = spawnRecruitAt(
+                helper, ModEntityTypes.ARC_TROOPER.get(), area.at(2, 1, 1));
+        commander.tame(owner);
+        soldier.tame(owner);
+        if (!data.registerRecruit(owner.getUUID(), commander.getUUID())
+                || !data.registerRecruit(owner.getUUID(), soldier.getUUID())
+                || !data.promoteCommander(owner.getUUID(), commander.getUUID())) {
+            helper.fail("Grouped patrol setup could not register and promote the live squad");
+            return;
+        }
+
+        String dimensionId = helper.getLevel().dimension().identifier().toString();
+        ArmyLocation firstWaypoint = new ArmyLocation(
+                dimensionId, commander.getX(), commander.getY(), commander.getZ());
+        BlockPos secondWaypointBlock = area.at(14, 1, 1);
+        ArmyLocation secondWaypoint = new ArmyLocation(
+                dimensionId, secondWaypointBlock.getX(), secondWaypointBlock.getY(), secondWaypointBlock.getZ());
+        var squad = data.createOrReclaimArmyGroup(
+                owner.getUUID(), commander.getUUID(), ArmyFormation.LINE,
+                firstWaypoint, helper.getLevel().getGameTime()).orElse(null);
+        if (squad == null || !squad.kingdomId().equals(kingdom.id())
+                || !squad.contains(commander.getUUID()) || !squad.contains(soldier.getUUID())) {
+            helper.fail("Grouped patrol setup did not create an authoritative live squad");
+            return;
+        }
+
+        ArmyPatrolPlan patrol = new ArmyPatrolPlan(
+                List.of(
+                        new ArmyPatrolWaypoint(firstWaypoint, 20),
+                        ArmyPatrolWaypoint.immediate(secondWaypoint)),
+                ArmyPatrolMode.LOOP,
+                ArmyPatrolState.start(),
+                ArmyPatrolPlan.DEFAULT_ARRIVAL_DISTANCE,
+                ArmyPatrolPlan.DEFAULT_MOVEMENT_SPEED,
+                ArmyPatrolEnemyPolicy.ENGAGE_HOSTILES);
+        ArmyGroupOrder patrolOrder = new ArmyGroupOrder(
+                ArmyCommandType.PATROL_ROUTE, Optional.of(firstWaypoint), Optional.empty(),
+                squad.order().formation(), squad.order().spacing());
+        var configured = squad.withPatrolPlanAndOrder(patrol, patrolOrder);
+        if (!data.replaceArmyGroup(configured, squad.simulation().revision())) {
+            helper.fail("Grouped patrol setup could not persist its waited route");
+            return;
+        }
+
+        long startedAt = helper.getTick();
+        long[] pausedAtTick = {-1L};
+        long[] resumedAtTick = {-1L};
+        ArmyPatrolState[] pausedState = {null};
+        boolean[] complete = {false};
+        helper.onEachTick(() -> {
+            if (complete[0]) {
+                return;
+            }
+            var current = data.armyGroup(configured.id()).orElse(null);
+            ArmyPatrolPlan currentPlan = current == null ? null : current.patrolPlan().orElse(null);
+            boolean commanderIndexed = helper.getLevel().getEntity(commander.getUUID()) == commander;
+            ArmyBrainState state = BrainUtil.getMemory(commander, ArmyBrainMemoryTypes.ARMY_STATE);
+            if (currentPlan == null || !commanderIndexed || state == null) {
+                if (helper.getTick() - startedAt >= 120L) {
+                    complete[0] = true;
+                    helper.fail("Grouped patrol never entered the live SmartBrain: indexed=" + commanderIndexed
+                            + ", state=" + (state != null) + ", plan=" + (currentPlan != null));
+                }
+                return;
+            }
+
+            if (pausedAtTick[0] < 0L) {
+                ArmyPatrolState patrolState = currentPlan.state();
+                if (patrolState.status() != ArmyPatrolStatus.ACTIVE || patrolState.waitTicksRemaining() <= 0) {
+                    if (helper.getTick() - startedAt >= 120L) {
+                        complete[0] = true;
+                        helper.fail("Loaded patrol never began its waited waypoint: state=" + patrolState
+                                + ", order=" + current.order());
                     }
                     return;
                 }
-                setRecruitField(recruit, "armyGroupId", UUID.randomUUID());
-                BrainUtil.setTargetOfEntity(recruit, target);
-                BrainUtil.setMemory(recruit,
-                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET,
-                        new net.minecraft.world.entity.ai.memory.WalkTarget(target, 1.0F, 1));
-                scenarioStartedRecruitTick[0] = recruit.tickCount;
-                phase[0] = 1;
-                return;
-            }
-            if (phase[0] == 1 && recruit.tickCount - scenarioStartedRecruitTick[0] >= 80) {
-                phase[0] = 2;
-                if (BrainUtil.hasMemory(recruit,
-                        net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET)
-                        || BrainUtil.hasMemory(recruit,
-                        net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)) {
-                    helper.fail("Grouped recruit retained stale local SmartBrain targets: tickCount="
-                            + recruit.tickCount + ", running="
-                            + recruit.getBrain().getRunningBehaviors());
+                var renamed = ArmyFieldCommandService.execute(owner, new FieldCommandRequestPayload(
+                        UUID.randomUUID(), FieldCommandAction.RENAME_PATROL_ROUTE, List.of(configured.id()),
+                        "Aurek Perimeter", 0, 0));
+                var editedWait = ArmyFieldCommandService.execute(owner, new FieldCommandRequestPayload(
+                        UUID.randomUUID(), FieldCommandAction.SET_PATROL_WAYPOINT_WAIT, List.of(configured.id()),
+                        "", 0, 45));
+                current = data.armyGroup(configured.id()).orElse(null);
+                currentPlan = current == null ? null : current.patrolPlan().orElse(null);
+                if (renamed.result() != FieldCommandResult.ACCEPTED
+                        || editedWait.result() != FieldCommandResult.ACCEPTED
+                        || currentPlan == null || !currentPlan.name().equals("Aurek Perimeter")
+                        || currentPlan.waypoints().getFirst().waitTicks() != 45) {
+                    complete[0] = true;
+                    helper.fail("Field patrol metadata did not persist atomically: rename=" + renamed.result()
+                            + ", wait=" + editedWait.result() + ", plan=" + currentPlan);
                     return;
                 }
-                recruit.discard();
-                target.discard();
+                var paused = ArmyFieldCommandService.execute(owner, new FieldCommandRequestPayload(
+                        UUID.randomUUID(), FieldCommandAction.PAUSE_PATROL, List.of(configured.id())));
+                current = data.armyGroup(configured.id()).orElse(null);
+                currentPlan = current == null ? null : current.patrolPlan().orElse(null);
+                if (paused.result() != FieldCommandResult.ACCEPTED || currentPlan == null
+                        || currentPlan.state().status() != ArmyPatrolStatus.PAUSED) {
+                    complete[0] = true;
+                    helper.fail("Field pause did not persist the live patrol state: result=" + paused.result()
+                            + ", plan=" + currentPlan);
+                    return;
+                }
+                pausedState[0] = currentPlan.state();
+                pausedAtTick[0] = helper.getTick();
+                return;
+            }
+
+            if (resumedAtTick[0] < 0L) {
+                if (helper.getTick() - pausedAtTick[0] < 24L) {
+                    return;
+                }
+                net.minecraft.world.entity.ai.memory.WalkTarget walkTarget = BrainUtil.getMemory(
+                        commander, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+                boolean remainedStill = commander.distanceToSqr(
+                        firstWaypoint.x(), firstWaypoint.y(), firstWaypoint.z()) <= 1.0D;
+                if (!pausedState[0].equals(currentPlan.state()) || walkTarget != null || !remainedStill) {
+                    complete[0] = true;
+                    helper.fail("Paused patrol leaked movement or consumed its dwell: expected=" + pausedState[0]
+                            + ", actual=" + currentPlan.state() + ", walkTarget=" + walkTarget
+                            + ", commander=" + commander.position());
+                    return;
+                }
+                var resumed = ArmyFieldCommandService.execute(owner, new FieldCommandRequestPayload(
+                        UUID.randomUUID(), FieldCommandAction.RESUME_PATROL, List.of(configured.id())));
+                current = data.armyGroup(configured.id()).orElse(null);
+                currentPlan = current == null ? null : current.patrolPlan().orElse(null);
+                if (resumed.result() != FieldCommandResult.ACCEPTED || currentPlan == null
+                        || currentPlan.state().status() != ArmyPatrolStatus.ACTIVE
+                        || currentPlan.state().waitTicksRemaining() != pausedState[0].waitTicksRemaining()) {
+                    complete[0] = true;
+                    helper.fail("Field resume did not restore the paused dwell state: result=" + resumed.result()
+                            + ", plan=" + currentPlan);
+                    return;
+                }
+                resumedAtTick[0] = helper.getTick();
+                return;
+            }
+
+            net.minecraft.world.entity.ai.memory.WalkTarget walkTarget = BrainUtil.getMemory(
+                    commander, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+            boolean releasedNextWaypoint = currentPlan.state().status() == ArmyPatrolStatus.ACTIVE
+                    && currentPlan.state().waitTicksRemaining() == 0
+                    && current.order().targetPosition().filter(secondWaypoint::equals).isPresent()
+                    && walkTarget != null
+                    && walkTarget.getTarget().currentBlockPosition().getX() == secondWaypointBlock.getX()
+                    && walkTarget.getTarget().currentBlockPosition().getZ() == secondWaypointBlock.getZ();
+            if (releasedNextWaypoint) {
+                complete[0] = true;
+                commander.discard();
+                soldier.discard();
                 helper.succeed();
+                return;
+            }
+            if (helper.getTick() - resumedAtTick[0] >= 100L) {
+                complete[0] = true;
+                helper.fail("Resumed patrol did not release a SmartBrain target for the next waypoint: state="
+                        + currentPlan.state() + ", order=" + current.order() + ", walkTarget=" + walkTarget);
+            }
+        });
+    }
+
+    /**
+     * Verifies that a server-authenticated Protect Marked Entity command is
+     * not merely persisted: when the marked allied recruit is attacked, both
+     * members of the loaded squad receive that hostile through their
+     * SmartBrain combat path.
+     */
+    private static void groupedProtectEntityRuntime(GameTestHelper helper) {
+        SmartBrainTestArea area = prepareSmartBrainTestArea(
+                helper, GameType.SURVIVAL, -4, 12, -4, 4);
+        ServerPlayer owner = area.player();
+        KingdomSavedData data = KingdomSavedData.get(helper.getLevel());
+        BlockPos capital = isolatedCapital(helper, 148);
+        KingdomRecord kingdom = data.foundKingdom(
+                owner.getUUID(), "galacticwars:republic",
+                helper.getLevel().dimension().identifier().toString(), capital);
+        KingdomBaseBlueprint forwardBase = GameplayDataManager.snapshot()
+                .blueprint("galacticwars:forward_base").orElseThrow();
+        BuildProject forwardBaseProject = fullyProgressProject(
+                data, owner.getUUID(), forwardBase,
+                helper.getLevel().dimension().identifier().toString(), capital.offset(32, 0, 0));
+        if (!data.completeBuildProject(owner.getUUID(), forwardBaseProject, forwardBase)) {
+            helper.fail("Grouped Protect Entity setup could not unlock a commander slot");
+            return;
+        }
+
+        GalacticRecruitEntity commander = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(1, 1, 1));
+        GalacticRecruitEntity soldier = spawnRecruitAt(
+                helper, ModEntityTypes.ARC_TROOPER.get(), area.at(2, 1, 1));
+        GalacticRecruitEntity protectedRecruit = spawnRecruitAt(
+                helper, ModEntityTypes.CLONE_TROOPER.get(), area.at(4, 1, 1));
+        GalacticRecruitEntity attacker = spawnRecruitAt(
+                helper, ModEntityTypes.B1_BATTLE_DROID.get(), area.at(5, 1, 1));
+        commander.tame(owner);
+        soldier.tame(owner);
+        protectedRecruit.tame(owner);
+        protectedRecruit.setNoAi(true);
+        attacker.setNoAi(true);
+        attacker.getAttribute(Attributes.MAX_HEALTH).setBaseValue(1024.0D);
+        attacker.setHealth(attacker.getMaxHealth());
+        ServerPlayer enemyOwner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
+        attacker.setOwner(enemyOwner);
+        attacker.setTame(true, true);
+        if (!data.registerRecruit(owner.getUUID(), commander.getUUID())
+                || !data.registerRecruit(owner.getUUID(), soldier.getUUID())
+                || !data.promoteCommander(owner.getUUID(), commander.getUUID())) {
+            helper.fail("Grouped Protect Entity setup could not register and promote the live squad");
+            return;
+        }
+
+        ArmyLocation anchor = new ArmyLocation(
+                helper.getLevel().dimension().identifier().toString(),
+                commander.getX(), commander.getY(), commander.getZ());
+        var squad = data.createOrReclaimArmyGroup(
+                owner.getUUID(), commander.getUUID(), ArmyFormation.LINE,
+                anchor, helper.getLevel().getGameTime()).orElse(null);
+        if (squad == null || !squad.kingdomId().equals(kingdom.id())
+                || !squad.contains(commander.getUUID()) || !squad.contains(soldier.getUUID())) {
+            helper.fail("Grouped Protect Entity setup did not create an authoritative live squad");
+            return;
+        }
+
+        ItemStack marker = new ItemStack(ModItems.COMMAND_MARKER.get());
+        marker.set(ModDataComponents.COMMAND_TARGET,
+                CommandTargetSelection.entity(helper.getLevel(), protectedRecruit));
+        owner.setItemInHand(InteractionHand.MAIN_HAND, marker);
+        ArmyFieldCommandService.clearReplayHistory(owner.getUUID());
+        var protectedResult = ArmyFieldCommandService.execute(owner, new FieldCommandRequestPayload(
+                UUID.randomUUID(), FieldCommandAction.PROTECT_MARKED_ENTITY, List.of(squad.id())));
+        ArmyGroupOrder protectedOrder = data.armyGroup(squad.id()).orElseThrow().order();
+        if (protectedResult.result() != FieldCommandResult.ACCEPTED
+                || protectedOrder.type() != ArmyCommandType.PROTECT_ENTITY
+                || protectedOrder.targetEntityId().filter(protectedRecruit.getUUID()::equals).isEmpty()) {
+            helper.fail("Protect Marked Entity did not persist an authoritative group order: result="
+                    + protectedResult.result() + ", order=" + protectedOrder);
+            return;
+        }
+
+        long startedAt = helper.getTick();
+        int[] threatStartedAtRecruitTick = {-1};
+        boolean[] complete = {false};
+        helper.onEachTick(() -> {
+            if (complete[0]) {
+                return;
+            }
+            boolean entitiesIndexed = helper.getLevel().getEntity(commander.getUUID()) == commander
+                    && helper.getLevel().getEntity(soldier.getUUID()) == soldier
+                    && helper.getLevel().getEntity(protectedRecruit.getUUID()) == protectedRecruit
+                    && helper.getLevel().getEntity(attacker.getUUID()) == attacker;
+            ArmyBrainState commanderState = BrainUtil.getMemory(commander, ArmyBrainMemoryTypes.ARMY_STATE);
+            ArmyBrainState soldierState = BrainUtil.getMemory(soldier, ArmyBrainMemoryTypes.ARMY_STATE);
+            if (!entitiesIndexed || commanderState == null || soldierState == null) {
+                if (helper.getTick() - startedAt >= 120L) {
+                    complete[0] = true;
+                    helper.fail("Grouped Protect Entity squad never entered the live brain: indexed="
+                            + entitiesIndexed + ", states=" + (commanderState != null) + "/"
+                            + (soldierState != null));
+                }
+                return;
+            }
+
+            if (threatStartedAtRecruitTick[0] < 0) {
+                attacker.setTarget(protectedRecruit);
+                protectedRecruit.setLastHurtByMob(attacker);
+                threatStartedAtRecruitTick[0] = commander.tickCount;
+                return;
+            }
+
+            boolean commanderDefending = commander.getTarget() == attacker
+                    && attacker.getUUID().equals(commanderState.selectedTargetId());
+            boolean soldierDefending = soldier.getTarget() == attacker
+                    && attacker.getUUID().equals(soldierState.selectedTargetId());
+            if (commanderDefending && soldierDefending) {
+                complete[0] = true;
+                ArmyFieldCommandService.clearReplayHistory(owner.getUUID());
+                commander.discard();
+                soldier.discard();
+                protectedRecruit.discard();
+                attacker.discard();
+                helper.succeed();
+                return;
+            }
+            if (commander.tickCount - threatStartedAtRecruitTick[0] >= 140) {
+                complete[0] = true;
+                helper.fail("Grouped Protect Entity did not defend the marked ally: commander="
+                        + commander.getTarget() + "/" + commanderState.selectedTargetId()
+                        + ", soldier=" + soldier.getTarget() + "/" + soldierState.selectedTargetId()
+                        + ", protectedThreat=" + (protectedRecruit.getLastHurtByMob() == attacker)
+                        + ", order=" + data.armyGroup(squad.id()).orElseThrow().order());
             }
         });
     }

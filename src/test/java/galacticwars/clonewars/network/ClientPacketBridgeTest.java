@@ -19,11 +19,14 @@ public final class ClientPacketBridgeTest {
                 "src/main/java/galacticwars/clonewars/GalacticWarsClient.java"));
         if (!networkSource.contains("ClientPacketBridge.handleForceHud(payload)")
                 || !networkSource.contains("ClientPacketBridge.handleGameplayCatalog(payload)")
+                || !networkSource.contains("ClientPacketBridge.handleFieldCommandState(payload)")
                 || !bridgeSource.contains("AtomicReference")
                 || !bridgeSource.contains("installForceHudHandler")
                 || !bridgeSource.contains("installGameplayCatalogHandler")
+                || !bridgeSource.contains("installFieldCommandStateHandler")
                 || !clientSource.contains("ClientPacketBridge.installForceHudHandler")
-                || !clientSource.contains("ClientPacketBridge.installGameplayCatalogHandler")) {
+                || !clientSource.contains("ClientPacketBridge.installGameplayCatalogHandler")
+                || !clientSource.contains("ClientPacketBridge.installFieldCommandStateHandler")) {
             throw new AssertionError("Client packet handoff is not fully installed and dispatched");
         }
         System.out.println("ClientPacketBridgeTest passed");

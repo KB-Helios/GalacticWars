@@ -26,6 +26,8 @@ public final class RecruitBrain implements SmartBrainBuilder<GalacticRecruitEnti
     @Override
     public List<? extends ExtendedSensor<?>> getSensors(GalacticRecruitEntity owner) {
         return List.of(
+                new ArmyGroupStateSensor(),
+                new ArmyThreatSensor(),
                 new NearbyPlayersSensor<GalacticRecruitEntity>()
                         .setPredicate((recruit, player) -> !player.isSpectator())
                         .scanRate(10),
@@ -43,7 +45,7 @@ public final class RecruitBrain implements SmartBrainBuilder<GalacticRecruitEnti
             GalacticRecruitEntity owner
     ) {
         return List.of(
-                new RecruitArmyRuntimeBehaviour(),
+                new ArmyPatrolBehaviour(),
                 new FloatToSurfaceOfFluid<GalacticRecruitEntity>(),
                 new LookAtTarget<GalacticRecruitEntity>(),
                 new RecruitWalkTargetBehaviour());
@@ -58,6 +60,7 @@ public final class RecruitBrain implements SmartBrainBuilder<GalacticRecruitEnti
                         new CivilianShelterBehaviour(),
                         new NaturalCivilianWorkBehaviour(),
                         new RecruitWorkerBehaviour(),
+                        new ArmyOrderBehaviour(),
                         new RecruitMoveToCommandBehaviour(1.05D),
                         new RecruitCompanionBehaviour(1.0D),
                         new OneRandomBehaviour<GalacticRecruitEntity>(
@@ -83,6 +86,7 @@ public final class RecruitBrain implements SmartBrainBuilder<GalacticRecruitEnti
         return List.of(
                 new RecruitInvalidateAttackTargetBehaviour(),
                 new FirstApplicableBehaviour<GalacticRecruitEntity>(
+                        new ArmyCombatBehaviour(),
                         new RecruitRangedCombatBehaviour(),
                         new RecruitMeleeCombatBehaviour()));
     }

@@ -23,7 +23,8 @@ public final class RecruitInvalidateAttackTargetBehaviour
     @Override
     protected void start(GalacticRecruitEntity recruit) {
         LivingEntity target = BrainUtil.getMemory(recruit, MemoryModuleType.ATTACK_TARGET);
-        if (!recruit.canUseLocalAttackTarget(target)) {
+        if (!recruit.canUseLocalAttackTarget(target)
+                && !ArmyBrainSupport.isCurrentGroupTarget(recruit, target)) {
             BrainUtil.clearMemories(recruit,
                     MemoryModuleType.ATTACK_TARGET,
                     MemoryModuleType.LOOK_TARGET,
