@@ -134,7 +134,7 @@ public final class LightsaberAssetIntegrationTest {
             int z
     ) {
         Pattern pattern = Pattern.compile(
-                "\\\"" + Pattern.quote(transform) + "\\\"(?s:.*?)"
+                "\\\"" + Pattern.quote(transform) + "\\\"[^}]*"
                         + "\\\"rotation\\\"\\s*:\\s*\\[\\s*" + x
                         + "(?:\\.0)?\\s*,\\s*" + y + "(?:\\.0)?\\s*,\\s*" + z
                         + "(?:\\.0)?\\s*]");
@@ -149,7 +149,7 @@ public final class LightsaberAssetIntegrationTest {
             double z
     ) {
         Pattern pattern = Pattern.compile(
-                "\\\"" + Pattern.quote(transform) + "\\\"(?s:.*?)"
+                "\\\"" + Pattern.quote(transform) + "\\\"[^}]*"
                         + "\\\"translation\\\"\\s*:\\s*\\[\\s*" + number(x)
                         + "\\s*,\\s*" + number(y) + "\\s*,\\s*" + number(z) + "\\s*]");
         return pattern.matcher(model).find();

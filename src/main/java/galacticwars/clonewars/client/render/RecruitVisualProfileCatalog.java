@@ -13,12 +13,6 @@ import java.util.Objects;
 
 /** Immutable, save-neutral mappings from synchronized recruit duty to visual texture variants. */
 public final class RecruitVisualProfileCatalog {
-    private static final Map<EntityType<?>, String> COMMANDER_TEXTURE_OVERRIDES = Map.of(
-            ModEntityTypes.CLONE_TROOPER.get(), "clone_trooper_commander",
-            ModEntityTypes.ARC_TROOPER.get(), "arc_trooper_commander",
-            ModEntityTypes.B1_BATTLE_DROID.get(), "b1_battle_droid_commander"
-    );
-
     private RecruitVisualProfileCatalog() {
     }
 
@@ -34,11 +28,22 @@ public final class RecruitVisualProfileCatalog {
         RecruitDuty resolvedDuty = duty == null ? RecruitDuty.SOLDIER : duty;
         String textureId = registeredId.getPath();
         if (resolvedDuty == RecruitDuty.COMMANDER) {
-            textureId = COMMANDER_TEXTURE_OVERRIDES.getOrDefault(entityType, textureId);
+            textureId = CommanderTextureOverridesHolder.VALUES.getOrDefault(entityType, textureId);
         }
         return Identifier.fromNamespaceAndPath(
                 GalacticWars.MODID,
                 "textures/entity/" + textureId + ".png"
         );
+    }
+
+    private static final class CommanderTextureOverridesHolder {
+        private static final Map<EntityType<?>, String> VALUES = Map.of(
+                ModEntityTypes.CLONE_TROOPER.get(), "clone_trooper_commander",
+                ModEntityTypes.ARC_TROOPER.get(), "arc_trooper_commander",
+                ModEntityTypes.B1_BATTLE_DROID.get(), "b1_battle_droid_commander"
+        );
+
+        private CommanderTextureOverridesHolder() {
+        }
     }
 }

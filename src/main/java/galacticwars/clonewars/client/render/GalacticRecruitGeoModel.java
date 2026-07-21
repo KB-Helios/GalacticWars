@@ -25,11 +25,11 @@ public final class GalacticRecruitGeoModel extends DefaultedEntityGeoModel<Galac
     public void addAdditionalStateData(
             GalacticRecruitEntity animatable,
             Object relatedObject,
-        GeoRenderState renderState
+            GeoRenderState renderState
     ) {
         super.addAdditionalStateData(animatable, relatedObject, renderState);
         RecruitDuty duty = animatable == null ? RecruitDuty.SOLDIER : animatable.getRecruitDuty();
-        renderState.addGeckolibData(RECRUIT_DUTY, duty == null ? RecruitDuty.SOLDIER : duty);
+        renderState.addGeckolibData(RECRUIT_DUTY, duty);
     }
 
     @Override
