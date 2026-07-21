@@ -11,10 +11,11 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 
-public final class LightsaberClientExtensions implements IClientItemExtensions {
-    public static final LightsaberClientExtensions INSTANCE = new LightsaberClientExtensions();
+/** Keeps blasters shouldered in third person and stable at eye level in first person. */
+public final class BlasterClientExtensions implements IClientItemExtensions {
+    public static final BlasterClientExtensions INSTANCE = new BlasterClientExtensions();
 
-    private LightsaberClientExtensions() {
+    private BlasterClientExtensions() {
     }
 
     @Override
@@ -23,7 +24,7 @@ public final class LightsaberClientExtensions implements IClientItemExtensions {
             InteractionHand hand,
             ItemStack stack
     ) {
-        return HumanoidModel.ArmPose.ITEM;
+        return HumanoidModel.ArmPose.CROSSBOW_HOLD;
     }
 
     @Override
@@ -38,17 +39,12 @@ public final class LightsaberClientExtensions implements IClientItemExtensions {
     ) {
         float direction = arm == HumanoidArm.RIGHT ? 1.0F : -1.0F;
         float ready = 1.0F - Mth.clamp(equipProgress, 0.0F, 1.0F);
-        float slash = Mth.sin(Mth.sqrt(swingProgress) * (float) Math.PI);
-        float idle = Mth.sin((player.tickCount + partialTick) * 0.14F) * 0.008F * ready;
+        float recoil = Mth.sin(Mth.sqrt(swingProgress) * (float) Math.PI);
+        float breathing = Mth.sin((player.tickCount + partialTick) * 0.11F) * 0.004F * ready;
 
-        // The GeckoLib geometry now pivots through the middle of the hilt. Keep
-        // the animation centered there so the hand stays wrapped around the
-        // grip instead of orbiting the weapon during a slash.
-        poseStack.translate(direction * 0.012F * ready, idle, -0.018F * ready);
-        poseStack.mulPose(Axis.ZP.rotationDegrees(direction * (-6.0F * ready - 20.0F * slash)));
-        poseStack.mulPose(Axis.XP.rotationDegrees(-3.0F * ready - 10.0F * slash));
-        // Returning false preserves Minecraft's normal first-person hand and item
-        // transforms after applying the subtle ready/slash offsets above.
+        poseStack.translate(direction * 0.012F * ready, breathing, -0.035F * ready + 0.055F * recoil);
+        poseStack.mulPose(Axis.XP.rotationDegrees(-2.0F * ready + 7.0F * recoil));
+        poseStack.mulPose(Axis.ZP.rotationDegrees(direction * -1.5F * ready));
         return false;
     }
 }

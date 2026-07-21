@@ -1,1 +1,28 @@
-{"parent":"minecraft:item/handheld","textures":{"layer0":"galacticwars:item/westar_blaster"}}
+{
+  "parent": "galacticwars:item/dc15_blaster",
+  "textures": {
+    "layer0": "galacticwars:item/westar_blaster_hq"
+  },
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [-90, 0, -62],
+      "translation": [3.2, 1.2, -3],
+      "scale": [0.74, 0.74, 0.74]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [-90, 0, 28],
+      "translation": [3.2, 1.2, -3],
+      "scale": [0.74, 0.74, 0.74]
+    },
+    "firstperson_righthand": {
+      "rotation": [-90, 0, -58],
+      "translation": [3.35, 3.65, 1.13],
+      "scale": [0.72, 0.72, 0.72]
+    },
+    "firstperson_lefthand": {
+      "rotation": [-90, 0, 32],
+      "translation": [3.35, 3.65, 1.13],
+      "scale": [0.72, 0.72, 0.72]
+    }
+  }
+}

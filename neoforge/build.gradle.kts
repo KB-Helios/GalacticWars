@@ -71,6 +71,7 @@ configurations.named("testRuntimeClasspath") { extendsFrom(commonRuntime) }
 
 val rootNeoForgeSources = listOf(
     "galacticwars/clonewars/client/gui/GalacticWarsConfigScreen.java",
+    "galacticwars/clonewars/client/render/BlasterClientExtensions.java",
     "galacticwars/clonewars/client/render/LightsaberClientExtensions.java",
     "galacticwars/clonewars/gametest/**",
 )

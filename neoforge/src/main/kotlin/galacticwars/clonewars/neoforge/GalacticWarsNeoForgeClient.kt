@@ -17,6 +17,7 @@ import galacticwars.clonewars.client.gui.GalacticWarsConfigScreen
 import galacticwars.clonewars.client.gui.MerchantTradeScreen
 import galacticwars.clonewars.client.gui.RecruitCommandScreen
 import galacticwars.clonewars.client.gui.VehicleHud
+import galacticwars.clonewars.client.render.BlasterClientExtensions
 import galacticwars.clonewars.client.render.LightsaberClientExtensions
 import galacticwars.clonewars.registry.ModEntityTypes
 import galacticwars.clonewars.registry.ModItems
@@ -83,6 +84,13 @@ object GalacticWarsNeoForgeClient {
 
     @SubscribeEvent
     fun registerClientExtensions(event: RegisterClientExtensionsEvent) {
+        event.registerItem(
+            BlasterClientExtensions.INSTANCE,
+            ModItems.DC15_BLASTER.get(),
+            ModItems.E5_BLASTER.get(),
+            ModItems.WESTAR_BLASTER.get(),
+            ModItems.SCATTER_BLASTER.get(),
+        )
         event.registerItem(
             LightsaberClientExtensions.INSTANCE,
             ModItems.BLUE_LIGHTSABER.get(),

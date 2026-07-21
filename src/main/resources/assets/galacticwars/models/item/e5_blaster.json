@@ -1,1 +1,6 @@
-{"parent":"minecraft:item/handheld","textures":{"layer0":"galacticwars:item/e5_blaster"}}
+{
+  "parent": "galacticwars:item/dc15_blaster",
+  "textures": {
+    "layer0": "galacticwars:item/e5_blaster_hq"
+  }
+}

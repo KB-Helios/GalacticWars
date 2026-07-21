@@ -1,1 +1,36 @@
-{"parent":"minecraft:item/handheld","textures":{"layer0":"galacticwars:item/scatter_blaster"}}
+{
+  "parent": "galacticwars:item/dc15_blaster",
+  "textures": {
+    "layer0": "galacticwars:item/scatter_blaster_hq"
+  },
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [-90, 0, -60],
+      "translation": [2.4, 0.6, -3],
+      "scale": [0.8, 0.8, 0.8]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [-90, 0, 30],
+      "translation": [2.4, 0.6, -3],
+      "scale": [0.8, 0.8, 0.8]
+    },
+    "firstperson_righthand": {
+      "rotation": [-90, 0, -55],
+      "translation": [2.2, 3.4, 1.13],
+      "scale": [0.58, 0.58, 0.58]
+    },
+    "firstperson_lefthand": {
+      "rotation": [-90, 0, 35],
+      "translation": [2.2, 3.4, 1.13],
+      "scale": [0.58, 0.58, 0.58]
+    },
+    "ground": {
+      "translation": [0, 2, 0],
+      "scale": [0.45, 0.45, 0.45]
+    },
+    "fixed": {
+      "rotation": [0, 180, 0],
+      "scale": [0.78, 0.78, 0.78]
+    }
+  }
+}

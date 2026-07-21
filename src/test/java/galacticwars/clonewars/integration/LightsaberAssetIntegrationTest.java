@@ -21,10 +21,14 @@ public final class LightsaberAssetIntegrationTest {
         require(base.contains("\"parent\": \"builtin/entity\""),
                 "lightsaber display model must delegate rendering to GeckoLib");
         require(base.contains("\"display\""), "lightsaber base model must define held-item transforms");
-        require(transformContains(base, "thirdperson_righthand", 0, -90, 55),
-                "third-person saber transform must use a sword-like grip angle");
-        require(transformContains(base, "firstperson_righthand", 0, -90, 25),
-                "first-person saber transform must align the hilt with the hand");
+        require(transformContains(base, "thirdperson_righthand", 0, -90, 30),
+                "third-person saber transform must keep the blade ready without over-rotating the hilt");
+        require(transformContains(base, "firstperson_righthand", 0, -90, 15),
+                "first-person saber transform must keep the blade clear of the camera");
+        require(transformTranslationContains(base, "thirdperson_righthand", 0, 0.5, -0.75),
+                "third-person saber transform must center the hand on the hilt pivot");
+        require(transformTranslationContains(base, "firstperson_righthand", 0.45, 0.8, -0.65),
+                "first-person saber transform must center the hand on the hilt pivot");
 
         String geometry = json(ASSETS.resolve("geckolib/models/item/lightsaber.geo.json"));
         require(geometry.contains("geometry.galacticwars.item.lightsaber"),
@@ -135,6 +139,25 @@ public final class LightsaberAssetIntegrationTest {
                         + "(?:\\.0)?\\s*,\\s*" + y + "(?:\\.0)?\\s*,\\s*" + z
                         + "(?:\\.0)?\\s*]");
         return pattern.matcher(model).find();
+    }
+
+    private static boolean transformTranslationContains(
+            String model,
+            String transform,
+            double x,
+            double y,
+            double z
+    ) {
+        Pattern pattern = Pattern.compile(
+                "\\\"" + Pattern.quote(transform) + "\\\"(?s:.*?)"
+                        + "\\\"translation\\\"\\s*:\\s*\\[\\s*" + number(x)
+                        + "\\s*,\\s*" + number(y) + "\\s*,\\s*" + number(z) + "\\s*]");
+        return pattern.matcher(model).find();
+    }
+
+    private static String number(double value) {
+        String literal = Double.toString(value).replace(".", "\\.");
+        return value == Math.rint(value) ? literal.replace("\\.0", "(?:\\.0)?") : literal;
     }
 
     private static boolean hiltSpansHandPivot(String geometry) {
