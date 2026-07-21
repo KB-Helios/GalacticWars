@@ -30,11 +30,17 @@ import galacticwars.clonewars.recruitment.RecruitDuty;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.workforce.CourierTransferAction;
-import galacticwars.clonewars.workforce.CourierTransferType;
+import galacticwars.clonewars.workforce.CourierRouteMode;
+import galacticwars.clonewars.workforce.CourierRoutePlan;
 import galacticwars.clonewars.workforce.CourierWaypoint;
 import galacticwars.clonewars.workforce.WorkAreaBounds;
 import galacticwars.clonewars.workforce.WorkAreaConfiguration;
+import galacticwars.clonewars.workforce.WorkforceCodecs;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 final class KingdomCodecs {
     static final Codec<KingdomNpcRecord> KINGDOM_NPC = RecordCodecBuilder.create(instance -> instance.group(
@@ -134,13 +140,38 @@ final class KingdomCodecs {
             Codec.intRange(1, 8).optionalFieldOf("spacing", 2).forGetter(ArmyGroupOrder::spacing)
     ).apply(instance, ArmyGroupOrder::new));
 
-    static final Codec<ArmySnapshotEquipment> ARMY_SNAPSHOT_EQUIPMENT = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.STRING.optionalFieldOf("main_hand", "").forGetter(ArmySnapshotEquipment::mainHand),
-            Codec.STRING.optionalFieldOf("head", "").forGetter(ArmySnapshotEquipment::head),
-            Codec.STRING.optionalFieldOf("chest", "").forGetter(ArmySnapshotEquipment::chest),
-            Codec.STRING.optionalFieldOf("legs", "").forGetter(ArmySnapshotEquipment::legs),
-            Codec.STRING.optionalFieldOf("feet", "").forGetter(ArmySnapshotEquipment::feet)
-    ).apply(instance, ArmySnapshotEquipment::new));
+    private static final Codec<ArmySnapshotEquipment> COMPLETE_ARMY_SNAPSHOT_EQUIPMENT =
+            RecordCodecBuilder.create(instance -> instance.group(
+                    ItemStack.OPTIONAL_CODEC.optionalFieldOf("main_hand", ItemStack.EMPTY)
+                            .forGetter(ArmySnapshotEquipment::mainHand),
+                    ItemStack.OPTIONAL_CODEC.optionalFieldOf("off_hand", ItemStack.EMPTY)
+                            .forGetter(ArmySnapshotEquipment::offHand),
+                    ItemStack.OPTIONAL_CODEC.optionalFieldOf("head", ItemStack.EMPTY)
+                            .forGetter(ArmySnapshotEquipment::head),
+                    ItemStack.OPTIONAL_CODEC.optionalFieldOf("chest", ItemStack.EMPTY)
+                            .forGetter(ArmySnapshotEquipment::chest),
+                    ItemStack.OPTIONAL_CODEC.optionalFieldOf("legs", ItemStack.EMPTY)
+                            .forGetter(ArmySnapshotEquipment::legs),
+                    ItemStack.OPTIONAL_CODEC.optionalFieldOf("feet", ItemStack.EMPTY)
+                            .forGetter(ArmySnapshotEquipment::feet)
+            ).apply(instance, ArmySnapshotEquipment::new));
+
+    private static final Codec<LegacyArmySnapshotEquipment> LEGACY_ARMY_SNAPSHOT_EQUIPMENT =
+            RecordCodecBuilder.create(instance -> instance.group(
+                    Codec.STRING.optionalFieldOf("main_hand", "").forGetter(LegacyArmySnapshotEquipment::mainHand),
+                    Codec.STRING.optionalFieldOf("head", "").forGetter(LegacyArmySnapshotEquipment::head),
+                    Codec.STRING.optionalFieldOf("chest", "").forGetter(LegacyArmySnapshotEquipment::chest),
+                    Codec.STRING.optionalFieldOf("legs", "").forGetter(LegacyArmySnapshotEquipment::legs),
+                    Codec.STRING.optionalFieldOf("feet", "").forGetter(LegacyArmySnapshotEquipment::feet)
+            ).apply(instance, LegacyArmySnapshotEquipment::new));
+
+    static final Codec<ArmySnapshotEquipment> ARMY_SNAPSHOT_EQUIPMENT =
+            COMPLETE_ARMY_SNAPSHOT_EQUIPMENT.withAlternative(
+                    LEGACY_ARMY_SNAPSHOT_EQUIPMENT,
+                    KingdomCodecs::migrateLegacyEquipment);
+
+    private static final Codec<List<ItemStack>> ARMY_SNAPSHOT_CARGO =
+            ItemStack.OPTIONAL_CODEC.listOf(0, ArmyMemberSnapshot.CARGO_SLOT_COUNT);
 
     static final Codec<ArmyMemberSnapshot> ARMY_MEMBER_SNAPSHOT = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("recruit_id").forGetter(ArmyMemberSnapshot::recruitId),
@@ -155,8 +186,44 @@ final class KingdomCodecs {
             Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("unpaid_ticks", 0).forGetter(ArmyMemberSnapshot::unpaidTicks),
             Codec.LONG.optionalFieldOf("generation", 0L).forGetter(ArmyMemberSnapshot::generation),
             ARMY_SNAPSHOT_EQUIPMENT.fieldOf("equipment").forGetter(ArmyMemberSnapshot::equipment),
+            ARMY_SNAPSHOT_CARGO.optionalFieldOf("cargo", List.of()).forGetter(ArmyMemberSnapshot::cargo),
             Codec.STRING.optionalFieldOf("custom_name", "").forGetter(ArmyMemberSnapshot::customName)
     ).apply(instance, ArmyMemberSnapshot::new));
+
+    private static ArmySnapshotEquipment migrateLegacyEquipment(LegacyArmySnapshotEquipment equipment) {
+        return new ArmySnapshotEquipment(
+                legacyItemStack(equipment.mainHand()),
+                ItemStack.EMPTY,
+                legacyItemStack(equipment.head()),
+                legacyItemStack(equipment.chest()),
+                legacyItemStack(equipment.legs()),
+                legacyItemStack(equipment.feet()));
+    }
+
+    private static ItemStack legacyItemStack(String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return ItemStack.EMPTY;
+        }
+        Identifier identifier;
+        try {
+            identifier = Identifier.parse(itemId);
+        } catch (RuntimeException invalid) {
+            return ItemStack.EMPTY;
+        }
+        Item item = BuiltInRegistries.ITEM.getValue(identifier);
+        return item != null && identifier.equals(BuiltInRegistries.ITEM.getKey(item))
+                ? new ItemStack(item)
+                : ItemStack.EMPTY;
+    }
+
+    private record LegacyArmySnapshotEquipment(
+            String mainHand,
+            String head,
+            String chest,
+            String legs,
+            String feet
+    ) {
+    }
 
     static final Codec<ArmyGroupSimulation> ARMY_GROUP_SIMULATION = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.xmap(value -> ArmyGroupLifecycleState.valueOf(value.toUpperCase()), value -> value.name().toLowerCase())
@@ -286,22 +353,25 @@ final class KingdomCodecs {
             Codec.intRange(1, 64).fieldOf("depth").forGetter(WorkAreaBounds::depth)
     ).apply(instance, WorkAreaBounds::new));
 
-    static final Codec<CourierTransferAction> COURIER_TRANSFER_ACTION = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.STRING.xmap(CourierTransferType::byId, CourierTransferType::id)
-                    .fieldOf("type").forGetter(CourierTransferAction::type),
-            Codec.STRING.optionalFieldOf("item", "").forGetter(CourierTransferAction::itemId),
-            Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("quantity", 0)
-                    .forGetter(CourierTransferAction::quantity)
-    ).apply(instance, CourierTransferAction::new));
+    static final Codec<CourierTransferAction> COURIER_TRANSFER_ACTION =
+            WorkforceCodecs.COURIER_TRANSFER_ACTION;
 
-    static final Codec<CourierWaypoint> COURIER_WAYPOINT = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.STRING.fieldOf("dimension").forGetter(CourierWaypoint::dimensionId),
-            Codec.INT.fieldOf("x").forGetter(CourierWaypoint::x),
-            Codec.INT.fieldOf("y").forGetter(CourierWaypoint::y),
-            Codec.INT.fieldOf("z").forGetter(CourierWaypoint::z),
-            COURIER_TRANSFER_ACTION.listOf().optionalFieldOf("actions", List.of())
-                    .forGetter(CourierWaypoint::actions)
-    ).apply(instance, CourierWaypoint::new));
+    private static final Codec<CourierWaypoint> LEGACY_UNBOUNDED_COURIER_WAYPOINT =
+            RecordCodecBuilder.create(instance -> instance.group(
+                    Codec.STRING.fieldOf("dimension").forGetter(CourierWaypoint::dimensionId),
+                    Codec.INT.fieldOf("x").forGetter(CourierWaypoint::x),
+                    Codec.INT.fieldOf("y").forGetter(CourierWaypoint::y),
+                    Codec.INT.fieldOf("z").forGetter(CourierWaypoint::z),
+                    COURIER_TRANSFER_ACTION.listOf().optionalFieldOf("actions", List.of())
+                            .forGetter(CourierWaypoint::actions)
+            ).apply(instance, CourierWaypoint::new));
+
+    static final Codec<CourierWaypoint> COURIER_WAYPOINT =
+            WorkforceCodecs.COURIER_WAYPOINT.withAlternative(LEGACY_UNBOUNDED_COURIER_WAYPOINT);
+
+    private static final Codec<List<CourierWaypoint>> COURIER_ROUTE =
+            COURIER_WAYPOINT.listOf(0, CourierRoutePlan.MAX_WAYPOINTS)
+                    .withAlternative(COURIER_WAYPOINT.listOf());
 
     static final Codec<WorkAreaConfiguration> WORK_AREA_CONFIGURATION = RecordCodecBuilder.create(instance -> instance.group(
             WORK_AREA_BOUNDS.fieldOf("bounds").forGetter(WorkAreaConfiguration::bounds),
@@ -309,8 +379,13 @@ final class KingdomCodecs {
             Codec.intRange(0, 100).optionalFieldOf("priority", 50).forGetter(WorkAreaConfiguration::priority),
             Codec.BOOL.optionalFieldOf("overlay_visible", false).forGetter(WorkAreaConfiguration::overlayVisible),
             Codec.STRING.listOf().optionalFieldOf("item_filters", List.of()).forGetter(WorkAreaConfiguration::itemFilters),
-            COURIER_WAYPOINT.listOf().optionalFieldOf("courier_route", List.of())
-                    .forGetter(WorkAreaConfiguration::courierRoute)
+            COURIER_ROUTE.optionalFieldOf("courier_route", List.of())
+                    .forGetter(WorkAreaConfiguration::courierRoute),
+            Codec.STRING.xmap(CourierRouteMode::byId, CourierRouteMode::id)
+                    .optionalFieldOf("courier_route_mode", CourierRouteMode.LOOP)
+                    .forGetter(WorkAreaConfiguration::courierRouteMode),
+            Codec.LONG.optionalFieldOf("courier_route_revision", 0L)
+                    .forGetter(WorkAreaConfiguration::courierRouteRevision)
     ).apply(instance, WorkAreaConfiguration::new));
 
     static final Codec<WorksiteRecord> WORKSITE = RecordCodecBuilder.create(instance -> instance.group(

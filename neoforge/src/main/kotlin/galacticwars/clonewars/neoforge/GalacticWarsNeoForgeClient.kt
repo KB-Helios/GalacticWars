@@ -16,6 +16,7 @@ import galacticwars.clonewars.client.gui.ForceHud
 import galacticwars.clonewars.client.gui.GalacticWarsConfigScreen
 import galacticwars.clonewars.client.gui.MerchantTradeScreen
 import galacticwars.clonewars.client.gui.RecruitCommandScreen
+import galacticwars.clonewars.client.gui.RecruitLoadoutScreen
 import galacticwars.clonewars.client.gui.VehicleHud
 import galacticwars.clonewars.client.render.BlasterClientExtensions
 import galacticwars.clonewars.client.render.LightsaberClientExtensions
@@ -46,6 +47,7 @@ object GalacticWarsNeoForgeClient {
     @SubscribeEvent
     fun registerMenuScreens(event: RegisterMenuScreensEvent) {
         event.register(ModMenuTypes.RECRUIT_COMMAND.get(), ::RecruitCommandScreen)
+        event.register(ModMenuTypes.RECRUIT_LOADOUT.get(), ::RecruitLoadoutScreen)
         event.register(
             ModMenuTypes.COMMAND_CENTER_NAVIGATION.get(),
             ::CommandCenterNavigationScreen,

@@ -18,7 +18,7 @@ public final class KingdomSavedDataTest {
     private static void savedDataUsesVersionedOverworldStorage() throws IOException {
         String source = read("src/main/java/galacticwars/clonewars/kingdom/KingdomSavedData.java");
         assertContains(source, "CURRENT_SCHEMA_VERSION", "schema version");
-        assertContains(source, "CURRENT_SCHEMA_VERSION = 7", "kingdom governance schema version");
+        assertContains(source, "CURRENT_SCHEMA_VERSION = 8", "kingdom governance schema version");
         assertContains(source, "pending_invites", "pending invitation persistence");
         assertContains(source, "pending_diplomacy", "pending diplomacy persistence");
         assertContains(source, "inactive_hall_owners", "inactive Hall persistence");

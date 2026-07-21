@@ -17,6 +17,10 @@ public record CourierWaypoint(
         if (dimensionId.isBlank()) {
             throw new IllegalArgumentException("dimensionId cannot be blank");
         }
-        actions = List.copyOf(Objects.requireNonNull(actions, "actions"));
+        List<CourierTransferAction> normalizedActions = List.copyOf(
+                Objects.requireNonNull(actions, "actions"));
+        actions = normalizedActions.size() <= WorkforceCodecs.MAX_ACTIONS_PER_WAYPOINT
+                ? normalizedActions
+                : List.copyOf(normalizedActions.subList(0, WorkforceCodecs.MAX_ACTIONS_PER_WAYPOINT));
     }
 }

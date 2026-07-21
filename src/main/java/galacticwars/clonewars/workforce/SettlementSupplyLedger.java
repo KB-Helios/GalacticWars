@@ -4,10 +4,12 @@ import galacticwars.clonewars.kingdom.StorageEndpoint;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Immutable demand and lease index. Physical containers remain the resource authority. */
@@ -21,6 +23,12 @@ public record SettlementSupplyLedger(
         Objects.requireNonNull(settlementId, "settlementId");
         demands = uniqueDemands(demands);
         reservations = uniqueReservations(reservations);
+        if (demands.size() > WorkforceCodecs.MAX_SUPPLY_DEMANDS) {
+            throw new IllegalArgumentException("too many settlement supply demands");
+        }
+        if (reservations.size() > WorkforceCodecs.MAX_SUPPLY_RESERVATIONS) {
+            throw new IllegalArgumentException("too many settlement supply reservations");
+        }
         if (revision < 0) {
             throw new IllegalArgumentException("revision cannot be negative");
         }
@@ -47,9 +55,38 @@ public record SettlementSupplyLedger(
             }
             return this;
         }
-        ArrayList<SupplyDemand> updated = new ArrayList<>(demands);
+        List<SupplyDemand> retainedDemands = demands;
+        List<SupplyReservation> retainedReservations = reservations;
+        if (demands.size() >= WorkforceCodecs.MAX_SUPPLY_DEMANDS) {
+            Set<UUID> activeDemandIds = new HashSet<>();
+            reservations.stream()
+                    .filter(reservation -> reservation.state() == SupplyReservation.State.ACTIVE)
+                    .map(SupplyReservation::demandId)
+                    .forEach(activeDemandIds::add);
+            int removalsNeeded = demands.size() - WorkforceCodecs.MAX_SUPPLY_DEMANDS + 1;
+            ArrayList<SupplyDemand> compactedDemands = new ArrayList<>(demands.size());
+            Set<UUID> removedDemandIds = new HashSet<>();
+            for (SupplyDemand candidate : demands) {
+                if (removalsNeeded > 0 && candidate.complete()
+                        && !activeDemandIds.contains(candidate.id())) {
+                    removedDemandIds.add(candidate.id());
+                    removalsNeeded--;
+                } else {
+                    compactedDemands.add(candidate);
+                }
+            }
+            if (removalsNeeded > 0) {
+                throw new IllegalArgumentException("supply_demand_capacity");
+            }
+            retainedDemands = compactedDemands;
+            retainedReservations = reservations.stream()
+                    .filter(reservation -> !removedDemandIds.contains(reservation.demandId())
+                            || reservation.state() == SupplyReservation.State.ACTIVE)
+                    .toList();
+        }
+        ArrayList<SupplyDemand> updated = new ArrayList<>(retainedDemands);
         updated.add(demand);
-        return copy(updated, reservations);
+        return copy(updated, retainedReservations);
     }
 
     public ReservationDecision reserve(
@@ -70,7 +107,8 @@ public record SettlementSupplyLedger(
         if (demand == null || demand.complete()) {
             return ReservationDecision.rejected("demand_unavailable", cleaned);
         }
-        if (requestedQuantity <= 0 || physicalStock < 0 || leaseTicks <= 0) {
+        if (requestedQuantity <= 0 || physicalStock < 0 || gameTime < 0 || leaseTicks <= 0
+                || leaseTicks > Long.MAX_VALUE - gameTime) {
             return ReservationDecision.rejected("invalid_reservation", cleaned);
         }
         Optional<SupplyReservation> existingReservation = cleaned.reservations.stream()
@@ -99,19 +137,20 @@ public record SettlementSupplyLedger(
         if (quantity == 0) {
             return ReservationDecision.rejected("physical_stock_unavailable", cleaned);
         }
-        long generation = cleaned.reservations.stream()
-                .filter(reservation -> reservation.demandId().equals(demandId))
-                .filter(reservation -> reservation.workerId().equals(workerId))
-                .filter(reservation -> reservation.state() != SupplyReservation.State.ACTIVE)
-                .count();
-        UUID reservationId = UUID.nameUUIDFromBytes((demandId + ":" + workerId + ":" + generation)
-                .getBytes(StandardCharsets.UTF_8));
+        Optional<SettlementSupplyLedger> ledgerWithRoom = cleaned.withReservationRoom();
+        if (ledgerWithRoom.isEmpty()) {
+            return ReservationDecision.rejected("reservation_capacity", cleaned);
+        }
+        SettlementSupplyLedger prepared = ledgerWithRoom.orElseThrow();
+        long expiresAtGameTime = gameTime + leaseTicks;
+        UUID reservationId = prepared.nextReservationId(
+                demandId, workerId, gameTime, expiresAtGameTime);
         SupplyReservation reservation = new SupplyReservation(
                 reservationId, demandId, workerId, endpoint, quantity,
-                Math.addExact(gameTime, leaseTicks), SupplyReservation.State.ACTIVE);
-        ArrayList<SupplyReservation> updated = new ArrayList<>(cleaned.reservations);
+                expiresAtGameTime, SupplyReservation.State.ACTIVE);
+        ArrayList<SupplyReservation> updated = new ArrayList<>(prepared.reservations);
         updated.add(reservation);
-        return ReservationDecision.accepted(reservation, cleaned.copy(cleaned.demands, updated));
+        return ReservationDecision.accepted(reservation, prepared.copy(prepared.demands, updated));
     }
 
     public SettlementSupplyLedger complete(
@@ -160,8 +199,41 @@ public record SettlementSupplyLedger(
         return reservations.stream().filter(candidate -> candidate.id().equals(reservationId)).findFirst();
     }
 
+    private Optional<SettlementSupplyLedger> withReservationRoom() {
+        if (reservations.size() < WorkforceCodecs.MAX_SUPPLY_RESERVATIONS) {
+            return Optional.of(this);
+        }
+        ArrayList<SupplyReservation> compacted = new ArrayList<>(reservations);
+        for (int index = 0; index < compacted.size(); index++) {
+            if (compacted.get(index).state() != SupplyReservation.State.ACTIVE) {
+                compacted.remove(index);
+                return Optional.of(copy(demands, compacted));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private UUID nextReservationId(
+            UUID demandId,
+            UUID workerId,
+            long gameTime,
+            long expiresAtGameTime
+    ) {
+        int salt = 0;
+        while (true) {
+            UUID candidate = UUID.nameUUIDFromBytes((demandId + ":" + workerId + ":"
+                    + gameTime + ":" + expiresAtGameTime + ":" + revision + ":" + salt)
+                    .getBytes(StandardCharsets.UTF_8));
+            if (reservation(candidate).isEmpty()) {
+                return candidate;
+            }
+            salt++;
+        }
+    }
+
     private SettlementSupplyLedger copy(List<SupplyDemand> demands, List<SupplyReservation> reservations) {
-        return new SettlementSupplyLedger(settlementId, demands, reservations, revision + 1);
+        int nextRevision = revision == Integer.MAX_VALUE ? Integer.MAX_VALUE : revision + 1;
+        return new SettlementSupplyLedger(settlementId, demands, reservations, nextRevision);
     }
 
     private static List<SupplyDemand> uniqueDemands(List<SupplyDemand> demands) {
@@ -183,14 +255,14 @@ public record SettlementSupplyLedger(
             Optional<SupplyReservation> reservation,
             SettlementSupplyLedger ledger
     ) {
-        private static ReservationDecision accepted(
+        public static ReservationDecision accepted(
                 SupplyReservation reservation,
                 SettlementSupplyLedger ledger
         ) {
             return new ReservationDecision(true, "accepted", Optional.of(reservation), ledger);
         }
 
-        private static ReservationDecision rejected(String reason, SettlementSupplyLedger ledger) {
+        public static ReservationDecision rejected(String reason, SettlementSupplyLedger ledger) {
             return new ReservationDecision(false, reason, Optional.empty(), ledger);
         }
     }

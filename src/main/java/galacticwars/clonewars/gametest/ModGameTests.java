@@ -18,6 +18,7 @@ import galacticwars.clonewars.army.ArmyFormation;
 import galacticwars.clonewars.army.ArmyGroupLifecycleState;
 import galacticwars.clonewars.army.ArmyGroupOrder;
 import galacticwars.clonewars.army.ArmyLocation;
+import galacticwars.clonewars.army.ArmyMemberSnapshot;
 import galacticwars.clonewars.army.ArmyPatrolEnemyPolicy;
 import galacticwars.clonewars.army.ArmyPatrolMode;
 import galacticwars.clonewars.army.ArmyPatrolPlan;
@@ -360,6 +361,8 @@ public final class ModGameTests {
         tests.put(id("recruit_contract_lifecycle"), ModGameTests::recruitContractLifecycle);
         tests.put(id("local_recruit_protect_owner"), ModGameTests::localRecruitProtectOwner);
         tests.put(id("worker_resource_conservation"), ModGameTests::workerResourceConservation);
+        tests.put(id("physical_logistics_transaction"),
+                PhysicalLogisticsGameTests::atomicPhysicalTransfer);
         tests.put(id("enabled_worker_loops"), ModGameTests::enabledWorkerLoops);
         tests.put(id("specialist_worker_loops"), ModGameTests::specialistWorkerLoops);
         tests.put(id("animal_farmer_species_pairing"), ModGameTests::animalFarmerSpeciesPairing);
@@ -384,6 +387,7 @@ public final class ModGameTests {
         tests.put(id("planet_arrival_runtime"), ModGameTests::planetArrivalRuntime);
         tests.put(id("planet_round_trip_home"), PlanetTravelGameTests::roundTripHome);
         tests.put(id("army_planet_transfer_transaction"), ModGameTests::armyPlanetTransferTransaction);
+        tests.put(id("recruit_army_snapshot_cargo"), ModGameTests::recruitArmySnapshotCargo);
         return Map.copyOf(tests);
     }
 
@@ -994,6 +998,70 @@ public final class ModGameTests {
                 || data.addRecruitToArmy(owner.getUUID(), lateRecruit)
                 || data.armyGroup(group.id()).orElseThrow().snapshots().size() != 2) {
             helper.fail("Virtual squad accepted a member without an authoritative materialization snapshot");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void recruitArmySnapshotCargo(GameTestHelper helper) {
+        ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        GalacticRecruitEntity recruit = helper.spawn(
+                ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(2, 1, 2));
+        recruit.tick();
+        owner.setPos(recruit.getX(), recruit.getY(), recruit.getZ());
+        recruit.tame(owner);
+        setRecruitField(recruit, "kingdomId", UUID.randomUUID());
+
+        ItemStack mainHand = new ItemStack(Items.IRON_SWORD);
+        mainHand.setDamageValue(17);
+        ItemStack offHand = new ItemStack(Items.SHIELD);
+        offHand.setDamageValue(9);
+        recruit.setItemSlot(EquipmentSlot.MAINHAND, mainHand);
+        recruit.setItemSlot(EquipmentSlot.OFFHAND, offHand);
+        recruit.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
+        recruit.setItemSlot(EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
+        recruit.setItemSlot(EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
+        recruit.setItemSlot(EquipmentSlot.FEET, new ItemStack(Items.IRON_BOOTS));
+
+        Container cargo = recruit.createCargoContainer();
+        cargo.setItem(0, new ItemStack(Items.DIAMOND, 3));
+        cargo.setItem(8, new ItemStack(Items.GOLD_INGOT, 27));
+        if (cargo.getContainerSize() != ArmyMemberSnapshot.CARGO_SLOT_COUNT || !cargo.stillValid(owner)) {
+            helper.fail("Recruit cargo did not expose a valid nine-slot server container");
+            return;
+        }
+
+        ArmyMemberSnapshot snapshot = recruit.createArmySnapshot(7L).orElse(null);
+        if (snapshot == null) {
+            helper.fail("Recruit could not create its army snapshot");
+            return;
+        }
+        snapshot.equipment().mainHand().setDamageValue(1);
+        snapshot.cargo().getFirst().setCount(1);
+
+        recruit.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+        recruit.setItemSlot(EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+        recruit.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
+        recruit.setItemSlot(EquipmentSlot.CHEST, ItemStack.EMPTY);
+        recruit.setItemSlot(EquipmentSlot.LEGS, ItemStack.EMPTY);
+        recruit.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
+        cargo.clearContent();
+        recruit.restoreArmySnapshot(snapshot, UUID.randomUUID());
+
+        Container restoredCargo = recruit.createCargoContainer();
+        if (!recruit.getItemBySlot(EquipmentSlot.MAINHAND).is(Items.IRON_SWORD)
+                || recruit.getItemBySlot(EquipmentSlot.MAINHAND).getDamageValue() != 17
+                || !recruit.getItemBySlot(EquipmentSlot.OFFHAND).is(Items.SHIELD)
+                || recruit.getItemBySlot(EquipmentSlot.OFFHAND).getDamageValue() != 9
+                || !recruit.getItemBySlot(EquipmentSlot.HEAD).is(Items.IRON_HELMET)
+                || !recruit.getItemBySlot(EquipmentSlot.CHEST).is(Items.IRON_CHESTPLATE)
+                || !recruit.getItemBySlot(EquipmentSlot.LEGS).is(Items.IRON_LEGGINGS)
+                || !recruit.getItemBySlot(EquipmentSlot.FEET).is(Items.IRON_BOOTS)
+                || !restoredCargo.getItem(0).is(Items.DIAMOND)
+                || restoredCargo.getItem(0).getCount() != 3
+                || !restoredCargo.getItem(8).is(Items.GOLD_INGOT)
+                || restoredCargo.getItem(8).getCount() != 27) {
+            helper.fail("Army snapshot did not restore complete recruit equipment and cargo");
             return;
         }
         helper.succeed();

@@ -91,7 +91,8 @@ public final class VirtualArmyMovementPlannerTest {
                 61,
                 40,
                 9L,
-                new ArmySnapshotEquipment("minecraft:iron_sword", "", "", "", ""),
+                ArmySnapshotEquipment.empty(),
+                List.of(),
                 "Captain");
         ArmyGroupRecord live = ArmyGroupRecord.create(
                 owner, kingdom, commander, List.of(), ArmyFormation.LINE, anchor, 100L);

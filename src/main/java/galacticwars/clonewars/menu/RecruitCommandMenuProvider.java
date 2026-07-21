@@ -11,6 +11,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 public class RecruitCommandMenuProvider implements ExtendedMenuProvider {
     private final GalacticRecruitEntity recruit;
     private boolean preparedArmyCommandAccess;
+    private boolean preparedLogisticsAccess;
 
     public RecruitCommandMenuProvider(GalacticRecruitEntity recruit) {
         this.recruit = recruit;
@@ -26,6 +27,7 @@ public class RecruitCommandMenuProvider implements ExtendedMenuProvider {
         RecruitCommandMenu menu = new RecruitCommandMenu(
                 containerId, playerInventory, this.recruit.getId());
         preparedArmyCommandAccess = menu.armyCommandAccess();
+        preparedLogisticsAccess = menu.logisticsAccess();
         return menu;
     }
 
@@ -33,5 +35,6 @@ public class RecruitCommandMenuProvider implements ExtendedMenuProvider {
     public void saveExtraData(FriendlyByteBuf buffer) {
         buffer.writeVarInt(this.recruit.getId());
         buffer.writeBoolean(preparedArmyCommandAccess);
+        buffer.writeBoolean(preparedLogisticsAccess);
     }
 }

@@ -402,6 +402,6 @@ public final class ArmyRuntimeEvents {
         return new ArmyMemberSnapshot(
                 snapshot.recruitId(), snapshot.entityTypeId(), snapshot.unitId(), snapshot.ownerId(), snapshot.kingdomId(),
                 snapshot.duty(), snapshot.health(), snapshot.morale(), snapshot.hunger(), snapshot.unpaidTicks(),
-                generation, snapshot.equipment(), snapshot.customName());
+                generation, snapshot.equipment(), snapshot.cargo(), snapshot.customName());
     }
 }

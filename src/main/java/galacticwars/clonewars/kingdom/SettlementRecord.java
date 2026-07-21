@@ -8,6 +8,8 @@ import java.util.UUID;
 import java.nio.charset.StandardCharsets;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import galacticwars.clonewars.workforce.WorkerProfession;
+import galacticwars.clonewars.workforce.CourierRouteMode;
+import galacticwars.clonewars.workforce.CourierWaypoint;
 import galacticwars.clonewars.workforce.WorkerProfessionCatalog;
 
 public record SettlementRecord(
@@ -339,6 +341,26 @@ public record SettlementRecord(
             updated.add(worksite.id().equals(assigned.id())
                     ? worksite.withLocationAndRadius(dimensionId, x, y, z, radius)
                     : worksite);
+        }
+        return withOperationalState(List.copyOf(updated), buildProjects, workOrders, revision + 1);
+    }
+
+    public SettlementRecord configureAssignedCourierRoute(
+            UUID recruitId,
+            List<CourierWaypoint> route,
+            CourierRouteMode mode
+    ) {
+        WorksiteRecord assigned = assignedWorksite(recruitId)
+                .filter(worksite -> worksite.accepts(WorkerProfession.COURIER))
+                .orElse(null);
+        if (assigned == null) {
+            return this;
+        }
+        WorksiteRecord configured = assigned.configured(
+                assigned.configuration().withCourierRoute(route, mode));
+        java.util.ArrayList<WorksiteRecord> updated = new java.util.ArrayList<>(worksites.size());
+        for (WorksiteRecord worksite : worksites) {
+            updated.add(worksite.id().equals(assigned.id()) ? configured : worksite);
         }
         return withOperationalState(List.copyOf(updated), buildProjects, workOrders, revision + 1);
     }

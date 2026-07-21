@@ -68,6 +68,7 @@ public final class CrossLoaderLaunchIntegrityTest {
                 "NeoForge lifecycle-late Architectury registration");
         for (String menu : new String[]{
                 "RECRUIT_COMMAND",
+                "RECRUIT_LOADOUT",
                 "COMMAND_CENTER_NAVIGATION",
                 "FACTION_SELECTION",
                 "MERCHANT_TRADE",

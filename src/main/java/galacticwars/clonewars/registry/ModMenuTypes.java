@@ -9,6 +9,7 @@ import galacticwars.clonewars.menu.CommandCenterOperationsMenu;
 import galacticwars.clonewars.menu.FactionSelectionMenu;
 import galacticwars.clonewars.menu.MerchantTradeMenu;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
+import galacticwars.clonewars.menu.RecruitLoadoutMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -22,6 +23,10 @@ public final class ModMenuTypes {
     public static final RegistrySupplier<MenuType<RecruitCommandMenu>> RECRUIT_COMMAND =
             MENU_TYPES.register("recruit_command", () -> MenuRegistry.ofExtended(
                     (id, inventory, buffer) -> new RecruitCommandMenu(
+                            id, inventory, registryBuffer(buffer, inventory))));
+    public static final RegistrySupplier<MenuType<RecruitLoadoutMenu>> RECRUIT_LOADOUT =
+            MENU_TYPES.register("recruit_loadout", () -> MenuRegistry.ofExtended(
+                    (id, inventory, buffer) -> new RecruitLoadoutMenu(
                             id, inventory, registryBuffer(buffer, inventory))));
     public static final RegistrySupplier<MenuType<CommandCenterNavigationMenu>> COMMAND_CENTER_NAVIGATION =
             MENU_TYPES.register("command_center_navigation",

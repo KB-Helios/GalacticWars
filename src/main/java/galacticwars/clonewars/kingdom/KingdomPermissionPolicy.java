@@ -13,6 +13,7 @@ public final class KingdomPermissionPolicy {
             KingdomPermission.BUILD,
             KingdomPermission.TRAVEL,
             KingdomPermission.USE_STORAGE,
+            KingdomPermission.MANAGE_LOGISTICS,
             KingdomPermission.MANAGE_WORKSITES,
             KingdomPermission.RECRUIT));
     private static final Set<KingdomPermission> BUILDER = Set.copyOf(EnumSet.of(
@@ -22,6 +23,7 @@ public final class KingdomPermissionPolicy {
             KingdomPermission.MANAGE_WORKSITES));
     private static final Set<KingdomPermission> QUARTERMASTER = Set.copyOf(EnumSet.of(
             KingdomPermission.USE_STORAGE,
+            KingdomPermission.MANAGE_LOGISTICS,
             KingdomPermission.TRAVEL,
             KingdomPermission.MANAGE_WORKSITES,
             KingdomPermission.RECRUIT));

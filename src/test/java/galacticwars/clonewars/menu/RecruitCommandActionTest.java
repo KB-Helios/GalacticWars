@@ -22,6 +22,9 @@ public final class RecruitCommandActionTest {
         assertEquals(RecruitCommandAction.CYCLE_FORMATION,
                 RecruitCommandAction.fromButtonId(RecruitCommandMenu.BUTTON_CYCLE_FORMATION).orElseThrow(),
                 "formation");
+        assertEquals(RecruitCommandAction.OPEN_LOADOUT,
+                RecruitCommandAction.fromButtonId(RecruitCommandMenu.BUTTON_OPEN_LOADOUT).orElseThrow(),
+                "loadout");
     }
 
     private static void mapsEnabledProfessions() {

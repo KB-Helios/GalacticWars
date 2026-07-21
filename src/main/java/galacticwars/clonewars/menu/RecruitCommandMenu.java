@@ -45,29 +45,43 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
     public static final int BUTTON_CYCLE_FORMATION = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 9;
     public static final int BUTTON_ROTATE_BLUEPRINT = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 10;
     public static final int BUTTON_PATROL = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 11;
+    public static final int BUTTON_OPEN_LOADOUT = WorkerProfessionCatalog.FIRST_COMMAND_BUTTON_ID + 12;
 
     private final int recruitEntityId;
     private final Level level;
     private final boolean armyCommandAccess;
+    private final boolean logisticsAccess;
 
     public RecruitCommandMenu(int containerId, Inventory inventory, FriendlyByteBuf extraData) {
-        this(containerId, inventory, extraData.readVarInt(), extraData.readBoolean());
+        this(
+                containerId,
+                inventory,
+                extraData.readVarInt(),
+                extraData.readBoolean(),
+                extraData.readBoolean());
     }
 
     public RecruitCommandMenu(int containerId, Inventory inventory, int recruitEntityId) {
-        this(containerId, inventory, recruitEntityId, resolveArmyCommandAccess(inventory, recruitEntityId));
+        this(
+                containerId,
+                inventory,
+                recruitEntityId,
+                resolveArmyCommandAccess(inventory, recruitEntityId),
+                resolveLogisticsAccess(inventory, recruitEntityId));
     }
 
     private RecruitCommandMenu(
             int containerId,
             Inventory inventory,
             int recruitEntityId,
-            boolean armyCommandAccess
+            boolean armyCommandAccess,
+            boolean logisticsAccess
     ) {
         super(ModMenuTypes.RECRUIT_COMMAND.get(), containerId);
         this.recruitEntityId = recruitEntityId;
         this.level = inventory.player.level();
         this.armyCommandAccess = armyCommandAccess;
+        this.logisticsAccess = logisticsAccess;
     }
 
     @Override
@@ -104,6 +118,10 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
         return armyCommandAccess;
     }
 
+    public boolean logisticsAccess() {
+        return logisticsAccess;
+    }
+
     public static int[] workerProfessionButtonIds() {
         return WorkerProfessionCatalog.enabledProfessions().stream()
                 .mapToInt(definition -> definition.commandButtonId())
@@ -118,5 +136,11 @@ public class RecruitCommandMenu extends AbstractContainerMenu {
         Entity entity = inventory.player.level().getEntity(recruitEntityId);
         return entity instanceof GalacticRecruitEntity recruit
                 && recruit.canPlayerCommandArmy(inventory.player);
+    }
+
+    private static boolean resolveLogisticsAccess(Inventory inventory, int recruitEntityId) {
+        Entity entity = inventory.player.level().getEntity(recruitEntityId);
+        return entity instanceof GalacticRecruitEntity recruit
+                && recruit.canPlayerManageLogistics(inventory.player);
     }
 }

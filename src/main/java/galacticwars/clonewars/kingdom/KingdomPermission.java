@@ -8,6 +8,7 @@ public enum KingdomPermission {
     TRAVEL,
     BUILD,
     USE_STORAGE,
+    MANAGE_LOGISTICS,
     MANAGE_WORKSITES,
     RECRUIT
 }

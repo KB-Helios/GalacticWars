@@ -1,5 +1,9 @@
 package galacticwars.clonewars.kingdom;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.mojang.serialization.JsonOps;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,9 +19,12 @@ import galacticwars.clonewars.recruitment.RecruitDuty;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.workforce.CourierTransferAction;
 import galacticwars.clonewars.workforce.CourierTransferType;
+import galacticwars.clonewars.workforce.CourierRouteMode;
+import galacticwars.clonewars.workforce.CourierRoutePlan;
 import galacticwars.clonewars.workforce.CourierWaypoint;
 import galacticwars.clonewars.workforce.WorkAreaBounds;
 import galacticwars.clonewars.workforce.WorkAreaConfiguration;
+import galacticwars.clonewars.workforce.WorkforceCodecs;
 
 public final class ArmyWorkforcePersistenceTest {
     private ArmyWorkforcePersistenceTest() {
@@ -33,6 +40,7 @@ public final class ArmyWorkforcePersistenceTest {
         projectSlotsAndAssignmentReleaseAreAtomic();
         frontierWorksitesMigrateAndPersistConfiguration();
         workAreasPersistBoundsFiltersPriorityAndCourierRoutes();
+        oversizedLegacyCourierRoutesMigrateToV8Bounds();
         workOrdersUseGuardedRevisionedTransitions();
         System.out.println("ArmyWorkforcePersistenceTest passed");
     }
@@ -106,7 +114,8 @@ public final class ArmyWorkforcePersistenceTest {
                 100,
                 0,
                 1L,
-                new ArmySnapshotEquipment("", "", "", "", ""),
+                ArmySnapshotEquipment.empty(),
+                List.of(),
                 "");
     }
 
@@ -240,14 +249,77 @@ public final class ArmyWorkforcePersistenceTest {
         WorkAreaConfiguration configuration = new WorkAreaConfiguration(
                 new WorkAreaBounds(12, 6, 8), true, 80, true,
                 List.of("galacticwars:energy_cell", "galacticwars:energy_cell"),
-                List.of(source, destination));
+                List.of(source, destination), CourierRouteMode.PING_PONG, 4L);
+        WorkAreaConfiguration restored = KingdomCodecs.WORK_AREA_CONFIGURATION.parse(
+                JsonOps.INSTANCE,
+                KingdomCodecs.WORK_AREA_CONFIGURATION.encodeStart(JsonOps.INSTANCE, configuration)
+                        .getOrThrow()).getOrThrow();
         WorksiteRecord configured = new WorksiteRecord(
                 UUID.randomUUID(), "courier", "minecraft:overworld", 0, 64, 0, 8, 2)
-                .configured(configuration);
+                .configured(restored);
         assertEquals(new WorkAreaBounds(12, 6, 8), configured.configuration().bounds(), "work area bounds");
         assertEquals(1, configured.configuration().itemFilters().size(), "normalized filters");
         assertEquals(80, configured.configuration().priority(), "work priority");
         assertEquals(2, configured.configuration().courierRoute().size(), "courier route");
+        assertEquals(CourierRouteMode.PING_PONG,
+                configured.configuration().courierRouteMode(), "courier route mode");
+        assertEquals(4L, configured.configuration().courierRouteRevision(), "courier route revision");
+    }
+
+    private static void oversizedLegacyCourierRoutesMigrateToV8Bounds() {
+        JsonObject legacyConfiguration = new JsonObject();
+        JsonObject bounds = new JsonObject();
+        bounds.addProperty("width", 12);
+        bounds.addProperty("height", 6);
+        bounds.addProperty("depth", 8);
+        legacyConfiguration.add("bounds", bounds);
+
+        JsonArray route = new JsonArray();
+        for (int waypointIndex = 0; waypointIndex < CourierRoutePlan.MAX_WAYPOINTS + 3; waypointIndex++) {
+            JsonObject waypoint = new JsonObject();
+            waypoint.addProperty("dimension", "minecraft:overworld");
+            waypoint.addProperty("x", waypointIndex);
+            waypoint.addProperty("y", 64);
+            waypoint.addProperty("z", 2);
+            JsonArray actions = new JsonArray();
+            for (int actionIndex = 0;
+                    actionIndex < WorkforceCodecs.MAX_ACTIONS_PER_WAYPOINT + 3;
+                    actionIndex++) {
+                JsonObject action = new JsonObject();
+                action.addProperty("type", "take");
+                action.addProperty("item", "galacticwars:energy_cell");
+                action.addProperty("quantity", actionIndex + 1);
+                actions.add(action);
+            }
+            waypoint.add("actions", actions);
+            route.add(waypoint);
+        }
+        legacyConfiguration.add("courier_route", route);
+
+        WorkAreaConfiguration migrated = KingdomCodecs.WORK_AREA_CONFIGURATION
+                .parse(JsonOps.INSTANCE, legacyConfiguration)
+                .getOrThrow();
+        assertEquals(CourierRoutePlan.MAX_WAYPOINTS, migrated.courierRoute().size(),
+                "legacy route truncation");
+        assertEquals(0, migrated.courierRoute().getFirst().x(), "legacy route keeps first waypoint");
+        assertEquals(CourierRoutePlan.MAX_WAYPOINTS - 1,
+                migrated.courierRoute().getLast().x(), "legacy route keeps deterministic prefix");
+        assertTrue(migrated.courierRoute().stream().allMatch(waypoint ->
+                        waypoint.actions().size() == WorkforceCodecs.MAX_ACTIONS_PER_WAYPOINT),
+                "legacy actions truncate on every retained waypoint");
+        assertEquals(WorkforceCodecs.MAX_ACTIONS_PER_WAYPOINT,
+                migrated.courierRoute().getFirst().actions().getLast().quantity(),
+                "legacy actions keep deterministic prefix");
+
+        JsonElement encoded = KingdomCodecs.WORK_AREA_CONFIGURATION
+                .encodeStart(JsonOps.INSTANCE, migrated)
+                .getOrThrow();
+        JsonArray encodedRoute = encoded.getAsJsonObject().getAsJsonArray("courier_route");
+        assertEquals(CourierRoutePlan.MAX_WAYPOINTS, encodedRoute.size(), "v8 encoded route bound");
+        assertTrue(encodedRoute.asList().stream().allMatch(waypoint ->
+                        waypoint.getAsJsonObject().getAsJsonArray("actions").size()
+                                <= WorkforceCodecs.MAX_ACTIONS_PER_WAYPOINT),
+                "v8 encoded action bound");
     }
 
     private static void assertEquals(Object expected, Object actual, String label) {

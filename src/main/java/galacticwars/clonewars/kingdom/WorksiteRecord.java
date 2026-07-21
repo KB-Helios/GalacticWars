@@ -114,7 +114,8 @@ public record WorksiteRecord(
                 acceptedProfessions, sourceProjectId, assignmentIds, storageEndpoints,
                 new WorkAreaConfiguration(WorkAreaBounds.radius(radius), configuration.kingdomAccess(),
                         configuration.priority(), configuration.overlayVisible(), configuration.itemFilters(),
-                        configuration.courierRoute()));
+                        configuration.courierRoute(), configuration.courierRouteMode(),
+                        configuration.courierRouteRevision()));
     }
 
     static WorksiteRecord fromPersistence(

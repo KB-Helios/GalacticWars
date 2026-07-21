@@ -56,6 +56,7 @@ import galacticwars.clonewars.item.CommandTargetSelection;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
 import galacticwars.clonewars.menu.RecruitCommandAction;
 import galacticwars.clonewars.menu.RecruitCommandMenuProvider;
+import galacticwars.clonewars.menu.RecruitLoadoutMenuProvider;
 import galacticwars.clonewars.menu.MerchantTradeMenuProvider;
 import galacticwars.clonewars.recruitment.RecruitmentAction;
 import galacticwars.clonewars.progression.ProgressionEventType;
@@ -79,6 +80,12 @@ import galacticwars.clonewars.settlement.KingdomWorkOrder;
 import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
 import galacticwars.clonewars.settlement.ConstructionPlan;
 import galacticwars.clonewars.workforce.ResourceInventory;
+import galacticwars.clonewars.workforce.CourierTransferAction;
+import galacticwars.clonewars.workforce.CourierTransferType;
+import galacticwars.clonewars.workforce.CourierRouteExecutionState;
+import galacticwars.clonewars.workforce.CourierRoutePlan;
+import galacticwars.clonewars.workforce.CourierRoutePlanner;
+import galacticwars.clonewars.workforce.CourierWaypoint;
 import galacticwars.clonewars.workforce.WorkAreaType;
 import galacticwars.clonewars.workforce.WorkerLogisticsDecision;
 import galacticwars.clonewars.workforce.WorkerLogisticsPlanner;
@@ -96,6 +103,13 @@ import galacticwars.clonewars.workforce.WorkerTaskDecision;
 import galacticwars.clonewars.workforce.WorkerTaskPlanner;
 import galacticwars.clonewars.workforce.WorkerStatus;
 import galacticwars.clonewars.workforce.WorkerWorksite;
+import galacticwars.clonewars.workforce.WorkforceCodecs;
+import galacticwars.clonewars.workforce.logistics.LogisticsAccessPolicy;
+import galacticwars.clonewars.workforce.logistics.LogisticsEndpoint;
+import galacticwars.clonewars.workforce.logistics.LogisticsEndpointIdentity;
+import galacticwars.clonewars.workforce.logistics.LogisticsTransferAuthority;
+import galacticwars.clonewars.workforce.logistics.LogisticsTransferRequest;
+import galacticwars.clonewars.workforce.logistics.PhysicalLogisticsTransaction;
 import galacticwars.clonewars.world.CivilianArchetypeDefinition;
 import galacticwars.clonewars.world.FactionOutpostMarkerService;
 import galacticwars.clonewars.world.FactionOutpostRecord;
@@ -137,6 +151,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.level.Level;
@@ -222,6 +237,7 @@ public class GalacticRecruitEntity extends TamableAnimal
     private @Nullable UUID armyGroupId;
     private @Nullable UUID workOrderId;
     private NonNullList<ItemStack> workerInventory = NonNullList.withSize(9, ItemStack.EMPTY);
+    private CourierRouteExecutionState courierRouteState = CourierRouteExecutionState.start(0L);
     private WorkerPhase workerPhase = WorkerPhase.ACQUIRE_ORDER;
     private String workerReason = "ready";
     private @Nullable BlockPos activeWorkTarget;
@@ -327,7 +343,7 @@ public class GalacticRecruitEntity extends TamableAnimal
         output.putBoolean("PendingNaturalSpawnRemoval", this.pendingNaturalSpawnRemoval);
         output.putBoolean("PendingNaturalSpawnInitialization", this.pendingNaturalSpawnInitialization);
         this.getWorkerProfession().ifPresent(profession -> output.putString("WorkerProfession", profession.id()));
-        output.putInt("RecruitDataVersion", 10);
+        output.putInt("RecruitDataVersion", 11);
         output.storeNullable("KingdomId", UUIDUtil.CODEC, this.kingdomId);
         output.storeNullable("SettlementId", UUIDUtil.CODEC, this.settlementId);
         output.storeNullable("FactionOutpostId", UUIDUtil.CODEC, this.factionOutpostId);
@@ -336,6 +352,8 @@ public class GalacticRecruitEntity extends TamableAnimal
         output.storeNullable("ActiveBuildProjectId", UUIDUtil.CODEC, this.activeBuildProjectId);
         ValueOutput workerInventoryOutput = output.child("WorkerInventory");
         ContainerHelper.saveAllItems(workerInventoryOutput, this.workerInventory);
+        output.store("CourierRouteState", WorkforceCodecs.COURIER_ROUTE_EXECUTION_STATE,
+                this.courierRouteState);
         output.putString("WorkerPhase", this.workerPhase.id());
         output.putString("WorkerReason", this.workerReason);
         output.putInt("WorkerCooldown", this.workerCooldownTicks);
@@ -428,6 +446,9 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.buildRotationSteps = Math.floorMod(input.getIntOr("BuildRotationSteps", 0), 4);
         this.workerInventory = NonNullList.withSize(9, ItemStack.EMPTY);
         input.child("WorkerInventory").ifPresent(child -> ContainerHelper.loadAllItems(child, this.workerInventory));
+        this.courierRouteState = input.read(
+                        "CourierRouteState", WorkforceCodecs.COURIER_ROUTE_EXECUTION_STATE)
+                .orElseGet(() -> CourierRouteExecutionState.start(0L));
         this.workerPhase = WorkerPhase.byId(input.getStringOr("WorkerPhase", WorkerPhase.ACQUIRE_ORDER.id()));
         this.workerReason = input.getStringOr("WorkerReason", "ready");
         this.workerCooldownTicks = Math.max(0, input.getIntOr("WorkerCooldown", 0));
@@ -1132,6 +1153,10 @@ public class GalacticRecruitEntity extends TamableAnimal
         return this.workerInventory.stream().mapToInt(ItemStack::getCount).sum();
     }
 
+    public CourierRouteExecutionState courierRouteExecutionState() {
+        return this.courierRouteState;
+    }
+
     public int getWorkerStorageItemCount() {
         return this.storageItemCount();
     }
@@ -1284,7 +1309,9 @@ public class GalacticRecruitEntity extends TamableAnimal
             return this.tryHire(player);
         }
         if (!this.isOwnedBy(player)
-                && !(this.canPlayerCommandArmy(player) && isArmyCommandAction(action))) {
+                && !(this.canPlayerCommandArmy(player) && isArmyCommandAction(action))
+                && !(action == RecruitCommandAction.OPEN_LOADOUT
+                        && this.canPlayerManageLogistics(player))) {
             sendFeedback(player, Component.translatable("message.galacticwars.recruit.not_owner"));
             return false;
         }
@@ -1303,6 +1330,13 @@ public class GalacticRecruitEntity extends TamableAnimal
             case NEXT_BLUEPRINT -> this.cycleSelectedBlueprint(player);
             case RETURN_TO_SOLDIER -> this.tryReturnToSoldier(player);
             case CANCEL_BUILD -> this.tryCancelBuilding(player);
+            case OPEN_LOADOUT -> {
+                if (!this.canPlayerManageLogistics(player)) {
+                    yield false;
+                }
+                MenuRegistry.openExtendedMenu(player, new RecruitLoadoutMenuProvider(this));
+                yield true;
+            }
             case FOLLOW -> {
                 if (!this.applyMenuArmyOrder(player, RecruitmentAction.FOLLOW_OWNER, null)) {
                     yield false;
@@ -2319,6 +2353,7 @@ public class GalacticRecruitEntity extends TamableAnimal
                     this.blockWorker("courier_source_empty");
                 }
             }
+            case "courier_route_action" -> this.executeCourierRouteAction();
             case "withdraw_animal_feed" -> {
                 net.minecraft.world.item.Item feed = this.requiredAnimalFeed();
                 if (feed != null && this.withdrawSpecificItem(this.activeWorkTarget, feed, 2)) {
@@ -2533,6 +2568,32 @@ public class GalacticRecruitEntity extends TamableAnimal
     }
 
     private void acquireCourierOrder() {
+        Optional<CourierRoutePlan> configuredRoute = this.authoritativeCourierRoute();
+        if (configuredRoute.isPresent()) {
+            CourierRoutePlan route = configuredRoute.orElseThrow();
+            this.courierRouteState = CourierRoutePlanner.reconcile(route, this.courierRouteState);
+            CourierWaypoint waypoint = CourierRoutePlanner.currentWaypoint(route, this.courierRouteState);
+            if (!waypoint.dimensionId().equals(this.level().dimension().identifier().toString())) {
+                this.blockWorker("courier_waypoint_wrong_dimension");
+                return;
+            }
+            BlockPos target = new BlockPos(waypoint.x(), waypoint.y(), waypoint.z());
+            if (!this.level().isLoaded(target)) {
+                this.blockWorker("courier_waypoint_unloaded");
+                return;
+            }
+            if (CourierRoutePlanner.currentAction(route, this.courierRouteState).isEmpty()) {
+                CourierRouteExecutionState previous = this.courierRouteState;
+                this.courierRouteState = CourierRoutePlanner.completeEmptyWaypoint(
+                        route, this.courierRouteState);
+                this.completeCourierRouteCycle(previous, this.courierRouteState);
+                this.workerCooldownTicks = 5;
+                this.transitionWorker(WorkerPhase.COOLDOWN, "courier_waypoint_complete", null);
+                return;
+            }
+            this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "courier_route_action", target);
+            return;
+        }
         if (this.storageTarget == null || this.workTarget == null
                 || this.storageTarget.equals(this.workTarget)
                 || this.findContainer(this.storageTarget).isEmpty()
@@ -2544,6 +2605,249 @@ public class GalacticRecruitEntity extends TamableAnimal
             this.transitionWorker(WorkerPhase.NAVIGATE_SOURCE, "courier_withdraw", this.storageTarget);
         } else {
             this.transitionWorker(WorkerPhase.NAVIGATE_STORAGE, "courier_deliver", this.workTarget);
+        }
+    }
+
+    private void executeCourierRouteAction() {
+        CourierRoutePlan route = this.authoritativeCourierRoute().orElse(null);
+        if (route == null || this.activeWorkTarget == null) {
+            this.blockWorker("courier_route_missing");
+            return;
+        }
+        this.courierRouteState = CourierRoutePlanner.reconcile(route, this.courierRouteState);
+        CourierWaypoint waypoint = CourierRoutePlanner.currentWaypoint(route, this.courierRouteState);
+        String dimensionId = this.level().dimension().identifier().toString();
+        if (!waypoint.dimensionId().equals(dimensionId)) {
+            this.blockWorker("courier_waypoint_wrong_dimension");
+            return;
+        }
+        BlockPos waypointPos = new BlockPos(waypoint.x(), waypoint.y(), waypoint.z());
+        if (!waypointPos.equals(this.activeWorkTarget)) {
+            this.transitionWorker(
+                    WorkerPhase.NAVIGATE_SOURCE, "courier_route_action", waypointPos);
+            return;
+        }
+        CourierTransferAction action = CourierRoutePlanner.currentAction(route, this.courierRouteState)
+                .orElse(null);
+        if (action == null) {
+            CourierRouteExecutionState previous = this.courierRouteState;
+            this.courierRouteState = CourierRoutePlanner.completeEmptyWaypoint(
+                    route, this.courierRouteState);
+            this.completeCourierRouteCycle(previous, this.courierRouteState);
+            this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "courier_waypoint_complete", null);
+            return;
+        }
+        if (action.effectiveType().waitsAtWaypoint()) {
+            if (this.courierRouteState.dwellTicksRemaining() == 0) {
+                this.courierRouteState = CourierRoutePlanner.startDwell(route, this.courierRouteState);
+            }
+            CourierRouteExecutionState previous = this.courierRouteState;
+            this.courierRouteState = CourierRoutePlanner.elapseDwell(
+                    route, this.courierRouteState, 1);
+            if (this.courierRouteState.dwellTicksRemaining() == 0) {
+                this.completeCourierRouteCycle(previous, this.courierRouteState);
+                this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "courier_wait_complete", null);
+            }
+            return;
+        }
+
+        Container container = this.findContainer(waypointPos).orElse(null);
+        CourierTransferOutcome outcome = container == null
+                ? CourierTransferOutcome.retry()
+                : this.executeCourierTransfer(waypointPos, container, action);
+        if (!outcome.complete()) {
+            this.workerCooldownTicks = 20;
+            this.transitionWorker(WorkerPhase.COOLDOWN, "courier_transfer_retry", null);
+            return;
+        }
+        CourierRouteExecutionState previous = this.courierRouteState;
+        this.courierRouteState = CourierRoutePlanner.completeCurrentAction(
+                route, this.courierRouteState);
+        this.completeCourierRouteCycle(previous, this.courierRouteState);
+        this.workerCooldownTicks = 20;
+        this.transitionWorker(
+                WorkerPhase.COOLDOWN,
+                outcome.transferred() > 0 ? "courier_transfer_complete" : "courier_target_satisfied",
+                null);
+    }
+
+    private CourierTransferOutcome executeCourierTransfer(
+            BlockPos waypointPos,
+            Container container,
+            CourierTransferAction action
+    ) {
+        int authorizedSlots = this.authorizedPhysicalStorageSlots(waypointPos, container);
+        if (authorizedSlots <= 0) {
+            return CourierTransferOutcome.retry();
+        }
+        CourierTransferType actionType = action.effectiveType();
+        net.minecraft.world.item.Item filteredItem = actionType.hasItemFilter()
+                ? resolveItem(action.itemId()) : null;
+        if (actionType.hasItemFilter() && filteredItem == null) {
+            return CourierTransferOutcome.retry();
+        }
+        boolean withdraw = actionType.takesFromWaypoint();
+        int limit = switch (actionType) {
+            case TAKE, PUT -> action.quantity();
+            case TAKE_FILL -> Math.max(0, action.quantity() - this.workerInventoryCount(filteredItem));
+            case PUT_FILL -> Math.max(0, action.quantity()
+                    - countItem(container, filteredItem, authorizedSlots));
+            case TAKE_ANY, PUT_ANY, TAKE_ALL, PUT_ALL -> Integer.MAX_VALUE;
+            default -> 0;
+        };
+        if (limit <= 0) {
+            int targetQuantity = courierTargetQuantity(actionType, container, filteredItem, authorizedSlots);
+            return new CourierTransferOutcome(
+                    0, CourierRoutePlanner.transferSatisfied(action, 0, targetQuantity));
+        }
+
+        List<ItemStack> sourceStacks = new ArrayList<>();
+        if (withdraw) {
+            for (int slot = 0; slot < authorizedSlots; slot++) {
+                sourceStacks.add(container.getItem(slot).copy());
+            }
+        } else {
+            this.workerInventory.forEach(stack -> sourceStacks.add(stack.copy()));
+        }
+
+        if (actionType == CourierTransferType.TAKE || actionType == CourierTransferType.PUT) {
+            List<ItemStack> attemptedTemplates = new ArrayList<>();
+            for (ItemStack stack : sourceStacks) {
+                if (stack.isEmpty()
+                        || !stack.is(filteredItem)
+                        || attemptedTemplates.stream().anyMatch(candidate ->
+                        ItemStack.isSameItemSameComponents(candidate, stack))) {
+                    continue;
+                }
+                attemptedTemplates.add(stack.copyWithCount(1));
+                int transferred = this.transferPhysicalQuantity(
+                        waypointPos,
+                        container,
+                        authorizedSlots,
+                        stack,
+                        action.quantity(),
+                        withdraw,
+                        LogisticsTransferRequest.Fulfillment.REQUIRE_EXACT);
+                if (CourierRoutePlanner.transferSatisfied(action, transferred, 0)) {
+                    return new CourierTransferOutcome(transferred, true);
+                }
+            }
+            return CourierTransferOutcome.retry();
+        }
+
+        int transferred = 0;
+        for (ItemStack stack : sourceStacks) {
+            if (stack.isEmpty()
+                    || filteredItem != null && !stack.is(filteredItem)
+                    || transferred >= limit) {
+                continue;
+            }
+            int requested = limit == Integer.MAX_VALUE
+                    ? stack.getCount()
+                    : Math.min(stack.getCount(), limit - transferred);
+            transferred += this.transferPhysicalQuantity(
+                    waypointPos,
+                    container,
+                    authorizedSlots,
+                    stack,
+                    requested,
+                    withdraw,
+                    LogisticsTransferRequest.Fulfillment.ALLOW_PARTIAL);
+        }
+        int targetQuantity = courierTargetQuantity(actionType, container, filteredItem, authorizedSlots);
+        return new CourierTransferOutcome(
+                transferred, CourierRoutePlanner.transferSatisfied(action, transferred, targetQuantity));
+    }
+
+    private int courierTargetQuantity(
+            CourierTransferType actionType,
+            Container container,
+            @Nullable Item filteredItem,
+            int authorizedSlots
+    ) {
+        return switch (actionType) {
+            case TAKE_FILL -> this.workerInventoryCount(filteredItem);
+            case PUT_FILL -> countItem(container, filteredItem, authorizedSlots);
+            default -> 0;
+        };
+    }
+
+    private record CourierTransferOutcome(int transferred, boolean complete) {
+        private static CourierTransferOutcome retry() {
+            return new CourierTransferOutcome(0, false);
+        }
+    }
+
+    private void completeCourierRouteCycle(
+            CourierRouteExecutionState previous,
+            CourierRouteExecutionState current
+    ) {
+        if (previous.waypointCursor() != 0 && current.waypointCursor() == 0) {
+            this.progressCurrentWorkOrder(1);
+        }
+    }
+
+    private Optional<CourierRoutePlan> authoritativeCourierRoute() {
+        if (!(this.level() instanceof ServerLevel serverLevel) || this.getOwnerReference() == null) {
+            return Optional.empty();
+        }
+        String dimensionId = serverLevel.dimension().identifier().toString();
+        return KingdomSavedData.get(serverLevel)
+                .assignedWorksite(this.getOwnerReference().getUUID(), this.getUUID())
+                .filter(worksite -> worksite.accepts(WorkerProfession.COURIER))
+                .filter(worksite -> worksite.dimensionId().equals(dimensionId))
+                .map(WorksiteRecord::configuration)
+                .flatMap(configuration -> configuration.courierRoutePlan());
+    }
+
+    private boolean isAuthoritativeCourierWaypoint(BlockPos pos) {
+        if (!(this.level() instanceof ServerLevel serverLevel) || this.getOwnerReference() == null) {
+            return false;
+        }
+        UUID ownerId = this.getOwnerReference().getUUID();
+        KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        KingdomRecord kingdom = data.kingdomForOwner(ownerId).orElse(null);
+        if (kingdom == null || !data.isHallActive(ownerId)) {
+            return false;
+        }
+        String dimensionId = this.level().dimension().identifier().toString();
+        boolean claimedByKingdom = data.claimAt(
+                        dimensionId,
+                        new net.minecraft.world.level.ChunkPos(pos.getX() >> 4, pos.getZ() >> 4))
+                .filter(claim -> claim.kingdomId().equals(kingdom.id()))
+                .isPresent();
+        return claimedByKingdom && this.authoritativeCourierRoute().stream()
+                .flatMap(route -> route.waypoints().stream())
+                .anyMatch(waypoint -> waypoint.dimensionId().equals(dimensionId)
+                        && waypoint.x() == pos.getX()
+                        && waypoint.y() == pos.getY()
+                        && waypoint.z() == pos.getZ());
+    }
+
+    private static int countItem(
+            Container container,
+            net.minecraft.world.item.Item item,
+            int slotLimit
+    ) {
+        int count = 0;
+        for (int slot = 0; slot < Math.min(slotLimit, container.getContainerSize()); slot++) {
+            ItemStack stack = container.getItem(slot);
+            if (stack.is(item)) {
+                count += stack.getCount();
+            }
+        }
+        return count;
+    }
+
+    private static @Nullable Item resolveItem(String itemId) {
+        try {
+            Identifier identifier = Identifier.parse(itemId);
+            net.minecraft.world.item.Item item = BuiltInRegistries.ITEM.getValue(identifier);
+            return item != null
+                    && item != Items.AIR
+                    && identifier.equals(BuiltInRegistries.ITEM.getKey(item)) ? item : null;
+        } catch (RuntimeException invalidIdentifier) {
+            return null;
         }
     }
 
@@ -2956,35 +3260,23 @@ public class GalacticRecruitEntity extends TamableAnimal
         }
         Container container = containerOptional.get();
         int slotLimit = Math.min(authorizedSlots, container.getContainerSize());
-        int remaining = amount;
-        NonNullList<ItemStack> nextInventory = this.copyWorkerInventory();
-        for (int slot = 0; slot < slotLimit && remaining > 0; slot++) {
+        for (int slot = 0; slot < slotLimit; slot++) {
             ItemStack stored = container.getItem(slot);
             if (!stored.is(item)) {
                 continue;
             }
-            int transfer = Math.min(remaining, stored.getCount());
-            ItemStack candidate = stored.copyWithCount(transfer);
-            if (!mergeAll(nextInventory, List.of(candidate))) {
-                return false;
-            }
-            remaining -= transfer;
-        }
-        if (remaining > 0) {
-            return false;
-        }
-        remaining = amount;
-        for (int slot = 0; slot < slotLimit && remaining > 0; slot++) {
-            ItemStack stored = container.getItem(slot);
-            if (stored.is(item)) {
-                int transfer = Math.min(remaining, stored.getCount());
-                container.removeItem(slot, transfer);
-                remaining -= transfer;
+            if (this.transferPhysical(
+                    pos,
+                    container,
+                    authorizedSlots,
+                    stored,
+                    amount,
+                    true,
+                    LogisticsTransferRequest.Fulfillment.REQUIRE_EXACT)) {
+                return true;
             }
         }
-        container.setChanged();
-        this.workerInventory = nextInventory;
-        return true;
+        return false;
     }
 
     private boolean withdrawFirstStack(BlockPos pos) {
@@ -3003,14 +3295,16 @@ public class GalacticRecruitEntity extends TamableAnimal
                 continue;
             }
             int transfer = Math.min(stored.getCount(), stored.getMaxStackSize());
-            NonNullList<ItemStack> nextInventory = this.copyWorkerInventory();
-            if (!mergeAll(nextInventory, List.of(stored.copyWithCount(transfer)))) {
-                continue;
+            if (this.transferPhysical(
+                    pos,
+                    container,
+                    authorizedSlots,
+                    stored,
+                    transfer,
+                    true,
+                    LogisticsTransferRequest.Fulfillment.REQUIRE_EXACT)) {
+                return true;
             }
-            container.removeItem(slot, transfer);
-            container.setChanged();
-            this.workerInventory = nextInventory;
-            return true;
         }
         return false;
     }
@@ -3038,12 +3332,100 @@ public class GalacticRecruitEntity extends TamableAnimal
         if (!mergeAll(simulated, contents)) {
             return false;
         }
-        for (int slot = 0; slot < simulated.size(); slot++) {
-            container.setItem(slot, simulated.get(slot));
+        for (ItemStack stack : contents) {
+            if (!this.transferPhysical(
+                    pos,
+                    container,
+                    authorizedSlots,
+                    stack,
+                    stack.getCount(),
+                    false,
+                    LogisticsTransferRequest.Fulfillment.REQUIRE_EXACT)) {
+                return false;
+            }
         }
-        container.setChanged();
-        this.workerInventory = NonNullList.withSize(9, ItemStack.EMPTY);
-        return true;
+        return this.workerInventoryIsEmpty();
+    }
+
+    private boolean transferPhysical(
+            BlockPos storagePos,
+            Container storage,
+            int authorizedStorageSlots,
+            ItemStack template,
+            int quantity,
+            boolean withdraw,
+            LogisticsTransferRequest.Fulfillment fulfillment
+    ) {
+        return this.transferPhysicalQuantity(
+                storagePos, storage, authorizedStorageSlots, template, quantity, withdraw, fulfillment) > 0;
+    }
+
+    private int transferPhysicalQuantity(
+            BlockPos storagePos,
+            Container storage,
+            int authorizedStorageSlots,
+            ItemStack template,
+            int quantity,
+            boolean withdraw,
+            LogisticsTransferRequest.Fulfillment fulfillment
+    ) {
+        if (!(this.level() instanceof ServerLevel serverLevel)
+                || this.getOwnerReference() == null
+                || template.isEmpty()
+                || quantity <= 0) {
+            return 0;
+        }
+        int slotLimit = Math.min(authorizedStorageSlots, storage.getContainerSize());
+        if (slotLimit <= 0) {
+            return 0;
+        }
+        UUID ownerId = this.getOwnerReference().getUUID();
+        LogisticsEndpointIdentity storageIdentity = this.storageEndpointIdentity(serverLevel, storagePos);
+        LogisticsEndpointIdentity cargoIdentity = new LogisticsEndpointIdentity(
+                "recruit:" + this.getUUID() + ":cargo");
+        LogisticsAccessPolicy policy = (actorId, endpoint, counterpart, operation, slot, stack) -> {
+            if (!actorId.equals(ownerId)) {
+                return false;
+            }
+            if (endpoint.equals(cargoIdentity)) {
+                return this.isAlive() && this.level() == serverLevel;
+            }
+            if (!endpoint.equals(storageIdentity) || !serverLevel.isLoaded(storagePos)) {
+                return false;
+            }
+            int liveSlots = this.authorizedPhysicalStorageSlots(storagePos, storage);
+            return Math.min(liveSlots, storage.getContainerSize()) == slotLimit;
+        };
+        LogisticsEndpoint storageEndpoint = LogisticsEndpoint.container(
+                storageIdentity, storage, slotLimit, policy);
+        LogisticsEndpoint cargoEndpoint = LogisticsEndpoint.container(
+                cargoIdentity, this.createCargoContainer(), ArmyMemberSnapshot.CARGO_SLOT_COUNT, policy);
+        LogisticsEndpoint source = withdraw ? storageEndpoint : cargoEndpoint;
+        LogisticsEndpoint destination = withdraw ? cargoEndpoint : storageEndpoint;
+        PhysicalLogisticsTransaction.Result result = PhysicalLogisticsTransaction.transfer(
+                source,
+                destination,
+                new LogisticsTransferAuthority(
+                        ownerId, source.identity(), destination.identity()),
+                new LogisticsTransferRequest(template, quantity, fulfillment));
+        return result.committed() ? result.transferredQuantity() : 0;
+    }
+
+    private int authorizedPhysicalStorageSlots(BlockPos pos, Container container) {
+        int registeredSlots = this.registeredStorageSlots(pos);
+        if (registeredSlots > 0) {
+            return Math.min(registeredSlots, container.getContainerSize());
+        }
+        return this.isAuthorizedWorkerDepositTarget(pos)
+                || this.isAuthoritativeCourierWaypoint(pos)
+                ? container.getContainerSize()
+                : 0;
+    }
+
+    private LogisticsEndpointIdentity storageEndpointIdentity(ServerLevel level, BlockPos pos) {
+        return new LogisticsEndpointIdentity("storage:"
+                + level.dimension().identifier() + ":"
+                + pos.getX() + "," + pos.getY() + "," + pos.getZ());
     }
 
     private boolean workerInventoryIsEmpty() {
@@ -3067,6 +3449,120 @@ public class GalacticRecruitEntity extends TamableAnimal
             copy.set(slot, this.workerInventory.get(slot).copy());
         }
         return copy;
+    }
+
+    public boolean canPlayerManageLogistics(Player player) {
+        Objects.requireNonNull(player, "player");
+        if (this.isOwnedBy(player)) {
+            return true;
+        }
+        if (!(this.level() instanceof ServerLevel serverLevel)) {
+            return false;
+        }
+        KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        KingdomRecord recruitKingdom = data.kingdomForRecruit(this.getUUID()).orElse(null);
+        KingdomRecord actorKingdom = data.kingdomForPlayer(player.getUUID()).orElse(null);
+        return recruitKingdom != null
+                && actorKingdom != null
+                && recruitKingdom.id().equals(actorKingdom.id())
+                && recruitKingdom.npc(this.getUUID()).isPresent()
+                && actorKingdom.allows(
+                        player.getUUID(), galacticwars.clonewars.kingdom.KingdomPermission.MANAGE_LOGISTICS);
+    }
+
+    /**
+     * Returns a server-only container view over this recruit's shared cargo slots.
+     * The view delegates directly to {@code workerInventory}; it never creates a
+     * second inventory that can drift from worker automation or army snapshots.
+     */
+    public Container createCargoContainer() {
+        if (this.level().isClientSide()) {
+            throw new IllegalStateException("recruit cargo can only be edited on the server");
+        }
+        return new RecruitCargoContainer();
+    }
+
+    public void markLoadoutChanged() {
+        if (this.level() instanceof ServerLevel serverLevel) {
+            this.syncArmySnapshot(serverLevel);
+        }
+    }
+
+    private final class RecruitCargoContainer implements Container {
+        @Override
+        public int getContainerSize() {
+            return ArmyMemberSnapshot.CARGO_SLOT_COUNT;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return GalacticRecruitEntity.this.workerInventoryIsEmpty();
+        }
+
+        @Override
+        public ItemStack getItem(int slot) {
+            return validSlot(slot)
+                    ? GalacticRecruitEntity.this.workerInventory.get(slot)
+                    : ItemStack.EMPTY;
+        }
+
+        @Override
+        public ItemStack removeItem(int slot, int amount) {
+            if (!validSlot(slot) || amount <= 0) {
+                return ItemStack.EMPTY;
+            }
+            ItemStack removed = ContainerHelper.removeItem(
+                    GalacticRecruitEntity.this.workerInventory, slot, amount);
+            if (!removed.isEmpty()) {
+                this.setChanged();
+            }
+            return removed;
+        }
+
+        @Override
+        public ItemStack removeItemNoUpdate(int slot) {
+            return validSlot(slot)
+                    ? ContainerHelper.takeItem(GalacticRecruitEntity.this.workerInventory, slot)
+                    : ItemStack.EMPTY;
+        }
+
+        @Override
+        public void setItem(int slot, ItemStack stack) {
+            if (!validSlot(slot)) {
+                throw new IndexOutOfBoundsException("cargo slot " + slot);
+            }
+            ItemStack stored = stack == null || stack.isEmpty()
+                    ? ItemStack.EMPTY
+                    : stack.copyWithCount(Math.min(stack.getCount(), stack.getMaxStackSize()));
+            GalacticRecruitEntity.this.workerInventory.set(slot, stored);
+            this.setChanged();
+        }
+
+        @Override
+        public void setChanged() {
+            if (GalacticRecruitEntity.this.level() instanceof ServerLevel serverLevel) {
+                GalacticRecruitEntity.this.syncArmySnapshot(serverLevel);
+            }
+        }
+
+        @Override
+        public boolean stillValid(Player player) {
+            return GalacticRecruitEntity.this.isAlive()
+                    && !GalacticRecruitEntity.this.level().isClientSide()
+                    && player.level() == GalacticRecruitEntity.this.level()
+                    && player.distanceToSqr(GalacticRecruitEntity.this) <= 64.0D;
+        }
+
+        @Override
+        public void clearContent() {
+            GalacticRecruitEntity.this.workerInventory = NonNullList.withSize(
+                    ArmyMemberSnapshot.CARGO_SLOT_COUNT, ItemStack.EMPTY);
+            this.setChanged();
+        }
+
+        private boolean validSlot(int slot) {
+            return slot >= 0 && slot < this.getContainerSize();
+        }
     }
 
     private static boolean mergeAll(List<ItemStack> inventory, List<ItemStack> incoming) {
@@ -4041,11 +4537,13 @@ public class GalacticRecruitEntity extends TamableAnimal
                 this.unpaidTicks,
                 generation,
                 new ArmySnapshotEquipment(
-                        itemId(this.getItemBySlot(EquipmentSlot.MAINHAND)),
-                        itemId(this.getItemBySlot(EquipmentSlot.HEAD)),
-                        itemId(this.getItemBySlot(EquipmentSlot.CHEST)),
-                        itemId(this.getItemBySlot(EquipmentSlot.LEGS)),
-                        itemId(this.getItemBySlot(EquipmentSlot.FEET))),
+                        this.getItemBySlot(EquipmentSlot.MAINHAND),
+                        this.getItemBySlot(EquipmentSlot.OFFHAND),
+                        this.getItemBySlot(EquipmentSlot.HEAD),
+                        this.getItemBySlot(EquipmentSlot.CHEST),
+                        this.getItemBySlot(EquipmentSlot.LEGS),
+                        this.getItemBySlot(EquipmentSlot.FEET)),
+                this.copyWorkerInventory(),
                 this.getCustomName() == null ? "" : this.getCustomName().getString()));
     }
 
@@ -4063,14 +4561,25 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.setRecruitDuty(snapshot.duty());
         this.applyUnitDefinition();
         this.setHealth(Math.min(this.getMaxHealth(), Math.max(1.0F, snapshot.health())));
-        this.setEquipmentFromData(EquipmentSlot.MAINHAND, snapshot.equipment().mainHand());
-        this.setEquipmentFromData(EquipmentSlot.HEAD, snapshot.equipment().head());
-        this.setEquipmentFromData(EquipmentSlot.CHEST, snapshot.equipment().chest());
-        this.setEquipmentFromData(EquipmentSlot.LEGS, snapshot.equipment().legs());
-        this.setEquipmentFromData(EquipmentSlot.FEET, snapshot.equipment().feet());
+        this.restoreArmyEquipment(EquipmentSlot.MAINHAND, snapshot.equipment().mainHand());
+        this.restoreArmyEquipment(EquipmentSlot.OFFHAND, snapshot.equipment().offHand());
+        this.restoreArmyEquipment(EquipmentSlot.HEAD, snapshot.equipment().head());
+        this.restoreArmyEquipment(EquipmentSlot.CHEST, snapshot.equipment().chest());
+        this.restoreArmyEquipment(EquipmentSlot.LEGS, snapshot.equipment().legs());
+        this.restoreArmyEquipment(EquipmentSlot.FEET, snapshot.equipment().feet());
+        List<ItemStack> cargo = snapshot.cargo();
+        this.workerInventory = NonNullList.withSize(ArmyMemberSnapshot.CARGO_SLOT_COUNT, ItemStack.EMPTY);
+        for (int slot = 0; slot < cargo.size(); slot++) {
+            this.workerInventory.set(slot, cargo.get(slot).copy());
+        }
         if (!snapshot.customName().isBlank()) {
             this.setCustomName(Component.literal(snapshot.customName()));
         }
+    }
+
+    private void restoreArmyEquipment(EquipmentSlot slot, ItemStack stack) {
+        this.setItemSlot(slot, stack.copy());
+        this.setDropChance(slot, 0.0F);
     }
 
     public long getArmySnapshotGeneration() {
@@ -4129,10 +4638,6 @@ public class GalacticRecruitEntity extends TamableAnimal
                         settlement.hallY() + 0.5D,
                         settlement.hallZ() + 0.5D) <= 1024.0D)
                 .isPresent();
-    }
-
-    private static String itemId(ItemStack stack) {
-        return stack.isEmpty() ? "" : BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
     }
 
     private static int clampVital(int value) {

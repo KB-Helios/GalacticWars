@@ -21,6 +21,7 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
     private static final int COLUMN_COUNT = 3;
     private static final int CONTROL_ROW_COUNT = 11;
     private static final int OFFICER_CONTROL_ROW_COUNT = 8;
+    private static final int OFFICER_LOGISTICS_ROW_COUNT = 9;
     private static final int STATUS_PANEL_MIN_WIDTH = 220;
     private static final int COMPACT_STATUS_ROW = 3;
     private static final int STATUS_COLOR = 0xE0E0E0;
@@ -49,17 +50,24 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 && recruit.isOwnedBy(this.minecraft.player);
         boolean tame = entity instanceof GalacticRecruitEntity recruit && recruit.isTame();
         boolean armyCommandAccess = this.menu.armyCommandAccess();
+        boolean logisticsAccess = this.menu.logisticsAccess();
         this.lastTame = tame;
         this.lastOwnedByPlayer = ownedByPlayer;
 
         int x = (this.width - BUTTON_WIDTH) / 2;
-        int visibleRows = ownedByPlayer ? CONTROL_ROW_COUNT : armyCommandAccess ? OFFICER_CONTROL_ROW_COUNT : 1;
+        int visibleRows = ownedByPlayer
+                ? CONTROL_ROW_COUNT
+                : armyCommandAccess && logisticsAccess
+                ? OFFICER_LOGISTICS_ROW_COUNT
+                : armyCommandAccess
+                ? OFFICER_CONTROL_ROW_COUNT
+                : 1;
         int y = Math.max(8, (this.height - (visibleRows * (BUTTON_HEIGHT + GAP))) / 2);
         if (!tame) {
             this.addButton(x, y, "screen.galacticwars.recruit.hire", RecruitCommandMenu.BUTTON_HIRE);
             return;
         }
-        if (!ownedByPlayer && !armyCommandAccess) {
+        if (!ownedByPlayer && !armyCommandAccess && !logisticsAccess) {
             this.addRenderableWidget(Button.builder(
                             Component.translatable("screen.galacticwars.recruit.locked"),
                             button -> this.onClose())
@@ -68,6 +76,14 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
             return;
         }
         if (!ownedByPlayer) {
+            if (!armyCommandAccess) {
+                this.addButton(
+                        x,
+                        y,
+                        "screen.galacticwars.recruit.loadout.open",
+                        RecruitCommandMenu.BUTTON_OPEN_LOADOUT);
+                return;
+            }
             this.addButton(x, y, "screen.galacticwars.recruit.follow", RecruitCommandMenu.BUTTON_FOLLOW);
             this.addButton(x, y + (BUTTON_HEIGHT + GAP),
                     "screen.galacticwars.recruit.hold", RecruitCommandMenu.BUTTON_HOLD);
@@ -85,6 +101,13 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
             this.addButton(x, y + 7 * (BUTTON_HEIGHT + GAP),
                     "screen.galacticwars.recruit.commander.formation",
                     RecruitCommandMenu.BUTTON_CYCLE_FORMATION);
+            if (logisticsAccess) {
+                this.addButton(
+                        x,
+                        y + 8 * (BUTTON_HEIGHT + GAP),
+                        "screen.galacticwars.recruit.loadout.open",
+                        RecruitCommandMenu.BUTTON_OPEN_LOADOUT);
+            }
             return;
         }
 
@@ -157,6 +180,11 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 y + 6 * (BUTTON_HEIGHT + GAP),
                 "screen.galacticwars.recruit.commander.patrol",
                 RecruitCommandMenu.BUTTON_PATROL);
+        this.addButton(
+                kingdomX,
+                y + 7 * (BUTTON_HEIGHT + GAP),
+                "screen.galacticwars.recruit.loadout.open",
+                RecruitCommandMenu.BUTTON_OPEN_LOADOUT);
     }
 
     @Override
@@ -232,7 +260,13 @@ public class RecruitCommandScreen extends Screen implements MenuAccess<RecruitCo
                 && this.minecraft.player != null
                 && recruit.isOwnedBy(this.minecraft.player);
         int columnCount = ownedByPlayer ? COLUMN_COUNT : 1;
-        int rowCount = ownedByPlayer ? CONTROL_ROW_COUNT : OFFICER_CONTROL_ROW_COUNT;
+        int rowCount = ownedByPlayer
+                ? CONTROL_ROW_COUNT
+                : this.menu.armyCommandAccess() && this.menu.logisticsAccess()
+                ? OFFICER_LOGISTICS_ROW_COUNT
+                : this.menu.armyCommandAccess()
+                ? OFFICER_CONTROL_ROW_COUNT
+                : 1;
         int controlsWidth = BUTTON_WIDTH * columnCount + COLUMN_GAP * (columnCount - 1);
         int controlsLeft = (this.width - controlsWidth) / 2;
         int controlsRight = controlsLeft + controlsWidth;

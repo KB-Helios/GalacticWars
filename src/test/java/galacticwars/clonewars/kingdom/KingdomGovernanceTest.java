@@ -3,7 +3,11 @@ package galacticwars.clonewars.kingdom;
 import java.util.List;
 import java.util.UUID;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
+import galacticwars.clonewars.workforce.CourierRouteMode;
+import galacticwars.clonewars.workforce.CourierTransferAction;
+import galacticwars.clonewars.workforce.CourierWaypoint;
 import galacticwars.clonewars.workforce.WorkerProfession;
+import net.minecraft.core.BlockPos;
 
 public final class KingdomGovernanceTest {
     private KingdomGovernanceTest() {
@@ -18,6 +22,9 @@ public final class KingdomGovernanceTest {
         npcRosterMigratesWorkersAndSoldiers();
         malformedMemberRolesUseSafeFallback();
         permissionSetsArePrecomputedAndImmutable();
+        logisticsAuthorityBelongsToOperationalLeaders();
+        courierRouteUpdatesAreRevisionedOnAssignedWorksites();
+        courierRouteAdmissionRequiresRuntimeDimensionAndClaims();
         System.out.println("KingdomGovernanceTest passed");
     }
 
@@ -101,6 +108,79 @@ public final class KingdomGovernanceTest {
         var second = KingdomPermissionPolicy.permissions(KingdomMemberRole.OFFICER);
         assertTrue(first == second, "precomputed permission set");
         assertThrows(() -> first.add(KingdomPermission.RECRUIT), "immutable permission set");
+    }
+
+    private static void logisticsAuthorityBelongsToOperationalLeaders() {
+        assertTrue(KingdomPermissionPolicy.allows(KingdomMemberRole.OWNER,
+                KingdomPermission.MANAGE_LOGISTICS), "owner logistics authority");
+        assertTrue(KingdomPermissionPolicy.allows(KingdomMemberRole.OFFICER,
+                KingdomPermission.MANAGE_LOGISTICS), "officer logistics authority");
+        assertTrue(KingdomPermissionPolicy.allows(KingdomMemberRole.QUARTERMASTER,
+                KingdomPermission.MANAGE_LOGISTICS), "quartermaster logistics authority");
+        assertTrue(!KingdomPermissionPolicy.allows(KingdomMemberRole.BUILDER,
+                KingdomPermission.MANAGE_LOGISTICS), "builder logistics denial");
+        assertTrue(!KingdomPermissionPolicy.allows(KingdomMemberRole.MEMBER,
+                KingdomPermission.MANAGE_LOGISTICS), "member logistics denial");
+    }
+
+    private static void courierRouteUpdatesAreRevisionedOnAssignedWorksites() {
+        UUID recruit = UUID.randomUUID();
+        SettlementRecord settlement = SettlementRecord.create("minecraft:overworld", 0, 64, 0)
+                .withRecruit(recruit)
+                .reserveWorksite(recruit, WorkerProfession.COURIER);
+        List<CourierWaypoint> route = List.of(
+                new CourierWaypoint("minecraft:overworld", 1, 64, 1,
+                        List.of(CourierTransferAction.takeAll())),
+                new CourierWaypoint("minecraft:overworld", 17, 64, 1,
+                        List.of(CourierTransferAction.putAll())));
+        SettlementRecord configured = settlement.configureAssignedCourierRoute(
+                recruit, route, CourierRouteMode.PING_PONG);
+        WorksiteRecord worksite = configured.assignedWorksite(recruit).orElseThrow();
+        assertEquals(CourierRouteMode.PING_PONG,
+                worksite.configuration().courierRouteMode(), "courier route mode");
+        assertEquals(1L, worksite.configuration().courierRouteRevision(),
+                "courier route revision");
+        assertEquals(settlement.revision() + 1, configured.revision(),
+                "settlement route revision");
+    }
+
+    private static void courierRouteAdmissionRequiresRuntimeDimensionAndClaims() {
+        UUID owner = UUID.randomUUID();
+        UUID recruit = UUID.randomUUID();
+        KingdomSavedData data = KingdomTestFixtures.withCivilianRecruit(
+                owner, recruit, "galacticwars:republic", "minecraft:overworld", new BlockPos(0, 64, 0));
+        assertTrue(data.reserveWorksite(owner, recruit, WorkerProfession.COURIER),
+                "courier worksite reserved");
+        assertTrue(data.addOutpost(
+                owner, SettlementRecord.create("minecraft:the_nether", 0, 64, 0)).isPresent(),
+                "cross-dimension claim registered");
+
+        List<CourierWaypoint> crossDimension = List.of(
+                new CourierWaypoint("minecraft:overworld", 1, 64, 1,
+                        List.of(CourierTransferAction.takeAll())),
+                new CourierWaypoint("minecraft:the_nether", 1, 64, 1,
+                        List.of(CourierTransferAction.putAll())));
+        assertTrue(data.configureAssignedCourierRoute(
+                        owner, recruit, crossDimension, CourierRouteMode.LOOP).isEmpty(),
+                "claimed cross-dimension route rejected");
+
+        List<CourierWaypoint> outsideClaim = List.of(
+                new CourierWaypoint("minecraft:overworld", 1, 64, 1,
+                        List.of(CourierTransferAction.takeAll())),
+                new CourierWaypoint("minecraft:overworld", 512, 64, 1,
+                        List.of(CourierTransferAction.putAll())));
+        assertTrue(data.configureAssignedCourierRoute(
+                        owner, recruit, outsideClaim, CourierRouteMode.LOOP).isEmpty(),
+                "same-dimension unclaimed route rejected");
+
+        List<CourierWaypoint> executable = List.of(
+                new CourierWaypoint("minecraft:overworld", 1, 64, 1,
+                        List.of(CourierTransferAction.takeAll())),
+                new CourierWaypoint("minecraft:overworld", 17, 64, 1,
+                        List.of(CourierTransferAction.putAll())));
+        assertTrue(data.configureAssignedCourierRoute(
+                        owner, recruit, executable, CourierRouteMode.LOOP).isPresent(),
+                "claimed same-dimension route accepted");
     }
 
     private static void siegesRejectNullParticipantLists() {

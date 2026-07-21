@@ -15,6 +15,7 @@ import galacticwars.clonewars.client.gui.CommandCenterOperationsScreen;
 import galacticwars.clonewars.client.gui.FactionSelectionScreen;
 import galacticwars.clonewars.client.gui.MerchantTradeScreen;
 import galacticwars.clonewars.client.gui.RecruitCommandScreen;
+import galacticwars.clonewars.client.gui.RecruitLoadoutScreen;
 import galacticwars.clonewars.client.render.GalacticRecruitRenderer;
 import galacticwars.clonewars.client.render.GalacticVehicleRenderer;
 import galacticwars.clonewars.combat.BlasterBoltEntity;
@@ -64,6 +65,8 @@ public final class GalacticWarsClient {
 
         MenuScreenRegistry.registerScreenFactory(
                 ModMenuTypes.RECRUIT_COMMAND.get(), RecruitCommandScreen::new);
+        MenuScreenRegistry.registerScreenFactory(
+                ModMenuTypes.RECRUIT_LOADOUT.get(), RecruitLoadoutScreen::new);
         MenuScreenRegistry.registerScreenFactory(
                 ModMenuTypes.COMMAND_CENTER_NAVIGATION.get(), CommandCenterNavigationScreen::new);
         MenuScreenRegistry.registerScreenFactory(

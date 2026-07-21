@@ -1,6 +1,8 @@
 package galacticwars.clonewars.workforce;
 
 import galacticwars.clonewars.kingdom.StorageEndpoint;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public final class SettlementSupplyLedgerTest {
@@ -26,7 +28,127 @@ public final class SettlementSupplyLedgerTest {
         assertTrue(expired.reservation(second.reservation().orElseThrow().id()).orElseThrow().state()
                 == SupplyReservation.State.RELEASED, "expired lease released");
         repeatedRequestsAndEndpointAccounting(demand, storage, firstWorker);
+        compactsCompletedDemandHistory(storage);
+        handlesReservationCapacity(storage);
         System.out.println("SettlementSupplyLedgerTest passed");
+    }
+
+    private static void compactsCompletedDemandHistory(StorageEndpoint storage) {
+        UUID settlementId = UUID.randomUUID();
+        ArrayList<SupplyDemand> demands = new ArrayList<>();
+        ArrayList<SupplyReservation> reservations = new ArrayList<>();
+        SupplyDemand oldestCompleted = demand(0, 1, 1);
+        demands.add(oldestCompleted);
+        reservations.add(reservation(0, oldestCompleted.id(), 1,
+                storage, SupplyReservation.State.COMPLETED));
+        for (int index = 1; index < WorkforceCodecs.MAX_SUPPLY_DEMANDS - 1; index++) {
+            demands.add(demand(index, 1, 1));
+        }
+        SupplyDemand active = demand(WorkforceCodecs.MAX_SUPPLY_DEMANDS, 2, 0);
+        demands.add(active);
+
+        SettlementSupplyLedger full = new SettlementSupplyLedger(
+                settlementId, demands, reservations, 10);
+        SupplyDemand replacement = demand(WorkforceCodecs.MAX_SUPPLY_DEMANDS + 1, 3, 0);
+        SettlementSupplyLedger compacted = full.request(replacement);
+        assertEquals(WorkforceCodecs.MAX_SUPPLY_DEMANDS, compacted.demands().size(),
+                "demand history stays bounded");
+        assertTrue(compacted.demands().stream().noneMatch(candidate -> candidate.id().equals(oldestCompleted.id())),
+                "oldest completed demand compacted");
+        assertTrue(compacted.demands().contains(active) && compacted.demands().contains(replacement),
+                "active and newly requested demands preserved");
+        assertTrue(compacted.reservations().isEmpty(),
+                "terminal reservations for a compacted demand are removed");
+
+        ArrayList<SupplyDemand> allActive = new ArrayList<>();
+        for (int index = 0; index < WorkforceCodecs.MAX_SUPPLY_DEMANDS; index++) {
+            allActive.add(demand(index + 1_000, 1, 0));
+        }
+        SettlementSupplyLedger saturated = new SettlementSupplyLedger(
+                UUID.randomUUID(), allActive, List.of(), 0);
+        assertIllegalArgument(
+                () -> saturated.request(demand(2_000, 1, 0)),
+                "supply_demand_capacity",
+                "new demand rejected when every demand remains active");
+    }
+
+    private static void handlesReservationCapacity(StorageEndpoint storage) {
+        SupplyDemand demand = demand(3_000, 10_000, 0);
+        UUID retainedWorker = new UUID(40L, 1L);
+        SupplyReservation retainedActive = new SupplyReservation(
+                new UUID(41L, 1L), demand.id(), retainedWorker, storage,
+                1, 1_000L, SupplyReservation.State.ACTIVE);
+        ArrayList<SupplyReservation> reservations = new ArrayList<>();
+        reservations.add(retainedActive);
+        SupplyReservation oldestTerminal = null;
+        SupplyReservation newestCompletedTerminal = null;
+        for (int index = 1; index < WorkforceCodecs.MAX_SUPPLY_RESERVATIONS; index++) {
+            SupplyReservation terminal = reservation(
+                    index + 10, demand.id(), index + 10, storage,
+                    index % 2 == 0
+                            ? SupplyReservation.State.COMPLETED
+                            : SupplyReservation.State.RELEASED);
+            reservations.add(terminal);
+            if (oldestTerminal == null) oldestTerminal = terminal;
+            if (terminal.state() == SupplyReservation.State.COMPLETED) {
+                newestCompletedTerminal = terminal;
+            }
+        }
+        SettlementSupplyLedger historyFull = new SettlementSupplyLedger(
+                UUID.randomUUID(), List.of(demand), reservations, Integer.MAX_VALUE);
+        UUID newWorker = new UUID(42L, 1L);
+        SettlementSupplyLedger.ReservationDecision accepted = historyFull.reserve(
+                demand.id(), newWorker, storage, 1, 10_000, 100L, 20L);
+        assertTrue(accepted.accepted(), "terminal history makes room for a live reservation");
+        assertEquals(WorkforceCodecs.MAX_SUPPLY_RESERVATIONS,
+                accepted.ledger().reservations().size(), "reservation history stays bounded");
+        assertEquals(Integer.MAX_VALUE, accepted.ledger().revision(),
+                "revision remains valid after counter saturation");
+        assertTrue(accepted.ledger().reservation(retainedActive.id()).isPresent(),
+                "active reservation survives compaction");
+        assertTrue(accepted.ledger().reservation(oldestTerminal.id()).isEmpty(),
+                "oldest terminal reservation compacted first");
+        assertTrue(accepted.ledger().reservation(newestCompletedTerminal.id()).isPresent(),
+                "recent terminal reservation retained for completion idempotence");
+        assertTrue(accepted.ledger().complete(
+                newestCompletedTerminal.id(), newestCompletedTerminal.workerId(),
+                newestCompletedTerminal.quantity(), 100L)
+                == accepted.ledger(), "retained completion retry remains a no-op");
+
+        ArrayList<SupplyReservation> activeReservations = new ArrayList<>();
+        for (int index = 0; index < WorkforceCodecs.MAX_SUPPLY_RESERVATIONS; index++) {
+            activeReservations.add(reservation(
+                    index + 5_000, demand.id(), index + 5_000, storage,
+                    SupplyReservation.State.ACTIVE));
+        }
+        SettlementSupplyLedger liveFull = new SettlementSupplyLedger(
+                UUID.randomUUID(), List.of(demand), activeReservations, 30);
+        SettlementSupplyLedger.ReservationDecision rejected = liveFull.reserve(
+                demand.id(), new UUID(43L, 1L), storage, 1,
+                20_000, 100L, 20L);
+        assertTrue(!rejected.accepted(), "fully active reservation ledger rejects without throwing");
+        assertTrue("reservation_capacity".equals(rejected.reason()),
+                "capacity rejection has a stable reason");
+        assertTrue(rejected.ledger() == liveFull,
+                "capacity rejection leaves the full active ledger untouched");
+    }
+
+    private static SupplyDemand demand(int seed, int quantity, int fulfilled) {
+        return new SupplyDemand(
+                new UUID(50L, seed), SupplyCategory.CONSTRUCTION,
+                "minecraft:stone", quantity, fulfilled, 50, "test:" + seed);
+    }
+
+    private static SupplyReservation reservation(
+            int seed,
+            UUID demandId,
+            int workerSeed,
+            StorageEndpoint storage,
+            SupplyReservation.State state
+    ) {
+        return new SupplyReservation(
+                new UUID(60L, seed), demandId, new UUID(70L, workerSeed), storage,
+                1, 1_000L, state);
     }
 
     private static void repeatedRequestsAndEndpointAccounting(
@@ -74,6 +196,22 @@ public final class SettlementSupplyLedgerTest {
             throw new AssertionError(message);
         } catch (IllegalStateException expected) {
             // Expected.
+        }
+    }
+
+    private static void assertIllegalArgument(
+            Runnable action,
+            String expectedMessage,
+            String message
+    ) {
+        try {
+            action.run();
+            throw new AssertionError(message);
+        } catch (IllegalArgumentException expected) {
+            if (!expectedMessage.equals(expected.getMessage())) {
+                throw new AssertionError(message + ": expected reason " + expectedMessage
+                        + ", got " + expected.getMessage());
+            }
         }
     }
 }

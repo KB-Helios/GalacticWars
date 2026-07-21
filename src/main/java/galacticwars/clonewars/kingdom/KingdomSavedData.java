@@ -27,6 +27,11 @@ import galacticwars.clonewars.faction.FactionBalanceService;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.workforce.WorkerProfession;
+import galacticwars.clonewars.workforce.CourierRouteMode;
+import galacticwars.clonewars.workforce.CourierWaypoint;
+import galacticwars.clonewars.workforce.SettlementSupplyLedger;
+import galacticwars.clonewars.workforce.SupplyDemand;
+import galacticwars.clonewars.workforce.WorkforceCodecs;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
@@ -34,7 +39,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 public final class KingdomSavedData extends SavedData {
-    public static final int CURRENT_SCHEMA_VERSION = 7;
+    public static final int CURRENT_SCHEMA_VERSION = 8;
     public static final Codec<KingdomSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("schema_version", CURRENT_SCHEMA_VERSION).forGetter(KingdomSavedData::schemaVersion),
             KingdomCodecs.KINGDOM_RECORD.listOf().optionalFieldOf("kingdoms", List.of()).forGetter(KingdomSavedData::kingdoms),
@@ -49,7 +54,10 @@ public final class KingdomSavedData extends SavedData {
             KingdomCodecs.KINGDOM_INVITE.listOf().optionalFieldOf("pending_invites", List.of())
                     .forGetter(KingdomSavedData::pendingInvites),
             KingdomCodecs.DIPLOMACY_PROPOSAL.listOf().optionalFieldOf("pending_diplomacy", List.of())
-                    .forGetter(KingdomSavedData::pendingDiplomacy)
+                    .forGetter(KingdomSavedData::pendingDiplomacy),
+            WorkforceCodecs.SETTLEMENT_SUPPLY_LEDGER.listOf()
+                    .optionalFieldOf("supply_ledgers", List.of())
+                    .forGetter(KingdomSavedData::supplyLedgers)
     ).apply(instance, KingdomSavedData::new));
     public static final SavedDataType<KingdomSavedData> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath(GalacticWars.MODID, "kingdoms"),
@@ -71,9 +79,11 @@ public final class KingdomSavedData extends SavedData {
     private final Map<UUID, KingdomSiege> siegesById = new LinkedHashMap<>();
     private final Map<UUID, KingdomInvite> invitesById = new LinkedHashMap<>();
     private final Map<UUID, DiplomacyProposal> proposalsById = new LinkedHashMap<>();
+    private final Map<UUID, SettlementSupplyLedger> supplyLedgersBySettlement = new LinkedHashMap<>();
 
     public KingdomSavedData() {
-        this(CURRENT_SCHEMA_VERSION, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        this(CURRENT_SCHEMA_VERSION, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of());
     }
 
     private KingdomSavedData(
@@ -84,7 +94,8 @@ public final class KingdomSavedData extends SavedData {
             List<KingdomDiplomacy> diplomacy,
             List<KingdomSiege> sieges,
             List<KingdomInvite> invites,
-            List<DiplomacyProposal> proposals
+            List<DiplomacyProposal> proposals,
+            List<SettlementSupplyLedger> supplyLedgers
     ) {
         this.schemaVersion = SavedDataSchemaPolicy.migrate(
                 schemaVersion, CURRENT_SCHEMA_VERSION, "kingdom");
@@ -131,6 +142,11 @@ public final class KingdomSavedData extends SavedData {
                 proposalsById.putIfAbsent(proposal.id(), proposal);
             }
         }
+        for (SettlementSupplyLedger ledger : supplyLedgers) {
+            if (kingdomIdsBySettlement.containsKey(ledger.settlementId())) {
+                supplyLedgersBySettlement.put(ledger.settlementId(), ledger);
+            }
+        }
     }
 
     public static KingdomSavedData get(ServerLevel level) {
@@ -163,6 +179,111 @@ public final class KingdomSavedData extends SavedData {
 
     public List<DiplomacyProposal> pendingDiplomacy() {
         return List.copyOf(proposalsById.values());
+    }
+
+    public List<SettlementSupplyLedger> supplyLedgers() {
+        return List.copyOf(supplyLedgersBySettlement.values());
+    }
+
+    public Optional<SettlementSupplyLedger> supplyLedger(UUID settlementId) {
+        return Optional.ofNullable(supplyLedgersBySettlement.get(settlementId));
+    }
+
+    public boolean requestSupply(
+            UUID ownerId,
+            UUID settlementId,
+            SupplyDemand demand
+    ) {
+        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
+        if (kingdom == null || kingdom.settlements().stream().noneMatch(settlement -> settlement.id().equals(settlementId))) {
+            return false;
+        }
+        SettlementSupplyLedger current = supplyLedgersBySettlement.get(settlementId);
+        if (current == null) {
+            return false;
+        }
+        SettlementSupplyLedger updated;
+        try {
+            updated = current.request(demand);
+        } catch (IllegalArgumentException rejected) {
+            return false;
+        }
+        if (updated != current) {
+            supplyLedgersBySettlement.put(settlementId, updated);
+            this.setDirty();
+        }
+        return true;
+    }
+
+    public SettlementSupplyLedger.ReservationDecision reserveSupply(
+            UUID ownerId,
+            UUID settlementId,
+            UUID demandId,
+            UUID workerId,
+            StorageEndpoint endpoint,
+            int requestedQuantity,
+            int physicalStock,
+            long gameTime,
+            long leaseTicks
+    ) {
+        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
+        SettlementRecord settlement = kingdom == null ? null : kingdom.settlements().stream()
+                .filter(candidate -> candidate.id().equals(settlementId)).findFirst().orElse(null);
+        SettlementSupplyLedger current = supplyLedgersBySettlement.get(settlementId);
+        if (settlement == null || current == null) {
+            return SettlementSupplyLedger.ReservationDecision.rejected("endpoint_unavailable", current == null
+                    ? SettlementSupplyLedger.create(settlementId) : current);
+        }
+        if (!settlement.containsRecruit(workerId)) {
+            return SettlementSupplyLedger.ReservationDecision.rejected("worker_unavailable", current);
+        }
+        if (KingdomStoragePolicy.registeredEndpoints(settlement).stream().noneMatch(endpoint::equals)) {
+            return SettlementSupplyLedger.ReservationDecision.rejected("endpoint_unavailable", current);
+        }
+        SettlementSupplyLedger.ReservationDecision decision = current.reserve(
+                demandId, workerId, endpoint, requestedQuantity, physicalStock, gameTime, leaseTicks);
+        if (decision.ledger() != current) {
+            supplyLedgersBySettlement.put(settlementId, decision.ledger());
+            this.setDirty();
+        }
+        return decision;
+    }
+
+    public boolean completeSupply(
+            UUID ownerId,
+            UUID settlementId,
+            UUID reservationId,
+            UUID workerId,
+            int deliveredQuantity,
+            long gameTime
+    ) {
+        KingdomRecord kingdom = kingdomsByOwner.get(ownerId);
+        SettlementRecord settlement = kingdom == null ? null : kingdom.settlements().stream()
+                .filter(candidate -> candidate.id().equals(settlementId)).findFirst().orElse(null);
+        SettlementSupplyLedger current = supplyLedgersBySettlement.get(settlementId);
+        if (settlement == null || current == null || !settlement.containsRecruit(workerId)) {
+            return false;
+        }
+        StorageEndpoint reservedEndpoint = current.reservations().stream()
+                .filter(reservation -> reservation.id().equals(reservationId))
+                .map(reservation -> reservation.endpoint())
+                .findFirst()
+                .orElse(null);
+        if (reservedEndpoint == null || KingdomStoragePolicy.registeredEndpoints(settlement).stream()
+                .noneMatch(reservedEndpoint::equals)) {
+            return false;
+        }
+        try {
+            SettlementSupplyLedger updated = current.complete(
+                    reservationId, workerId, deliveredQuantity, gameTime);
+            if (updated != current) {
+                supplyLedgersBySettlement.put(settlementId, updated);
+                this.setDirty();
+            }
+            return true;
+        } catch (IllegalArgumentException | IllegalStateException rejected) {
+            return false;
+        }
     }
 
     public Optional<KingdomInvite> inviteMember(
@@ -873,6 +994,41 @@ public final class KingdomSavedData extends SavedData {
         SettlementRecord updated = kingdom.settlement().configureAssignedFrontierWorksite(
                 recruitId, dimensionId, target.getX(), target.getY(), target.getZ(), radius);
         if (updated == kingdom.settlement()) {
+            return Optional.empty();
+        }
+        storeKingdom(kingdom.withSettlement(updated));
+        this.setDirty();
+        return updated.assignedWorksite(recruitId);
+    }
+
+    public Optional<WorksiteRecord> configureAssignedCourierRoute(
+            UUID actorId,
+            UUID recruitId,
+            List<CourierWaypoint> route,
+            CourierRouteMode mode
+    ) {
+        Objects.requireNonNull(route, "route");
+        Objects.requireNonNull(mode, "mode");
+        KingdomRecord kingdom = kingdomForPlayer(actorId).orElse(null);
+        SettlementRecord current = kingdom == null ? null : kingdom.settlement();
+        WorksiteRecord courierWorksite = current == null ? null : current.assignedWorksite(recruitId)
+                .filter(worksite -> worksite.accepts(WorkerProfession.COURIER))
+                .orElse(null);
+        if (kingdom == null
+                || inactiveHallOwners.contains(kingdom.ownerId())
+                || !kingdom.allows(actorId, KingdomPermission.MANAGE_LOGISTICS)
+                || !current.containsRecruit(recruitId)
+                || courierWorksite == null
+                || route.size() == 1
+                || route.size() > galacticwars.clonewars.workforce.CourierRoutePlan.MAX_WAYPOINTS
+                || route.stream().anyMatch(waypoint ->
+                        !courierWorksite.dimensionId().equals(waypoint.dimensionId()))
+                || route.stream().anyMatch(waypoint -> kingdom.claims().stream().noneMatch(claim ->
+                        claim.contains(waypoint.dimensionId(), waypoint.x() >> 4, waypoint.z() >> 4)))) {
+            return Optional.empty();
+        }
+        SettlementRecord updated = current.configureAssignedCourierRoute(recruitId, route, mode);
+        if (updated == current) {
             return Optional.empty();
         }
         storeKingdom(kingdom.withSettlement(updated));
@@ -1620,6 +1776,8 @@ public final class KingdomSavedData extends SavedData {
         kingdom.members().forEach(member -> kingdomIdsByMember.put(member.playerId(), kingdom.id()));
         kingdom.settlements().forEach(settlement -> {
             kingdomIdsBySettlement.put(settlement.id(), kingdom.id());
+            supplyLedgersBySettlement.putIfAbsent(
+                    settlement.id(), SettlementSupplyLedger.create(settlement.id()));
             settlement.recruitIds().forEach(recruitId -> kingdomIdsByRecruit.put(recruitId, kingdom.id()));
         });
         kingdom.claims().forEach(claim -> claim.chunks().forEach(chunk ->
@@ -1638,6 +1796,13 @@ public final class KingdomSavedData extends SavedData {
                     claimsByChunk.remove(new ClaimKey(claim.dimensionId(), chunk.x(), chunk.z()), claim)));
         }
         indexKingdom(kingdom);
+        if (previous != null) {
+            Set<UUID> retainedSettlementIds = kingdom.settlements().stream()
+                    .map(SettlementRecord::id).collect(java.util.stream.Collectors.toSet());
+            previous.settlements().stream().map(SettlementRecord::id)
+                    .filter(settlementId -> !retainedSettlementIds.contains(settlementId))
+                    .forEach(supplyLedgersBySettlement::remove);
+        }
     }
 
     private boolean capitalClaimAvailable(String dimensionId, BlockPos hallPos, UUID replacedClaimId) {
