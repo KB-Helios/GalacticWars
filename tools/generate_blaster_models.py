@@ -147,6 +147,7 @@ def display_model(weapon_id: str) -> dict:
     pistol = weapon_id == "westar_blaster"
     heavy = weapon_id == "scatter_blaster"
     scale = 0.58 if heavy else 0.66 if pistol else 0.62
+    first_person_scale = round(scale - 0.08, 2)
     return {
         "parent": "builtin/entity",
         "ambientocclusion": False,
@@ -154,8 +155,8 @@ def display_model(weapon_id: str) -> dict:
         "display": {
             "thirdperson_righthand": {"rotation": [-8, -88, -8], "translation": [0.4, 2.6, -1.2], "scale": [scale] * 3},
             "thirdperson_lefthand": {"rotation": [-8, 88, 8], "translation": [-0.4, 2.6, -1.2], "scale": [scale] * 3},
-            "firstperson_righthand": {"rotation": [0, -92, -4], "translation": [1.2, 2.8, 0.6], "scale": [scale - 0.08] * 3},
-            "firstperson_lefthand": {"rotation": [0, 92, 4], "translation": [-1.2, 2.8, 0.6], "scale": [scale - 0.08] * 3},
+            "firstperson_righthand": {"rotation": [0, -92, -4], "translation": [1.2, 2.8, 0.6], "scale": [first_person_scale] * 3},
+            "firstperson_lefthand": {"rotation": [0, 92, 4], "translation": [-1.2, 2.8, 0.6], "scale": [first_person_scale] * 3},
             "gui": {"rotation": [24, 225, 0], "translation": [0, 0, 0], "scale": [0.55] * 3},
             "ground": {"rotation": [0, 90, 0], "translation": [0, 2, 0], "scale": [0.42] * 3},
             "fixed": {"rotation": [0, 90, 15], "translation": [0, 0, 0], "scale": [0.58] * 3},

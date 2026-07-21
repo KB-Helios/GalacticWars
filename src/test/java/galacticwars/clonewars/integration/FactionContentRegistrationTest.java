@@ -69,6 +69,9 @@ public final class FactionContentRegistrationTest {
             assertContains(items, "\"" + id + "_spawn_egg\"", "spawn egg registration " + id);
             assertContains(language, "\"entity.galacticwars." + id + "\"", "entity translation " + id);
         }
+        assertContains(language,
+                "\"item.galacticwars.hutt_enforcer_spawn_egg\": \"Trandoshan Enforcer Spawn Egg\"",
+                "Trandoshan enforcer spawn egg translation");
         assertContains(client, "ModEntityTypes.recruits()", "data-driven renderer registration");
         assertContains(common, "ModEntityTypes.recruits()", "data-driven attributes and spawn placement");
     }

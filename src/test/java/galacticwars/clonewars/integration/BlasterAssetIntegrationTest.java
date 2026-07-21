@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 
 public final class BlasterAssetIntegrationTest {
@@ -38,6 +39,8 @@ public final class BlasterAssetIntegrationTest {
             require(!display.contains("minecraft:item/generated")
                             && !display.contains("minecraft:item/handheld"),
                     weapon + " must not fall back to a paper-thin vanilla model");
+            require(!Pattern.compile("-?\\d+\\.\\d{10,}").matcher(display).find(),
+                    weapon + " display transforms must use clean decimal values");
 
             Path geometryPath = ASSETS.resolve("geckolib/models/item/blaster/" + weapon + ".geo.json");
             String geometry = json(geometryPath);

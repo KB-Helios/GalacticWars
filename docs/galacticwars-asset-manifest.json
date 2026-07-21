@@ -134,12 +134,12 @@
       "kind": "geckolib_animated_3d_item",
       "ids": ["blue","green","red","purple","yellow","white"],
       "model_path_template": "geckolib/models/item/lightsaber/{id}.geo.json",
-      "mcmeta_path_template": "textures/item/lightsaber/{id}.png.mcmeta"
+      "animation_path_template": "geckolib/animations/item/lightsaber/{id}.animation.json",
       "frame_size": "256x256",
       "animated_texture_size": "256x1024",
       "texture_path_template": "textures/item/lightsaber/{id}.png",
       "glowmask_path_template": "textures/item/lightsaber/{id}_glowmask.png",
-      "animation_path_template": "textures/item/lightsaber/{id}.png.mcmeta"
+      "mcmeta_path_template": "textures/item/lightsaber/{id}.png.mcmeta"
     },
     {
       "id": "planets",
