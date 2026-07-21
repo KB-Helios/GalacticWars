@@ -88,13 +88,13 @@ public final class ModItems {
     public static final RegistrySupplier<TacticalCommandMarkerItem> COMMAND_MARKER =
             registerItem("command_marker", TacticalCommandMarkerItem::new);
     public static final RegistrySupplier<BlasterItem> DC15_BLASTER =
-            registerItem("dc15_blaster", properties -> new BlasterItem(blaster(properties, 850), 6.0D, 3.4F, 0.7F));
+            registerItem("dc15_blaster", properties -> new BlasterItem("dc15_blaster", blaster(properties, 850), 6.0D, 3.4F, 0.7F));
     public static final RegistrySupplier<BlasterItem> E5_BLASTER =
-            registerItem("e5_blaster", properties -> new BlasterItem(blaster(properties, 700), 5.0D, 3.2F, 1.0F));
+            registerItem("e5_blaster", properties -> new BlasterItem("e5_blaster", blaster(properties, 700), 5.0D, 3.2F, 1.0F));
     public static final RegistrySupplier<BlasterItem> WESTAR_BLASTER =
-            registerItem("westar_blaster", properties -> new BlasterItem(blaster(properties, 900), 6.5D, 3.5F, 0.6F));
+            registerItem("westar_blaster", properties -> new BlasterItem("westar_blaster", blaster(properties, 900), 6.5D, 3.5F, 0.6F));
     public static final RegistrySupplier<BlasterItem> SCATTER_BLASTER =
-            registerItem("scatter_blaster", properties -> new BlasterItem(blaster(properties, 650), 7.0D, 2.8F, 1.4F));
+            registerItem("scatter_blaster", properties -> new BlasterItem("scatter_blaster", blaster(properties, 650), 7.0D, 2.8F, 1.4F));
     public static final RegistrySupplier<BowItem> NIGHTSISTER_BOW =
             registerItem("nightsister_bow", properties -> new BowItem(properties.durability(600)));
     public static final RegistrySupplier<LightsaberItem> BLUE_LIGHTSABER = lightsaber("blue");

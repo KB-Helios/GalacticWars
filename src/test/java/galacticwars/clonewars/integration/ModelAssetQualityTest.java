@@ -67,12 +67,18 @@ public final class ModelAssetQualityTest {
     }
 
     private static void assertLongBladeLightsaber() throws Exception {
-        String geometry = Files.readString(GECKOLIB_MODELS.resolve("item/lightsaber.geo.json"));
-        require(geometry.contains("\"name\": \"hilt\"")
-                        && geometry.contains("\"name\": \"blade\""),
-                "lightsaber must use separate GeckoLib hilt and blade bones");
-        require(geometry.contains("36.0") && occurrences(geometry, "\"origin\"") >= 24,
-                "lightsaber must keep its long blade and segmented three-dimensional hilt");
+        Set<Integer> distinct = new HashSet<>();
+        for (String color : Set.of("blue", "green", "red", "purple", "yellow", "white")) {
+            String geometry = Files.readString(
+                    GECKOLIB_MODELS.resolve("item/lightsaber/" + color + ".geo.json"));
+            require(geometry.contains("\"name\": \"hilt\"")
+                            && geometry.contains("\"name\": \"blade\""),
+                    color + " lightsaber must use separate hilt and blade bones");
+            require(geometry.contains("36.0") && occurrences(geometry, "\"origin\"") >= 26,
+                    color + " lightsaber must keep its long blade and original volumetric hilt");
+            distinct.add(geometry.hashCode());
+        }
+        require(distinct.size() == 6, "all six lightsaber hilts must have distinct geometry");
     }
 
     private static int occurrences(String content, String needle) {

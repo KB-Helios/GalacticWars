@@ -1,6 +1,6 @@
 {
   "id": "galacticwars:hutt_enforcer",
-  "display_name": "Hutt Enforcer",
+  "display_name": "Trandoshan Enforcer",
   "faction": "galacticwars:hutt_cartel",
   "entity_type": "galacticwars:hutt_enforcer",
   "role": "infantry",

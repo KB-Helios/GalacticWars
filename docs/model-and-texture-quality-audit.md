@@ -35,7 +35,7 @@ Date: 2026-07-20
   so the hand meets the grip instead of the pommel floating above it.
 - Six four-frame 256x1024 UV atlases and matching emissive glowmasks replace the generic split hilt/blade strips.
 - Minecraft item definitions use `minecraft:special` plus `geckolib:geckolib`; the Java item implements `GeoItem` and renders through `GeoItemRenderer`.
-- Equipped armor uses 24/27 cuboids for permissioned Phase I/Phase II clone sets and 51/54/55/54
+- Equipped armor uses 24/27 cuboids for permissioned Phase I/Phase II clone sets and 56/54/33/54
   cuboids for the project-authored Separatist, Mandalorian, Nightsister, and Beskar sets. The clone
   geometry uses visibly different authored helmet groups and the ARC NPCs add specialist equipment.
 - Clone wearable armor preserves the source 128x128 atlas and source equipment sprites. The other
@@ -59,3 +59,22 @@ and the client log contained no Galactic Wars model, texture, animation, or rend
 Local evidence screenshots are retained under `run/screenshots`: `2026-07-13_23.46.12.png` through
 `2026-07-13_23.46.58.png` cover the five equipped armor families, while
 `2026-07-13_23.47.17.png` and `2026-07-13_23.47.18.png` show the first-person saber and capsule.
+
+## 2026-07-21 Clone Wars 3D visual overhaul
+
+- The deterministic turnaround covers all 26 NPCs, three commanders, six armor families, five
+  vehicles, six lightsabers, four blasters, and representative capsules in front/side/back views,
+  applying cube rotations and the bone hierarchy.
+- Species imports now add Togruta head-tails/montrals, Duros cranium/brow, Rodian muzzle/antennae, and
+  Trandoshan muzzle/brow landmarks. Weak project-authored characters now use role-specific robes,
+  cloth panels, horns/tattoos, droid profiles, cannon, cape, bandolier, and civilian details.
+- Mandalorians use extended 256x256 atlases with T-visors, rangefinders, jetpacks, and role-specific
+  cape/pauldron/pack pieces. Clone commander atlases preserve the exact soldier alpha mask.
+- Nightsister armor is cloth/wrap/hood/skirt construction rather than plate; Separatist armor gains
+  visible servos, reactor, mechanical spine, and knee pistons.
+- Vehicle cube counts are 23/32/22/26/44 for BARC/AT-RT/STAP/AAT/LAAT, preserving bones, seats,
+  hitboxes, gameplay IDs, and animations.
+- Four blasters are distinct 256x256 emissive GeckoLib items. Six sabers preserve the shared `blade`
+  bone and 36-unit blade while owning different hilt geometry.
+- Display labels are `Rodian Civilian`, `Duros Smuggler`, and `Trandoshan Enforcer`; registry/save IDs
+  remain stable.

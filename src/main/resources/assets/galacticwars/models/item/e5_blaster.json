@@ -1,6 +1,126 @@
 {
-  "parent": "galacticwars:item/dc15_blaster",
-  "textures": {
-    "layer0": "galacticwars:item/e5_blaster_hq"
+  "parent": "builtin/entity",
+  "ambientocclusion": false,
+  "gui_light": "front",
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [
+        -8,
+        -88,
+        -8
+      ],
+      "translation": [
+        0.4,
+        2.6,
+        -1.2
+      ],
+      "scale": [
+        0.62,
+        0.62,
+        0.62
+      ]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [
+        -8,
+        88,
+        8
+      ],
+      "translation": [
+        -0.4,
+        2.6,
+        -1.2
+      ],
+      "scale": [
+        0.62,
+        0.62,
+        0.62
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        0,
+        -92,
+        -4
+      ],
+      "translation": [
+        1.2,
+        2.8,
+        0.6
+      ],
+      "scale": [
+        0.54,
+        0.54,
+        0.54
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        0,
+        92,
+        4
+      ],
+      "translation": [
+        -1.2,
+        2.8,
+        0.6
+      ],
+      "scale": [
+        0.54,
+        0.54,
+        0.54
+      ]
+    },
+    "gui": {
+      "rotation": [
+        24,
+        225,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.55,
+        0.55,
+        0.55
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "translation": [
+        0,
+        2,
+        0
+      ],
+      "scale": [
+        0.42,
+        0.42,
+        0.42
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        90,
+        15
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.58,
+        0.58,
+        0.58
+      ]
+    }
   }
 }

@@ -1,5 +1,8 @@
 package galacticwars.clonewars.integration;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,9 +26,7 @@ public final class AssetManifestCompletenessTest {
             "field_command_and_deployment");
     private static final Set<String> SOURCE_128_UNITS = Set.of(
             "clone_trooper", "arc_trooper", "phase_i_clone_trooper", "phase_i_arc_trooper",
-            "mandalorian_warrior", "mandalorian_marksman", "mandalorian_heavy",
-            "mandalorian_clansperson", "senate_commando", "republic_honor_guard",
-            "hutt_enforcer");
+            "senate_commando", "republic_honor_guard");
     private static final Set<String> SOURCE_128_BY_64_UNITS = Set.of(
             "b1_battle_droid", "b1_security_droid", "separatist_technician");
     private static final List<String> FACTIONS = List.of(
@@ -60,6 +61,7 @@ public final class AssetManifestCompletenessTest {
 
     public static void main(String[] args) throws Exception {
         String manifest = Files.readString(MANIFEST);
+        validateManifestJson(manifest);
         assertContains(manifest, "\"schema_version\": 1", "asset schema");
         assertContains(manifest, "\"namespace\": \"galacticwars\"", "asset namespace");
         for (String batch : List.of("core", "factions", "units", "equipped_armor", "combat_and_tools",
@@ -102,6 +104,32 @@ public final class AssetManifestCompletenessTest {
         validateMinimumDistinctUnitTextures(UNITS.size() - 2);
         for (String faction : FACTIONS) validateFactionEquipment(faction);
         System.out.println("AssetManifestCompletenessTest passed (" + assets.size() + " authored assets)");
+    }
+
+    private static void validateManifestJson(String manifest) {
+        JsonArray batches = JsonParser.parseString(manifest).getAsJsonObject().getAsJsonArray("batches");
+        JsonObject lightsabers = null;
+        for (var element : batches) {
+            JsonObject batch = element.getAsJsonObject();
+            if ("lightsaber_models".equals(batch.get("id").getAsString())) {
+                lightsabers = batch;
+                break;
+            }
+        }
+        if (lightsabers == null) {
+            throw new AssertionError("asset manifest lacks lightsaber_models batch");
+        }
+        assertEquals(
+                "geckolib/animations/item/lightsaber/{id}.animation.json",
+                lightsabers.get("animation_path_template").getAsString(),
+                "lightsaber GeckoLib animation path");
+        assertEquals(
+                "textures/item/lightsaber/{id}.png.mcmeta",
+                lightsabers.get("mcmeta_path_template").getAsString(),
+                "lightsaber sprite animation metadata path");
+        if (occurrences(manifest, "\"animation_path_template\"") != 2) {
+            throw new AssertionError("asset manifest must contain one animation path per GeckoLib item batch");
+        }
     }
 
     private static List<ExpectedAsset> expectations() {
@@ -236,8 +264,20 @@ public final class AssetManifestCompletenessTest {
         if (!Files.isRegularFile(definition) || !Files.isRegularFile(model)) {
             throw new AssertionError("Item asset lacks definition/model: " + id);
         }
-        if (!Files.readString(definition).contains("galacticwars:item/" + id)
-                || !Files.readString(model).contains("galacticwars:item/" + id)) {
+        String definitionJson = Files.readString(definition);
+        String modelJson = Files.readString(model);
+        if (Set.of("dc15_blaster", "e5_blaster", "westar_blaster", "scatter_blaster").contains(id)) {
+            if (!definitionJson.contains("galacticwars:item/" + id)
+                    || !definitionJson.contains("geckolib:geckolib")
+                    || !modelJson.contains("\"parent\": \"builtin/entity\"")
+                    || !Files.isRegularFile(ASSET_ROOT.resolve(
+                            "geckolib/models/item/blaster/" + id + ".geo.json"))
+                    || !Files.isRegularFile(ASSET_ROOT.resolve(
+                            "textures/item/blaster/" + id + ".png"))) {
+                throw new AssertionError("Volumetric blaster contract is incomplete: " + id);
+            }
+        } else if (!definitionJson.contains("galacticwars:item/" + id)
+                || !modelJson.contains("galacticwars:item/" + id)) {
             throw new AssertionError("Item model reference does not resolve to its manifest texture: " + id);
         }
     }
@@ -286,6 +326,22 @@ public final class AssetManifestCompletenessTest {
         if (!value.contains(expected)) {
             throw new AssertionError(label + " missing <" + expected + ">");
         }
+    }
+
+    private static void assertEquals(String expected, String actual, String label) {
+        if (!expected.equals(actual)) {
+            throw new AssertionError(label + " expected <" + expected + "> but was <" + actual + ">");
+        }
+    }
+
+    private static int occurrences(String value, String expected) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = value.indexOf(expected, offset)) >= 0) {
+            count++;
+            offset += expected.length();
+        }
+        return count;
     }
 
     private record ExpectedAsset(

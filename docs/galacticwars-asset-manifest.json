@@ -5,7 +5,7 @@
     "blocks_and_items": "Minecraft-readable cinematic pixel art",
     "entities": "project-authored and permissioned upstream-derived Clone Wars character art fitted to exact GeckoLib UVs",
     "copyright_rule": "every upstream-derived asset must retain its repository, pinned commit, license, transformation, and authorization record",
-    "alpha_rule": "unused UV space and inventory-icon backgrounds must be fully transparent"
+    "alpha_rule": "every exposed base face is opaque; a transparent overlay is permitted only over opaque supporting geometry; unused UV space and inventory-icon backgrounds remain transparent"
   },
   "batches": [
     {
@@ -68,11 +68,6 @@
         "republic_honor_guard":"128x128",
         "b1_battle_droid":"128x64",
         "b1_security_droid":"128x64",
-        "mandalorian_warrior":"128x128",
-        "mandalorian_marksman":"128x128",
-        "mandalorian_heavy":"128x128",
-        "mandalorian_clansperson":"128x128",
-        "hutt_enforcer":"128x128",
         "separatist_technician":"128x64"
       },
       "source_overrides": {
@@ -99,7 +94,7 @@
       "ids": ["phase_i_clone","republic_plastoid","separatist_alloy","mandalorian_alloy","nightsister_weave","beskar"],
       "size_overrides": {"phase_i_clone":"128x128","republic_plastoid":"128x128"},
       "path_template": "textures/armor/{id}.png",
-      "cube_counts": {"phase_i_clone":24,"republic_plastoid":27,"separatist_alloy":51,"mandalorian_alloy":54,"nightsister_weave":55,"beskar":54},
+      "cube_counts": {"phase_i_clone":24,"republic_plastoid":27,"separatist_alloy":56,"mandalorian_alloy":54,"nightsister_weave":33,"beskar":54},
       "source_overrides": {"galaxies_pswg_clone_trooper":["phase_i_clone","republic_plastoid"]},
       "inventory_icon_policy": "preserve existing icons and use the licensed source sprites for distinct Phase I and Phase II four-piece clone sets",
       "inventory_ids": ["phase_i_clone_helmet","phase_i_clone_chestplate","phase_i_clone_leggings","phase_i_clone_boots"]
@@ -124,16 +119,27 @@
       "path_template": "textures/item/{id}.png"
     },
     {
+      "id": "blaster_models",
+      "kind": "geckolib_emissive_3d_item",
+      "ids": ["dc15_blaster","e5_blaster","westar_blaster","scatter_blaster"],
+      "model_path_template": "geckolib/models/item/blaster/{id}.geo.json",
+      "animation_path_template": "geckolib/animations/item/blaster/{id}.animation.json",
+      "texture_path_template": "textures/item/blaster/{id}.png",
+      "glowmask_path_template": "textures/item/blaster/{id}_glowmask.png",
+      "atlas_size": "256x256",
+      "renderer": "GalacticBlasterRenderer"
+    },
+    {
       "id": "lightsaber_models",
       "kind": "geckolib_animated_3d_item",
       "ids": ["blue","green","red","purple","yellow","white"],
-      "model": "geckolib/models/item/lightsaber.geo.json",
-      "animation": "geckolib/animations/item/lightsaber.animation.json",
+      "model_path_template": "geckolib/models/item/lightsaber/{id}.geo.json",
+      "animation_path_template": "geckolib/animations/item/lightsaber/{id}.animation.json",
       "frame_size": "256x256",
       "animated_texture_size": "256x1024",
       "texture_path_template": "textures/item/lightsaber/{id}.png",
       "glowmask_path_template": "textures/item/lightsaber/{id}_glowmask.png",
-      "animation_path_template": "textures/item/lightsaber/{id}.png.mcmeta"
+      "mcmeta_path_template": "textures/item/lightsaber/{id}.png.mcmeta"
     },
     {
       "id": "planets",

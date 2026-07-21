@@ -9,11 +9,30 @@ from __future__ import annotations
 
 import json
 import math
+import hashlib
+import io
+import os
+import tempfile
 from pathlib import Path
+
+from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_ROOT = ROOT / "src/main/resources/assets/galacticwars/geckolib/models/entity/vehicle"
+TEXTURE_ROOT = ROOT / "src/main/resources/assets/galacticwars/textures/entity/vehicle"
+
+
+def save_png(image: Image.Image, destination: Path) -> None:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=False)
+    descriptor, temporary_name = tempfile.mkstemp(dir=destination.parent, suffix=".png")
+    try:
+        with os.fdopen(descriptor, "wb") as temporary:
+            temporary.write(buffer.getvalue())
+        os.replace(temporary_name, destination)
+    finally:
+        Path(temporary_name).unlink(missing_ok=True)
 
 
 def cube(origin, size, *, rotation=None, pivot=None, inflate=None):
@@ -79,6 +98,9 @@ DETAILS = {
             cube([-3, 9.5, -28], [6, 1.5, 6], rotation=[-7, 0, 0], pivot=[0, 9, -24]),
             cube([-7, 7, 12], [14, 3, 9]),
             cube([-5, 6, 17], [10, 2, 6]),
+            cube([-6.5, 8.4, -35], [4.6, 1.8, 14], rotation=[-5, 0, -2], pivot=[-3.5, 9, -22]),
+            cube([1.9, 8.4, -35], [4.6, 1.8, 14], rotation=[-5, 0, 2], pivot=[3.5, 9, -22]),
+            cube([-1.8, 8.7, -25], [3.6, 1.2, 6]),
         ],
         "engine_left": [
             cube([-12, 4, 7], [6, 5, 6]),
@@ -106,6 +128,10 @@ DETAILS = {
             cube([-5, 18, 7], [10, 6, 4]),
             cube([-4, 34, -4], [8, 2, 8]),
             cube([-2, 24, -8.8], [4, 4, 1.2]),
+            cube([-7.2, 21.0, -8.0], [1.2, 13.0, 1.2], rotation=[0, 0, -5], pivot=[-6, 21, 0]),
+            cube([6.0, 21.0, -8.0], [1.2, 13.0, 1.2], rotation=[0, 0, 5], pivot=[6, 21, 0]),
+            cube([-7.0, 32.5, -8.0], [14, 1.2, 1.2]),
+            cube([-5.2, 20.5, 4.5], [10.4, 1.6, 5.0], rotation=[-8, 0, 0], pivot=[0, 21, 4]),
         ],
         "left_upper_leg": [
             cube([-8.5, 12, 0.5], [7, 7, 7]),
@@ -136,6 +162,8 @@ DETAILS = {
             cube([-4, 8, -23], [8, 2, 10], rotation=[-5, 0, 0], pivot=[0, 8, -16]),
             cube([-7, 5, 8], [14, 2, 8]),
             cube([-8, 4, 12], [16, 1.5, 7]),
+            cube([-2.8, 7.8, -29], [5.6, 1.5, 17], rotation=[-4, 0, 0], pivot=[0, 8, -15]),
+            cube([-1.8, 8.5, -32], [3.6, 1.0, 5]),
         ],
         "engine": [
             cube([-5, 5, 8], [10, 7, 6]),
@@ -164,6 +192,9 @@ DETAILS = {
             cube([10, 3, -19], [6, 8, 38], rotation=[0, 0, 5], pivot=[12, 7, 0]),
             cube([-11, 1, -25], [22, 4, 8]),
             cube([-10, 1, 18], [20, 5, 7]),
+            cube([-20, 10, -23], [8, 4, 13], rotation=[0, 8, -4], pivot=[-12, 10, -10]),
+            cube([12, 10, -23], [8, 4, 13], rotation=[0, -8, 4], pivot=[12, 10, -10]),
+            cube([-12, 11.5, -28], [24, 3.5, 10]),
         ],
         "turret": [
             cube([-8, 27, -10], [16, 4, 16]),
@@ -194,6 +225,10 @@ DETAILS = {
             cube([-17, 7, -17], [3, 12, 30]),
             cube([14, 7, -17], [3, 12, 30]),
             cube([-10, 14, 19], [20, 6, 9]),
+            cube([-12, 25.5, -39], [24, 6, 17], rotation=[8, 0, 0], pivot=[0, 25, -22]),
+            cube([-14.5, 6.5, 27], [29, 14, 2.0]),
+            cube([-13.5, 8.0, -19], [2.0, 11.0, 22.0]),
+            cube([11.5, 8.0, -19], [2.0, 11.0, 22.0]),
         ],
         "left_wing": [
             cube([-52, 20, -3], [36, 3, 14]),
@@ -300,6 +335,39 @@ def refine_model(vehicle_id: str, additions: dict[str, list[dict]]) -> int:
             atlas_height,
             f"{vehicle_id}/{bone_name} detail at {detail['origin']}",
         )
+    texture_path = TEXTURE_ROOT / f"{vehicle_id}.png"
+    with Image.open(texture_path) as source:
+        texture = source.convert("RGBA")
+
+    # Build set of pending tile texel coordinates to exclude from base color sampling
+    pending_texels = set()
+    for bone_name, detail, footprint in pending:
+        u, v = detail["uv"]
+        width, height = footprint
+        for py in range(v, v + height):
+            for px in range(u, u + width):
+                pending_texels.add((px, py))
+
+    visible_colors = [
+        texture.getpixel((x, y))[:3]
+        for y in range(texture.height)
+        for x in range(texture.width)
+        if (x, y) not in pending_texels
+        and texture.getpixel((x, y))[3]
+        and max(texture.getpixel((x, y))[:3]) > 22
+    ]
+    if not visible_colors:
+        raise ValueError(f"{vehicle_id} has no visible material colors")
+    base = tuple(sorted(channel)[len(channel) // 2] for channel in zip(*visible_colors))
+    for bone_name, detail, footprint in pending:
+        u, v = detail["uv"]
+        width, height = footprint
+        salt = int(hashlib.sha256(f"{vehicle_id}:{bone_name}:{detail['origin']}".encode()).hexdigest()[:8], 16)
+        for y in range(v, v + height):
+            for x in range(u, u + width):
+                amount = 24 if y == v else -20 if x in {u, u + width - 1} else ((salt + x * 7 + y * 11) % 9) - 4
+                texture.putpixel((x, y), tuple(max(0, min(255, channel + amount)) for channel in base) + (255,))
+    save_png(texture, texture_path)
     path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
     return added
 

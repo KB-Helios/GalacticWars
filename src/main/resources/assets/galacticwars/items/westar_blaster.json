@@ -1,1 +1,9 @@
-{"model":{"type":"minecraft:model","model":"galacticwars:item/westar_blaster"}}
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "galacticwars:item/westar_blaster",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
+  }
+}

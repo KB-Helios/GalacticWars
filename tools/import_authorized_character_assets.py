@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import json
 import hashlib
+import io
 import math
+import os
 import re
+import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +36,19 @@ ITEM_TEXTURES = ASSETS / "textures/item"
 SOURCE_INVENTORY = SOURCE_ROOT / "source_inventory.json"
 
 Policy = Literal["default", "include", "force", "exclude"]
+
+
+def save_png(image: Image.Image, destination: Path, *, optimize: bool = False) -> None:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=optimize)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(dir=destination.parent, suffix=".png")
+    try:
+        with os.fdopen(descriptor, "wb") as temporary:
+            temporary.write(buffer.getvalue())
+        os.replace(temporary_name, destination)
+    finally:
+        Path(temporary_name).unlink(missing_ok=True)
 GroupPolicy = Callable[[tuple[str, ...], dict], Policy]
 CubePolicy = Callable[[tuple[str, ...], dict, int], bool]
 
@@ -380,6 +396,65 @@ def add_component_bones(converted: ConvertedModel, components: Iterable[tuple[st
             bones.append({"name": name, "pivot": [0, 0, 0], "cubes": [], "parent": parent})
 
 
+def box_uv_footprint(size: Iterable[float]) -> tuple[int, int]:
+    width, height, depth = (max(1, int(math.ceil(float(value)))) for value in size)
+    return 2 * (width + depth), height + depth
+
+
+def allocate_transparent_box_uv(image: Image.Image, size: Iterable[float], label: str) -> list[int]:
+    footprint_width, footprint_height = box_uv_footprint(size)
+    for y in range(image.height - footprint_height, -1, -1):
+        for x in range(image.width - footprint_width, -1, -1):
+            if all(
+                    image.getpixel((u, v))[3] == 0
+                    for v in range(y, y + footprint_height)
+                    for u in range(x, x + footprint_width)):
+                return [x, y]
+    raise ValueError(f"No transparent {footprint_width}x{footprint_height} region for {label}")
+
+
+def append_landmark_box(
+        converted: ConvertedModel,
+        image: Image.Image,
+        name: str,
+        parent: str,
+        origin: Iterable[float],
+        size: Iterable[float],
+        color: tuple[int, int, int],
+        *,
+        pivot: Iterable[float] | None = None,
+        rotation: Iterable[float] | None = None,
+) -> None:
+    """Add a deterministic opaque box-UV landmark in unused atlas space."""
+    clean_size = clean_vector(size)
+    uv = allocate_transparent_box_uv(image, clean_size, name)
+    footprint_width, footprint_height = box_uv_footprint(clean_size)
+    for y in range(uv[1], uv[1] + footprint_height):
+        for x in range(uv[0], uv[0] + footprint_width):
+            shade = 14 if y == uv[1] else -12 if (x + y) % 7 == 0 else 0
+            image.putpixel((x, y), tuple(max(0, min(255, channel + shade)) for channel in color) + (255,))
+    cube = {"origin": clean_vector(origin), "size": clean_size, "uv": uv}
+    if pivot is not None:
+        cube["pivot"] = clean_vector(pivot)
+    if rotation is not None:
+        cube["rotation"] = clean_vector(rotation)
+    parent_pivots = {
+        "head": [0, 24, 0],
+        "helmet": [0, 24, 0],
+        "body": [0, 24, 0],
+        "right_arm": [-5, 22, 0],
+        "left_arm": [5, 22, 0],
+        "right_leg": [-2, 12, 0],
+        "left_leg": [2, 12, 0],
+    }
+    converted.geometry["minecraft:geometry"][0]["bones"].append({
+        "name": name,
+        "parent": parent,
+        "pivot": clean_vector(pivot if pivot is not None else parent_pivots.get(parent, (0, 24, 0))),
+        "cubes": [cube],
+    })
+
+
 def set_bone_pivot(converted: ConvertedModel, bone_name: str, pivot: Iterable[float]) -> None:
     bones = converted.geometry["minecraft:geometry"][0]["bones"]
     matches = [bone for bone in bones if bone["name"] == bone_name]
@@ -683,7 +758,7 @@ def write_species_composite_texture(
     head = alpha_composite_layers(head_layers, (150, 150))
     atlas.alpha_composite(head, (106, 0))
     destination.parent.mkdir(parents=True, exist_ok=True)
-    atlas.save(destination, optimize=False)
+    save_png(atlas, destination, optimize=False)
 
 
 def fill_required_faces(
@@ -749,7 +824,7 @@ def copy_animation(source_id: str, destination_id: str) -> None:
 def copy_rgba(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with Image.open(source) as image:
-        image.convert("RGBA").save(destination, optimize=False)
+        save_png(image.convert("RGBA"), destination, optimize=False)
 
 
 def paint_pixels(image: Image.Image, face: dict, predicate: Callable[[float, float], bool], color: tuple[int, int, int]) -> None:
@@ -827,7 +902,7 @@ def write_501st_texture(converted: ConvertedModel, destination: Path) -> None:
                 if direction in faces:
                     paint_pixels(image, faces[direction], lambda x, y: 0.32 < y < 0.62, blue)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    image.save(destination, optimize=False)
+    save_png(image, destination, optimize=False)
 
 
 def forge_commander_color() -> tuple[int, int, int]:
@@ -852,6 +927,7 @@ def write_clone_commander_texture(
 ) -> None:
     with Image.open(base_texture) as source:
         image = source.convert("RGBA")
+    soldier_alpha = image.getchannel("A").tobytes()
     commander = forge_commander_color()
     for path, element in converted.selected_elements:
         if "phase2" not in path and "phase_2" not in path:
@@ -861,9 +937,10 @@ def write_clone_commander_texture(
                 paint_pixels(image, face, lambda x, y: 0.42 <= x <= 0.58 and y <= 0.82, commander)
             elif direction in {"east", "west"}:
                 paint_pixels(image, face, lambda x, y: 0.34 <= x <= 0.66 and y <= 0.46, commander)
-    fill_converted_faces(image, converted, (188, 188, 185))
+    if image.getchannel("A").tobytes() != soldier_alpha:
+        raise ValueError("Commander markings changed the soldier alpha/UV mask")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    image.save(destination, optimize=False)
+    save_png(image, destination, optimize=False)
 
 
 MANDALORIAN_PALETTES = {
@@ -922,8 +999,27 @@ def write_mandalorian_texture(
                 target = light
                 factor = 0.72 + luminance / 850
             image.putpixel((x, y), tuple(min(255, round(channel * factor)) for channel in target) + (alpha,))
+    signal = {
+        "warrior": (30, 190, 181),
+        "marksman": (236, 111, 36),
+        "heavy": (92, 204, 231),
+        "clansperson": (201, 172, 92),
+    }[variant]
+    for y in range(image.height):
+        for x in range(image.width):
+            red, green, blue, alpha = image.getpixel((x, y))
+            if alpha == 0 or max(red, green, blue) < 45:
+                continue
+            marked = (
+                (variant == "warrior" and (x + 2 * y) % 29 < 2)
+                or (variant == "marksman" and (2 * x + y) % 31 < 2)
+                or (variant == "heavy" and y % 23 in {0, 1})
+                or (variant == "clansperson" and x % 27 in {0, 1})
+            )
+            if marked:
+                image.putpixel((x, y), tuple((channel + accent * 2) // 3 for channel, accent in zip((red, green, blue), signal)) + (alpha,))
     destination.parent.mkdir(parents=True, exist_ok=True)
-    image.save(destination, optimize=False)
+    save_png(image, destination, optimize=False)
 
 
 def add_sprite_marking(image: Image.Image, piece: str) -> None:
@@ -952,13 +1048,13 @@ def write_clone_item_icons() -> None:
     for piece, source_name in sources.items():
         with Image.open(GALAXIES_SOURCE / source_name) as source:
             phase_i = source.convert("RGBA")
-        phase_i.save(ITEM_TEXTURES / f"phase_i_clone_{piece}.png", optimize=False)
+        save_png(phase_i, ITEM_TEXTURES / f"phase_i_clone_{piece}.png", optimize=False)
 
         phase_ii_source = "ct_p2_helmet.png" if piece == "helmet" else source_name
         with Image.open(GALAXIES_SOURCE / phase_ii_source) as source:
             phase_ii = source.convert("RGBA")
         add_sprite_marking(phase_ii, piece)
-        phase_ii.save(ITEM_TEXTURES / f"republic_plastoid_{piece}.png", optimize=False)
+        save_png(phase_ii, ITEM_TEXTURES / f"republic_plastoid_{piece}.png", optimize=False)
 
 
 CLONE_COMPONENTS = (
@@ -1039,11 +1135,11 @@ def build_b1_assets() -> None:
         with Image.open(FORGE_SOURCE / texture_name) as source:
             texture = source.convert("RGBA")
         fill_converted_faces(texture, variant, fallback)
-        texture.save(ENTITY_TEXTURES / f"{asset_id}.png", optimize=False)
+        save_png(texture, ENTITY_TEXTURES / f"{asset_id}.png", optimize=False)
     with Image.open(FORGE_SOURCE / "droid_commander.png") as source:
         commander = source.convert("RGBA")
     fill_converted_faces(commander, converted, (105, 87, 62))
-    commander.save(ENTITY_TEXTURES / "b1_battle_droid_commander.png", optimize=False)
+    save_png(commander, ENTITY_TEXTURES / "b1_battle_droid_commander.png", optimize=False)
     copy_animation("b1_battle_droid", "b1_security_droid")
     copy_animation("b1_battle_droid", "separatist_technician")
 
@@ -1060,7 +1156,7 @@ def build_republic_guard_assets() -> None:
         with Image.open(GALAXIES_SOURCE / texture_name) as source:
             texture = source.convert("RGBA")
         fill_required_faces(texture, converted.selected_elements, underlayer)
-        texture.save(ENTITY_TEXTURES / f"{asset_id}.png", optimize=False)
+        save_png(texture, ENTITY_TEXTURES / f"{asset_id}.png", optimize=False)
         copy_animation("republic_civilian", asset_id)
         adapt_animation_bones(asset_id, {
             "hair": "head",
@@ -1090,7 +1186,6 @@ def build_species_composite(
     converted = merge_species_geometry(asset_id, body, head)
     if head_pivot is not None:
         set_bone_pivot(converted, "head", head_pivot)
-    write_model(ENTITY_MODELS / f"{asset_id}.geo.json", converted)
     texture_path = ENTITY_TEXTURES / f"{asset_id}.png"
     write_species_composite_texture(
         texture_path,
@@ -1103,7 +1198,21 @@ def build_species_composite(
     with Image.open(texture_path) as source:
         texture = source.convert("RGBA")
     fill_converted_faces(texture, converted, fallback)
-    texture.save(texture_path, optimize=False)
+    if asset_id == "togruta_civilian":
+        append_landmark_box(converted, texture, "right_montral", "head", (-4.4, 29.5, -1.2), (2.3, 7.0, 2.5), (218, 222, 209), pivot=(-3.0, 29.5, 0), rotation=(0, 0, -12))
+        append_landmark_box(converted, texture, "left_montral", "head", (2.1, 29.5, -1.2), (2.3, 7.0, 2.5), (218, 222, 209), pivot=(3.0, 29.5, 0), rotation=(0, 0, 12))
+        append_landmark_box(converted, texture, "center_lekku", "head", (-1.35, 17.0, 3.4), (2.7, 13.5, 2.3), (203, 213, 220), pivot=(0, 28, 3.5), rotation=(-4, 0, 0))
+        append_landmark_box(converted, texture, "right_lekku", "head", (-4.5, 15.5, 1.6), (2.4, 14.5, 2.5), (201, 211, 219), pivot=(-3.0, 28, 2.5), rotation=(-3, 0, -7))
+        append_landmark_box(converted, texture, "left_lekku", "head", (2.1, 15.5, 1.6), (2.4, 14.5, 2.5), (201, 211, 219), pivot=(3.0, 28, 2.5), rotation=(-3, 0, 7))
+    elif asset_id == "smuggler":
+        append_landmark_box(converted, texture, "duros_cranium", "head", (-3.8, 29.0, -2.6), (7.6, 3.4, 6.6), (51, 105, 154))
+        append_landmark_box(converted, texture, "duros_brow", "head", (-3.5, 27.3, -4.55), (7.0, 1.15, 0.65), (118, 36, 34))
+    elif asset_id == "hutt_civilian":
+        append_landmark_box(converted, texture, "rodian_muzzle", "head", (-2.0, 25.4, -5.8), (4.0, 2.5, 2.2), (65, 126, 62))
+        append_landmark_box(converted, texture, "right_antenna", "head", (-3.1, 31.0, -0.5), (0.7, 3.8, 0.7), (86, 151, 77), pivot=(-2.7, 31, 0), rotation=(0, 0, -8))
+        append_landmark_box(converted, texture, "left_antenna", "head", (2.4, 31.0, -0.5), (0.7, 3.8, 0.7), (86, 151, 77), pivot=(2.7, 31, 0), rotation=(0, 0, 8))
+    save_png(texture, texture_path, optimize=False)
+    write_model(ENTITY_MODELS / f"{asset_id}.geo.json", converted)
 
 
 def build_species_assets() -> None:
@@ -1166,9 +1275,15 @@ def build_trandoshan_asset() -> None:
         "hutt_enforcer",
         group_policy=trandoshan_group_policy,
     )
-    set_model_identity(converted, "hutt_enforcer", 128, 128)
-    write_model(ENTITY_MODELS / "hutt_enforcer.geo.json", converted)
-    texture = alpha_composite_layers((
+    # The source horn edit handles sit above the cranium. Lower the authored horn
+    # cluster as a unit so the scales connect to the skull instead of floating.
+    for bone in converted.geometry["minecraft:geometry"][0]["bones"]:
+        if bone["name"] == "horns1" or bone.get("parent") == "horns1":
+            bone["pivot"][1] = clean_number(float(bone["pivot"][1]) - 2.25)
+            for horn_cube in bone.get("cubes", []):
+                horn_cube["origin"][1] = clean_number(float(horn_cube["origin"][1]) - 2.25)
+    set_model_identity(converted, "hutt_enforcer", 256, 256)
+    source_texture = alpha_composite_layers((
         "trandoshan_skin.png",
         "trandoshan_jumpsuit.png",
         "trandoshan_vest.png",
@@ -1176,8 +1291,14 @@ def build_trandoshan_asset() -> None:
         "trandoshan_eyes_yellow.png",
         "trandoshan_mouth.png",
     ), (150, 150)).crop((0, 0, 128, 128))
+    texture = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    texture.alpha_composite(source_texture, (0, 0))
     fill_required_faces(texture, converted.selected_elements, (64, 73, 42))
-    texture.save(ENTITY_TEXTURES / "hutt_enforcer.png", optimize=False)
+    append_landmark_box(converted, texture, "trandoshan_muzzle", "head", (-3.0, 24.7, -6.0), (6.0, 3.0, 2.5), (88, 108, 52))
+    append_landmark_box(converted, texture, "right_brow_scale", "head", (-3.8, 28.2, -4.8), (3.2, 1.2, 0.75), (151, 159, 77), pivot=(-2, 28, -4.4), rotation=(0, 0, -8))
+    append_landmark_box(converted, texture, "left_brow_scale", "head", (0.6, 28.2, -4.8), (3.2, 1.2, 0.75), (151, 159, 77), pivot=(2, 28, -4.4), rotation=(0, 0, 8))
+    save_png(texture, ENTITY_TEXTURES / "hutt_enforcer.png", optimize=False)
+    write_model(ENTITY_MODELS / "hutt_enforcer.geo.json", converted)
     adapt_animation_bones("hutt_enforcer", {
         "chest_armor": "body",
         "harness": "body",
@@ -1202,8 +1323,26 @@ def build_mandalorian_assets() -> None:
         # The source helmet group uses a horn-editing handle near ground level.
         # GeckoLib needs the head center so helmet motion turns in place.
         set_bone_pivot(converted, "helmet", (0, 24, 0))
+        texture_path = ENTITY_TEXTURES / f"{asset_id}.png"
+        write_mandalorian_texture(variant, converted, texture_path)
+        with Image.open(texture_path) as source:
+            original_texture = source.convert("RGBA")
+        texture = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+        texture.alpha_composite(original_texture, (0, 0))
+        set_model_identity(converted, asset_id, 256, 256)
+        accent = MANDALORIAN_PALETTES[variant][1]
+        append_landmark_box(converted, texture, "t_visor_brow", "helmet", (-3.5, 27.7, -4.75), (7.0, 1.1, 0.7), (12, 17, 20))
+        append_landmark_box(converted, texture, "t_visor_drop", "helmet", (-0.7, 24.5, -4.8), (1.4, 3.4, 0.75), (12, 17, 20))
+        append_landmark_box(converted, texture, "rangefinder", "helmet", (4.15, 27.0, -0.8), (0.9, 5.0, 1.2), accent)
+        append_landmark_box(converted, texture, "jetpack", "body", (-2.8, 15.0, 2.4), (5.6, 7.4, 2.4), MANDALORIAN_PALETTES[variant][0])
+        if variant == "marksman":
+            append_landmark_box(converted, texture, "marksman_cape", "body", (1.0, 8.5, 2.3), (4.0, 13.0, 0.7), accent, pivot=(2.5, 20, 2.4), rotation=(0, 0, -4))
+        elif variant == "heavy":
+            append_landmark_box(converted, texture, "heavy_pauldron", "right_arm", (-9.6, 18.0, -3.0), (6.2, 5.8, 6.0), MANDALORIAN_PALETTES[variant][2])
+        elif variant == "clansperson":
+            append_landmark_box(converted, texture, "utility_pack", "body", (-3.3, 14.5, 2.3), (6.6, 5.0, 2.1), MANDALORIAN_PALETTES[variant][0])
+        save_png(texture, texture_path, optimize=False)
         write_model(ENTITY_MODELS / f"{asset_id}.geo.json", converted)
-        write_mandalorian_texture(variant, converted, ENTITY_TEXTURES / f"{asset_id}.png")
         if variant == "clansperson":
             adapt_animation_bones(asset_id, {
                 "hair": "head",
