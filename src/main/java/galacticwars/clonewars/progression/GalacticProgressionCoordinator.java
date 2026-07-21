@@ -123,6 +123,9 @@ public final class GalacticProgressionCoordinator {
 
     /** Shared authoritative predicate used by campaign commits and player-facing progress views. */
     public static boolean objectiveComplete(ProgressionState state, String objective) {
+        if (state == null) {
+            return false;
+        }
         return switch (objective) {
             case "faction_pledged" -> !state.factionId().isEmpty();
             case "command_center", "forward_base", "supply_depot" ->

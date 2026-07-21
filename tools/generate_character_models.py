@@ -906,6 +906,15 @@ def write_recruit_animation(design: RecruitDesign, builder: ModelBuilder) -> Non
     """Write a distinct locomotion set that exercises the authored child rig."""
     seed = int(hashlib.sha256(design.id.encode("utf-8")).hexdigest()[:4], 16)
     idle_tilt = 1.0 + (seed % 5) * 0.35
+    if design.style.startswith("droid"):
+        idle_length = 1.6
+    elif design.style == "robe":
+        idle_length = 2.4
+    elif design.style == "civilian":
+        idle_length = 2.8
+    else:
+        idle_length = 2.0
+    idle_midpoint = idle_length / 2
     stride = 22 + seed % 9
     attack = 82 + seed % 15
     child_idle: dict[str, dict] = {}
@@ -969,8 +978,12 @@ def write_recruit_animation(design: RecruitDesign, builder: ModelBuilder) -> Non
     animations = {
         "format_version": "1.8.0",
         "animations": {
-            "misc.idle": {"loop": True, "animation_length": 3.0 + (seed % 3) * 0.1, "bones": {
-                "head": {"rotation": {"0.0": [0, -2, 0], "1.0": [0, 2, 0], "2.0": [0, -2, 0]}},
+            "misc.idle": {"loop": True, "animation_length": idle_length, "bones": {
+                "head": {"rotation": {
+                    "0.0": [0, -2, 0],
+                    f"{idle_midpoint:.1f}": [0, 2, 0],
+                    f"{idle_length:.1f}": [0, -2, 0],
+                }},
                 **child_idle,
             }},
             "move.walk": {"loop": True, "animation_length": 1.0, "bones": walk_bones},

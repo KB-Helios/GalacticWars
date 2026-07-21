@@ -355,6 +355,14 @@ def add_component_bones(converted: ConvertedModel, components: Iterable[tuple[st
             bones.append({"name": name, "pivot": [0, 0, 0], "cubes": [], "parent": parent})
 
 
+def set_bone_pivot(converted: ConvertedModel, bone_name: str, pivot: Iterable[float]) -> None:
+    bones = converted.geometry["minecraft:geometry"][0]["bones"]
+    matches = [bone for bone in bones if bone["name"] == bone_name]
+    if len(matches) != 1:
+        raise ValueError(f"Expected one {bone_name} bone, found {len(matches)}")
+    matches[0]["pivot"] = clean_vector(pivot)
+
+
 def split_cube_y(cube: dict, split_y: float) -> tuple[dict, dict]:
     """Split one authored limb cuboid at a joint while preserving its face texture regions."""
     origin_y = float(cube["origin"][1])
@@ -684,6 +692,10 @@ def build_clone_assets() -> None:
             group_policy=clone_group_policy(phase, arc),
         )
         add_component_bones(converted, CLONE_COMPONENTS)
+        if arc:
+            # The source kama group inherits a modeling-handle origin far to the side.
+            # Rotate both authored panels around the wearer's hips instead.
+            set_bone_pivot(converted, "kama", (0, 12, 0))
         write_model(ENTITY_MODELS / f"{asset_id}.geo.json", converted)
         if phase == 1:
             copy_rgba(GALAXIES_SOURCE / "Clone Trooper.png", ENTITY_TEXTURES / f"{asset_id}.png")
@@ -734,6 +746,9 @@ def build_mandalorian_assets() -> None:
             asset_id,
             group_policy=mandalorian_group_policy(variant),
         )
+        # The source helmet group uses a horn-editing handle near ground level.
+        # GeckoLib needs the head center so helmet motion turns in place.
+        set_bone_pivot(converted, "helmet", (0, 24, 0))
         write_model(ENTITY_MODELS / f"{asset_id}.geo.json", converted)
         write_mandalorian_texture(variant, converted, ENTITY_TEXTURES / f"{asset_id}.png")
         if variant == "clansperson":

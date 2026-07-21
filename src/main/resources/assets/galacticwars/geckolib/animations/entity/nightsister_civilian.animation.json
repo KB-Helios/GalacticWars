@@ -3,7 +3,7 @@
   "animations": {
     "misc.idle": {
       "loop": true,
-      "animation_length": 3.2,
+      "animation_length": 2.8,
       "bones": {
         "head": {
           "rotation": {
@@ -12,12 +12,12 @@
               -2,
               0
             ],
-            "1.0": [
+            "1.4": [
               0,
               2,
               0
             ],
-            "2.0": [
+            "2.8": [
               0,
               -2,
               0

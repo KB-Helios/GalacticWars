@@ -106,6 +106,8 @@ public final class RecruitTextureAtlasTest {
         assertContains(animation, "\"move.walk\"", recruit + " walk animation");
         assertContains(animation, "\"attack.swing\"", recruit + " attack animation");
         validatesNamedSilhouette(recruit, geometry);
+        validatesRigPivots(recruit, geometry);
+        validatesIdleDuration(recruit, animation);
 
         BufferedImage egg = ImageIO.read(ASSET_ROOT.resolve(
                 "textures/item/" + recruit + "_spawn_egg.png").toFile());
@@ -198,6 +200,60 @@ public final class RecruitTextureAtlasTest {
                 "geckolib/animations/entity/",
                 ".animation.json",
                 "humanoid, droid, brute, robed, civilian, and clone animation families");
+    }
+
+    private static void validatesRigPivots(String recruit, String geometry) {
+        if (recruit.equals("arc_trooper") || recruit.equals("phase_i_arc_trooper")) {
+            assertBonePivot(geometry, "kama", 0, 12, 0, recruit);
+        }
+        if (recruit.startsWith("mandalorian_")) {
+            assertBonePivot(geometry, "helmet", 0, 24, 0, recruit);
+        }
+    }
+
+    private static void validatesIdleDuration(String recruit, String animation) {
+        int idleName = animation.indexOf("\"misc.idle\"");
+        int idleStart = animation.indexOf('{', idleName);
+        if (idleName < 0 || idleStart < 0) {
+            throw new AssertionError(recruit + " idle animation object missing");
+        }
+        String idle = animation.substring(idleStart, matchingBrace(animation, idleStart) + 1);
+        Pattern idleLength = Pattern.compile(
+                "\\\"animation_length\\\"\\s*:\\s*([0-9.]+)");
+        Matcher lengthMatcher = idleLength.matcher(idle);
+        if (!lengthMatcher.find()) {
+            throw new AssertionError(recruit + " idle animation length declaration missing");
+        }
+        double animationLength = Double.parseDouble(lengthMatcher.group(1));
+        Matcher timestamps = Pattern.compile("\\\"([0-9]+(?:\\.[0-9]+)?)\\\"\\s*:").matcher(idle);
+        double lastKeyframe = -1;
+        while (timestamps.find()) {
+            lastKeyframe = Math.max(lastKeyframe, Double.parseDouble(timestamps.group(1)));
+        }
+        assertDoubleEquals(animationLength, lastKeyframe,
+                recruit + " idle duration must end with its final keyframes");
+    }
+
+    private static void assertBonePivot(
+            String geometry,
+            String bone,
+            double expectedX,
+            double expectedY,
+            double expectedZ,
+            String recruit
+    ) {
+        Pattern pivot = Pattern.compile(
+                "\\\"name\\\"\\s*:\\s*\\\"" + Pattern.quote(bone)
+                        + "\\\"\\s*,\\s*\\\"pivot\\\"\\s*:\\s*\\[\\s*"
+                        + "(-?[0-9.]+)\\s*,\\s*(-?[0-9.]+)\\s*,\\s*(-?[0-9.]+)\\s*]",
+                Pattern.DOTALL);
+        Matcher matcher = pivot.matcher(geometry);
+        if (!matcher.find()) {
+            throw new AssertionError(recruit + " " + bone + " pivot declaration missing");
+        }
+        assertDoubleEquals(expectedX, Double.parseDouble(matcher.group(1)), recruit + " " + bone + " pivot x");
+        assertDoubleEquals(expectedY, Double.parseDouble(matcher.group(2)), recruit + " " + bone + " pivot y");
+        assertDoubleEquals(expectedZ, Double.parseDouble(matcher.group(3)), recruit + " " + bone + " pivot z");
     }
 
     private static void validatesArmorAssetSet(String family) throws IOException {
@@ -714,6 +770,12 @@ public final class RecruitTextureAtlasTest {
 
     private static void assertEquals(int expected, int actual, String label) {
         if (expected != actual) {
+            throw new AssertionError(label + " expected <" + expected + "> but was <" + actual + ">");
+        }
+    }
+
+    private static void assertDoubleEquals(double expected, double actual, String label) {
+        if (Math.abs(expected - actual) > 0.00001) {
             throw new AssertionError(label + " expected <" + expected + "> but was <" + actual + ">");
         }
     }

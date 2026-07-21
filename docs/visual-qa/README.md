@@ -31,10 +31,10 @@ instance and YACL plus GeckoLib enabled.
 ## Automated gates
 
 - `clean build`: passed on 2026-07-14.
-- `runGameTestServer`: 46/46 required GameTests passed, including direct
+- `runGameTestServer`: 55/55 required GameTests passed, including direct
   Command Center player interaction, all five campaign paths, NPC brains,
   vehicles, Force abilities, multiplayer authority, travel, and persistence.
-- Spawn eggs: all 20 registry entries passed player-game-mode interaction,
+- Spawn eggs: all 22 registry entries passed player-game-mode interaction,
   entity-type component, persistence, loadout/archetype, creative/survival,
   replaceable-block, custom-name, stack-consumption, and spawner checks.
 - Assets: every authored item model has a modern item definition and every
