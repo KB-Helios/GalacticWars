@@ -4,6 +4,8 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
@@ -30,30 +32,7 @@ public final class LightsaberAssetIntegrationTest {
         require(transformTranslationContains(base, "firstperson_righthand", 0.45, 0.8, -0.65),
                 "first-person saber transform must center the hand on the hilt pivot");
 
-        String geometry = json(ASSETS.resolve("geckolib/models/item/lightsaber.geo.json"));
-        require(geometry.contains("geometry.galacticwars.item.lightsaber"),
-                "lightsaber must own a GeckoLib geometry identifier");
-        require(geometry.contains("\"texture_width\": 256")
-                        && geometry.contains("\"texture_height\": 256"),
-                "lightsaber must use the high-density 256x256 UV frame");
-        require(geometry.contains("\"name\": \"hilt\"")
-                        && geometry.contains("\"name\": \"blade\""),
-                "lightsaber model must separate hilt and blade bones");
-        require(occurrences(geometry, "\"origin\"") >= 24,
-                "lightsaber model must contain detailed segmented hilt and layered blade geometry");
-        require(geometry.contains("36.0") && geometry.contains("36.1"),
-                "lightsaber energy blade must retain the long 36-unit profile");
-        require(hiltSpansHandPivot(geometry),
-                "lightsaber hilt must straddle the hand origin instead of starting above it");
-        require(Pattern.compile(
-                        "\\\"name\\\"\\s*:\\s*\\\"blade\\\"(?s:.*?)"
-                                + "\\\"pivot\\\"\\s*:\\s*\\[\\s*0(?:\\.0)?\\s*,\\s*5(?:\\.0)?\\s*,\\s*0(?:\\.0)?\\s*]")
-                        .matcher(geometry).find(),
-                "lightsaber blade pivot must follow the recentered hilt tip");
-        require(json(ASSETS.resolve("geckolib/animations/item/lightsaber.animation.json"))
-                        .contains("animation.lightsaber.idle"),
-                "lightsaber must expose a GeckoLib idle animation");
-
+        Set<Integer> geometryHashes = new HashSet<>();
         for (String color : COLORS) {
             String definition = json(ASSETS.resolve("items/" + color + "_lightsaber.json"));
             require(
@@ -71,6 +50,30 @@ public final class LightsaberAssetIntegrationTest {
             image("textures/item/lightsaber/" + color + ".png", 256, 1024, true);
             image("textures/item/lightsaber/" + color + "_glowmask.png", 256, 1024, true);
 
+            String geometry = json(ASSETS.resolve(
+                    "geckolib/models/item/lightsaber/" + color + ".geo.json"));
+            require(geometry.contains("geometry.galacticwars.item.lightsaber." + color),
+                    color + " lightsaber must own a stable geometry identifier");
+            require(geometry.contains("\"texture_width\": 256")
+                            && geometry.contains("\"texture_height\": 256")
+                            && geometry.contains("\"name\": \"hilt\"")
+                            && geometry.contains("\"name\": \"blade\""),
+                    color + " lightsaber geometry and atlas contract");
+            require(occurrences(geometry, "\"origin\"") >= 26
+                            && geometry.contains("36.0") && geometry.contains("36.1"),
+                    color + " must retain a detailed original hilt and long blade");
+            require(hiltSpansHandPivot(geometry), color + " hilt must straddle the hand origin");
+            require(Pattern.compile(
+                            "\\\"name\\\"\\s*:\\s*\\\"blade\\\"(?s:.*?)"
+                                    + "\\\"pivot\\\"\\s*:\\s*\\[\\s*0(?:\\.0)?\\s*,\\s*5(?:\\.0)?\\s*,\\s*0(?:\\.0)?\\s*]")
+                            .matcher(geometry).find(),
+                    color + " blade pivot contract");
+            geometryHashes.add(java.util.Arrays.hashCode(geometry.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            require(json(ASSETS.resolve(
+                    "geckolib/animations/item/lightsaber/" + color + ".animation.json"))
+                            .contains("animation.lightsaber.idle"),
+                    color + " GeckoLib idle animation");
+
             String animation = json(
                     ASSETS.resolve("textures/item/lightsaber/" + color + ".png.mcmeta"));
             require(animation.contains("\"frametime\": 2"), color + " blade animation speed");
@@ -79,6 +82,7 @@ public final class LightsaberAssetIntegrationTest {
                             "textures/item/lightsaber/" + color + "_glowmask.png.mcmeta")),
                     color + " glowmask animation metadata");
         }
+        require(geometryHashes.size() == COLORS.size(), "every lightsaber color must own distinct hilt geometry");
 
         String itemClass = Files.readString(Path.of(
                 "src/main/java/galacticwars/clonewars/item/LightsaberItem.java"));

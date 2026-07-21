@@ -459,3 +459,40 @@ safety system during output moderation (request ID
 above replaced it. Visual validation confirmed distinct early/late and line/specialist clone silhouettes,
 skeletal/heavy/agile droid proportions, family-specific child rigs, twenty or more non-zero cuboids per
 NPC, and unique texture and animation hashes across all twenty-two sets.
+
+## 2026-07-21 complete 3D visual-overhaul concepts
+
+These project-bound boards are silhouette/material references only; no generated pixels ship as
+runtime textures. Final geometry, UVs, atlases, glowmasks, definitions, and transforms are deterministic
+outputs of the repository Python tools. Existing upstream-derived work retains the pinned source,
+GPL-compatible licensing, authorization, and transformation records above.
+
+| Board | Built-in output | SHA-256 | Final use |
+| --- | --- | --- | --- |
+| `tools/source_art/generated_concepts/2026-07-21/clone_wars_character_turnarounds_v1.png` | `exec-981484d3-ddc9-40e6-8ee2-f788d80c331e.png` | `c75c8566512c7c73aa069da5dfedd6a9904b67e40d087ad371180f94160125aa` | Robes, droid landmarks, bounty gear, Dathomirian cloth/horns, and Togruta head-tails. |
+| `tools/source_art/generated_concepts/2026-07-21/clone_wars_vehicle_turnarounds_v1.png` | `exec-f89fb0fd-b489-45e5-b4b0-17dfa159c2a3.png` | `80f84fc5b74b24ab5c58842f0f74c38d5eaff5c0693b803974c8ecfc255c0c5c` | Forked speeder, open walker, narrow platform, crescent tank, and angular gunship massing. |
+| `tools/source_art/generated_concepts/2026-07-21/clone_wars_equipment_turnarounds_v1.png` | `exec-3abfa4e7-b4bf-4184-91c4-4aa3a8b53d6e.png` | `a808c9d6f0185acc31628da7cfb9649b150c1748cb9f4ac002c323c84f646590` | Volumetric blasters, distinct saber hilts, Mandalorian, cloth, and mechanical armor. |
+
+Successful prompts:
+
+```text
+Create a stylized orthographic turnaround concept sheet for an original block-built galactic voxel game. Show nine distinct unnamed archetypes in front, side, and back views: a layered-robed energy-sword field guardian; a bulky blue-gray combat automaton with an integrated right forearm cannon; a slender agile tan command automaton with a narrow angular head; an armored frontier tracker; a practical city civilian; a crimson-and-charcoal mystic acolyte in layered cloth wraps and hood; a mystic archer with quiver and asymmetric skirt; a muscular horned warrior with geometric facial and body markings; and an orange-skinned civilian with immediately readable striped head crests and three long head tails. Chunky Minecraft-compatible voxel construction, animated-series silhouette language, pixel-material readability at gameplay distance, neutral A-pose, consistent scale, light gray studio grid. Emphasize landmark geometry and clean material zones. Original designs only. No text, labels, logos, watermark, photorealism, blood, or combat scene.
+```
+
+```text
+Create an original stylized orthographic vehicle concept sheet for a block-built galactic voxel game. Five distinct vehicles, each shown in front, side, top, and rear views on a light gray studio grid: a very fast forked-nose scout speeder bike with exposed saddle and rear vanes; an open-cockpit two-legged reconnaissance walker with articulated knees and chin blaster; a narrow single-rider vertical hover platform with small steering forks; a low crescent-hulled repulsor battle tank with central turret and side cannons; and a broad angular troop gunship with open side doors, short wings, missile pods, bubble turrets, and rear ramp. Chunky Minecraft-compatible geometry, clear animated-series silhouettes, readable scale, practical panel separation, original designs. No text, labels, logos, watermark, photorealism, characters, or battle scene.
+```
+
+```text
+Create an original stylized orthographic equipment concept sheet for a block-built galactic voxel game. On a light gray studio grid show four distinct volumetric energy rifles in front/side/top views: a long heavy service rifle with squared stock and blue power cell; a compact tan mechanical carbine with skeletal barrel; a twin-grip chrome frontier pistol with angular muzzle; and a short broad scatter carbine with vented receiver. Also show six long energy-sword hilts, each with a different era-authentic silhouette: ridged silver-blue, black-and-brass green, ornate silver-purple, dark clawed red, temple-guard gold, and clean pearl-white; blades are not shown. Include three wearable armor silhouettes: layered plate-and-cloth jetpack armor with strong T-shaped visor, layered crimson mystic wraps with hood and split skirt, and a coherent angular graphite mechanical exosuit. Chunky Minecraft-compatible voxel geometry, readable pixel-material zones, original designs, no text, labels, logos, watermark, photorealism, hands, or characters.
+```
+
+The first franchise-worded character attempt was rejected during output moderation (request ID
+`11465710-c5b7-482a-8a83-87a61e96b358`); no output was retained. References were the repository's
+authorized intake, current QA captures, and the project-authorized era direction; no unlicensed
+third-party mod asset or external reference image was introduced.
+
+Runtime resolutions are 256x256 for rebuilt/import-refined NPCs, 1024x1024 for original wearable
+armor, 256x256 per blaster atlas/glowmask, 256x1024 per animated saber atlas/glowmask, and 256x256 for
+vehicles. Clone/guard/B1 assets retain stronger authored 128x128 or 128x64 resolution. Commander
+markings start from an exact soldier RGBA copy and generation rejects any alpha-mask change.

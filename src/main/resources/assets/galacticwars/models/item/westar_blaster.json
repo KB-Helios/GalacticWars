@@ -1,28 +1,126 @@
 {
-  "parent": "galacticwars:item/dc15_blaster",
-  "textures": {
-    "layer0": "galacticwars:item/westar_blaster_hq"
-  },
+  "parent": "builtin/entity",
+  "ambientocclusion": false,
+  "gui_light": "front",
   "display": {
     "thirdperson_righthand": {
-      "rotation": [-90, 0, -62],
-      "translation": [3.2, 1.2, -3],
-      "scale": [0.74, 0.74, 0.74]
+      "rotation": [
+        -8,
+        -88,
+        -8
+      ],
+      "translation": [
+        0.4,
+        2.6,
+        -1.2
+      ],
+      "scale": [
+        0.66,
+        0.66,
+        0.66
+      ]
     },
     "thirdperson_lefthand": {
-      "rotation": [-90, 0, 28],
-      "translation": [3.2, 1.2, -3],
-      "scale": [0.74, 0.74, 0.74]
+      "rotation": [
+        -8,
+        88,
+        8
+      ],
+      "translation": [
+        -0.4,
+        2.6,
+        -1.2
+      ],
+      "scale": [
+        0.66,
+        0.66,
+        0.66
+      ]
     },
     "firstperson_righthand": {
-      "rotation": [-90, 0, -58],
-      "translation": [3.35, 3.65, 1.13],
-      "scale": [0.72, 0.72, 0.72]
+      "rotation": [
+        0,
+        -92,
+        -4
+      ],
+      "translation": [
+        1.2,
+        2.8,
+        0.6
+      ],
+      "scale": [
+        0.5800000000000001,
+        0.5800000000000001,
+        0.5800000000000001
+      ]
     },
     "firstperson_lefthand": {
-      "rotation": [-90, 0, 32],
-      "translation": [3.35, 3.65, 1.13],
-      "scale": [0.72, 0.72, 0.72]
+      "rotation": [
+        0,
+        92,
+        4
+      ],
+      "translation": [
+        -1.2,
+        2.8,
+        0.6
+      ],
+      "scale": [
+        0.5800000000000001,
+        0.5800000000000001,
+        0.5800000000000001
+      ]
+    },
+    "gui": {
+      "rotation": [
+        24,
+        225,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.55,
+        0.55,
+        0.55
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "translation": [
+        0,
+        2,
+        0
+      ],
+      "scale": [
+        0.42,
+        0.42,
+        0.42
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        90,
+        15
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.58,
+        0.58,
+        0.58
+      ]
     }
   }
 }

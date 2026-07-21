@@ -323,5 +323,7 @@ if __name__ == "__main__":
     # hilt/blade textures above.
     from generate_lightsaber_model import generate_all as generate_lightsaber_assets
     generate_lightsaber_assets()
+    from generate_blaster_models import generate_all as generate_blaster_assets
+    generate_blaster_assets()
     armor_families()
     armor_item_icons()

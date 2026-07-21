@@ -1,5 +1,14 @@
 package galacticwars.clonewars.combat;
 
+import com.geckolib.animatable.GeoItem;
+import com.geckolib.animatable.client.GeoRenderProvider;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.animation.AnimationController;
+import com.geckolib.animation.RawAnimation;
+import com.geckolib.renderer.GeoItemRenderer;
+import com.geckolib.util.GeckoLibUtil;
+import galacticwars.clonewars.client.render.GalacticBlasterRenderer;
 import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.registry.ModDataComponents;
 import net.minecraft.network.chat.Component;
@@ -19,21 +28,65 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 
-public final class BlasterItem extends Item {
+public final class BlasterItem extends Item implements GeoItem {
+    private static final RawAnimation IDLE =
+            RawAnimation.begin().thenLoop("animation.blaster.idle");
+
+    private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+    private final String visualId;
     private final double damage;
     private final float velocity;
     private final float inaccuracy;
 
-    public BlasterItem(Properties properties, double damage, float velocity, float inaccuracy) {
+    public BlasterItem(
+            String visualId,
+            Properties properties,
+            double damage,
+            float velocity,
+            float inaccuracy
+    ) {
         super(properties.stacksTo(1));
         if (damage <= 0.0D || velocity <= 0.0F || inaccuracy < 0.0F) {
             throw new IllegalArgumentException("Invalid blaster tuning");
         }
+        this.visualId = Objects.requireNonNull(visualId, "visualId");
         this.damage = damage;
         this.velocity = velocity;
         this.inaccuracy = inaccuracy;
+        GeoItem.registerSyncedAnimatable(this);
+    }
+
+    public String visualId() {
+        return this.visualId;
+    }
+
+    @Override
+    public void createGeoRenderer(Consumer<GeoRenderProvider> consumer) {
+        consumer.accept(new GeoRenderProvider() {
+            private GeoItemRenderer<?> renderer;
+
+            @Override
+            public GeoItemRenderer<?> getGeoItemRenderer() {
+                if (this.renderer == null) {
+                    this.renderer = new GalacticBlasterRenderer(BlasterItem.this);
+                }
+                return this.renderer;
+            }
+        });
+    }
+
+    @Override
+    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+        controllers.add(new AnimationController<>("blaster", 2, state -> state.setAndContinue(IDLE)));
+    }
+
+    @Override
+    public AnimatableInstanceCache getAnimatableInstanceCache() {
+        return this.cache;
     }
 
     @Override

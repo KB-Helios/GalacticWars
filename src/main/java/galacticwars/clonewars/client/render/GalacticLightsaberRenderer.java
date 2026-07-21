@@ -7,12 +7,11 @@ import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.item.LightsaberItem;
 import net.minecraft.resources.Identifier;
 
-/** Renders the shared long-blade model with the item's color atlas and full-bright glowmask. */
+/** Renders a color-specific era-authentic hilt with the shared long-blade contract. */
 public final class GalacticLightsaberRenderer extends GeoItemRenderer<LightsaberItem> {
     public GalacticLightsaberRenderer(LightsaberItem item) {
         super(new DefaultedItemGeoModel<LightsaberItem>(
-                Identifier.fromNamespaceAndPath(GalacticWars.MODID, "lightsaber"))
-                .withAltTexture(Identifier.fromNamespaceAndPath(
+                Identifier.fromNamespaceAndPath(
                         GalacticWars.MODID, "lightsaber/" + item.colorId())));
         this.withRenderLayer(new AutoGlowingGeoLayer<>(this));
         this.useAlternateGuiLighting();

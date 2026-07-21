@@ -23,9 +23,7 @@ public final class AssetManifestCompletenessTest {
             "field_command_and_deployment");
     private static final Set<String> SOURCE_128_UNITS = Set.of(
             "clone_trooper", "arc_trooper", "phase_i_clone_trooper", "phase_i_arc_trooper",
-            "mandalorian_warrior", "mandalorian_marksman", "mandalorian_heavy",
-            "mandalorian_clansperson", "senate_commando", "republic_honor_guard",
-            "hutt_enforcer");
+            "senate_commando", "republic_honor_guard");
     private static final Set<String> SOURCE_128_BY_64_UNITS = Set.of(
             "b1_battle_droid", "b1_security_droid", "separatist_technician");
     private static final List<String> FACTIONS = List.of(
@@ -236,8 +234,20 @@ public final class AssetManifestCompletenessTest {
         if (!Files.isRegularFile(definition) || !Files.isRegularFile(model)) {
             throw new AssertionError("Item asset lacks definition/model: " + id);
         }
-        if (!Files.readString(definition).contains("galacticwars:item/" + id)
-                || !Files.readString(model).contains("galacticwars:item/" + id)) {
+        String definitionJson = Files.readString(definition);
+        String modelJson = Files.readString(model);
+        if (Set.of("dc15_blaster", "e5_blaster", "westar_blaster", "scatter_blaster").contains(id)) {
+            if (!definitionJson.contains("galacticwars:item/" + id)
+                    || !definitionJson.contains("geckolib:geckolib")
+                    || !modelJson.contains("\"parent\": \"builtin/entity\"")
+                    || !Files.isRegularFile(ASSET_ROOT.resolve(
+                            "geckolib/models/item/blaster/" + id + ".geo.json"))
+                    || !Files.isRegularFile(ASSET_ROOT.resolve(
+                            "textures/item/blaster/" + id + ".png"))) {
+                throw new AssertionError("Volumetric blaster contract is incomplete: " + id);
+            }
+        } else if (!definitionJson.contains("galacticwars:item/" + id)
+                || !modelJson.contains("galacticwars:item/" + id)) {
             throw new AssertionError("Item model reference does not resolve to its manifest texture: " + id);
         }
     }

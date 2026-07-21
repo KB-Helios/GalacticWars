@@ -46,9 +46,7 @@ public final class RecruitTextureAtlasTest {
             "separatist_alloy", "beskar");
     private static final Set<String> LICENSED_128_RECRUITS = Set.of(
             "clone_trooper", "arc_trooper", "phase_i_clone_trooper", "phase_i_arc_trooper",
-            "mandalorian_warrior", "mandalorian_marksman", "mandalorian_heavy",
-            "mandalorian_clansperson", "senate_commando", "republic_honor_guard",
-            "hutt_enforcer");
+            "senate_commando", "republic_honor_guard");
     private static final Set<String> LICENSED_128_BY_64_RECRUITS = Set.of(
             "b1_battle_droid", "b1_security_droid", "separatist_technician");
     private static final Set<String> AUTHORIZED_SOURCE_RECRUITS = Set.of(
@@ -164,6 +162,28 @@ public final class RecruitTextureAtlasTest {
                 .contains(recruit)) {
             requiredParts = List.of(
                     "neck", "right_forearm", "left_forearm", "right_shin", "left_shin");
+            if (recruit.equals("b2_super_battle_droid")) {
+                requiredParts = List.of("neck", "right_forearm", "left_forearm", "right_shin",
+                        "left_shin", "forearm_cannon");
+            } else if (recruit.equals("commando_droid")) {
+                requiredParts = List.of("neck", "right_forearm", "left_forearm", "right_shin",
+                        "left_shin", "commando_head_profile");
+            }
+        } else if (recruit.equals("togruta_civilian")) {
+            requiredParts = List.of(
+                    "right_montral", "left_montral", "center_lekku", "right_lekku", "left_lekku");
+        } else if (recruit.equals("smuggler")) {
+            requiredParts = List.of("duros_cranium", "duros_brow");
+        } else if (recruit.equals("hutt_civilian")) {
+            requiredParts = List.of("rodian_muzzle", "right_antenna", "left_antenna");
+        } else if (recruit.equals("hutt_enforcer")) {
+            requiredParts = List.of("trandoshan_muzzle", "right_brow_scale", "left_brow_scale");
+        } else if (recruit.startsWith("mandalorian_")) {
+            requiredParts = List.of("t_visor_brow", "t_visor_drop", "rangefinder", "jetpack");
+        } else if (Set.of("jedi_knight", "nightsister_acolyte", "nightsister_archer").contains(recruit)) {
+            requiredParts = List.of("robe_mantle", "robe_skirt", "cloth_panels");
+        } else if (recruit.equals("nightbrother_brute")) {
+            requiredParts = List.of("horns", "face_tattoo_vertical");
         } else {
             return;
         }
@@ -303,7 +323,8 @@ public final class RecruitTextureAtlasTest {
                 image,
                 ARMOR_BONES,
                 family.equals("phase_i_clone") ? 24
-                        : family.equals("republic_plastoid") ? 27 : 50,
+                        : family.equals("republic_plastoid") ? 27
+                        : family.equals("nightsister_weave") ? 33 : 50,
                 licensedClone ? 0 : ARMOR_TEXEL_DENSITY
         );
         assertMinimumOpaqueColors(image, licensedClone ? 20 : 48,
@@ -474,11 +495,17 @@ public final class RecruitTextureAtlasTest {
         Matcher cubes = CUBE.matcher(geometry);
         int cubeCount = 0;
         while (cubes.find()) {
-            int width = (int) Math.ceil(Double.parseDouble(cubes.group(1)));
-            int height = (int) Math.ceil(Double.parseDouble(cubes.group(2)));
-            int depth = (int) Math.ceil(Double.parseDouble(cubes.group(3)));
+            double rawWidth = Double.parseDouble(cubes.group(1));
+            double rawHeight = Double.parseDouble(cubes.group(2));
+            double rawDepth = Double.parseDouble(cubes.group(3));
+            if (rawWidth <= 0 || rawHeight <= 0 || rawDepth <= 0) {
+                throw new AssertionError(label + " cube " + cubeCount + " is degenerate");
+            }
+            int width = (int) Math.ceil(rawWidth);
+            int height = (int) Math.ceil(rawHeight);
+            int depth = (int) Math.ceil(rawDepth);
             int uvStart = skipWhitespace(geometry, cubes.end());
-            if (texelDensity == 1) {
+            if (uvStart < geometry.length() && geometry.charAt(uvStart) == '[') {
                 Matcher origin = BOX_UV.matcher(geometry);
                 origin.region(uvStart, geometry.length());
                 if (!origin.lookingAt()) {
@@ -780,6 +807,20 @@ public final class RecruitTextureAtlasTest {
                     Files.readAllBytes(ASSET_ROOT.resolve(
                             "textures/entity/" + recruit + "_commander.png")))) {
                 throw new AssertionError(recruit + " commander texture must differ from soldier texture");
+            }
+            if (!recruit.equals("b1_battle_droid")) {
+                BufferedImage soldier = ImageIO.read(ASSET_ROOT.resolve(
+                        "textures/entity/" + recruit + ".png").toFile());
+                for (int y = 0; y < texture.getHeight(); y++) {
+                    for (int x = 0; x < texture.getWidth(); x++) {
+                        int soldierAlpha = soldier.getRGB(x, y) >>> 24;
+                        int commanderAlpha = texture.getRGB(x, y) >>> 24;
+                        if (soldierAlpha != commanderAlpha) {
+                            throw new AssertionError(recruit
+                                    + " commander must preserve soldier alpha mask at " + x + "," + y);
+                        }
+                    }
+                }
             }
         }
     }

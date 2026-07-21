@@ -1,4 +1,4 @@
-"""Generate the shared GeckoLib lightsaber model and its UV-safe material variants.
+"""Generate color-specific GeckoLib lightsaber models and UV-safe material variants.
 
 The retained image-generation reference establishes silhouette and material direction. This
 script is the distributable source of truth: geometry, UV allocation, animated textures,
@@ -8,8 +8,11 @@ glowmasks, item definitions, and display transforms are regenerated together.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import math
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,8 +21,8 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "src/main/resources/assets/galacticwars"
-MODEL_PATH = ASSETS / "geckolib/models/item/lightsaber.geo.json"
-ANIMATION_PATH = ASSETS / "geckolib/animations/item/lightsaber.animation.json"
+MODEL_ROOT = ASSETS / "geckolib/models/item/lightsaber"
+ANIMATION_ROOT = ASSETS / "geckolib/animations/item/lightsaber"
 TEXTURE_ROOT = ASSETS / "textures/item/lightsaber"
 ITEM_TEXTURE_ROOT = ASSETS / "textures/item"
 ITEM_MODEL_ROOT = ASSETS / "models/item"
@@ -30,6 +33,19 @@ FRAME_COUNT = 4
 
 
 Color = tuple[int, int, int]
+
+
+def save_png(image: Image.Image, destination: Path) -> None:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(dir=destination.parent, suffix=".png")
+    try:
+        with os.fdopen(descriptor, "wb") as temporary:
+            temporary.write(buffer.getvalue())
+        os.replace(temporary_name, destination)
+    finally:
+        Path(temporary_name).unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -75,7 +91,7 @@ class CubeSpec:
     material: str
 
 
-def cubes() -> tuple[CubeSpec, ...]:
+def cubes(name: str) -> tuple[CubeSpec, ...]:
     specs = [
         CubeSpec("pommel_tip", "hilt", (-1.25, 0.0, -1.25), (2.5, 0.45, 2.5), "shadow"),
         CubeSpec("pommel_cap", "hilt", (-1.65, 0.4, -1.65), (3.3, 0.7, 3.3), "metal"),
@@ -101,6 +117,38 @@ def cubes() -> tuple[CubeSpec, ...]:
         CubeSpec("blade_core", "blade", (-0.46, 10.04, -0.46), (0.92, 36.1, 0.92), "core"),
         CubeSpec("blade_tip", "blade", (-0.86, 45.9, -0.86), (1.72, 0.75, 1.72), "blade"),
     ))
+    variant_details = {
+        "blue": (
+            CubeSpec("blue_control_box", "hilt", (-2.0, 5.9, -0.75), (0.55, 2.1, 1.5), "accent"),
+            CubeSpec("blue_emitter_shroud", "hilt", (-1.25, 9.8, -2.25), (2.5, 1.45, 0.55), "light"),
+        ),
+        "green": (
+            CubeSpec("green_grip_band_lower", "hilt", (-1.8, 2.05, -1.8), (3.6, 0.55, 3.6), "accent"),
+            CubeSpec("green_grip_band_upper", "hilt", (-1.8, 4.75, -1.8), (3.6, 0.55, 3.6), "accent"),
+            CubeSpec("green_flat_emitter", "hilt", (-2.05, 9.45, -1.45), (4.1, 0.8, 2.9), "metal"),
+        ),
+        "purple": (
+            CubeSpec("purple_control_gem", "hilt", (1.6, 6.75, -0.65), (0.5, 0.8, 1.3), "accent"),
+            CubeSpec("purple_emitter_guard_west", "hilt", (-2.3, 8.7, -1.0), (0.6, 2.2, 2.0), "light"),
+            CubeSpec("purple_emitter_guard_east", "hilt", (1.7, 8.7, -1.0), (0.6, 2.2, 2.0), "light"),
+        ),
+        "red": (
+            CubeSpec("red_claw_west", "hilt", (-2.55, 9.2, -0.7), (0.7, 2.25, 1.4), "shadow"),
+            CubeSpec("red_claw_east", "hilt", (1.85, 9.2, -0.7), (0.7, 2.25, 1.4), "shadow"),
+            CubeSpec("red_vent", "hilt", (-0.8, 6.55, -1.8), (1.6, 1.2, 0.45), "accent"),
+        ),
+        "yellow": (
+            CubeSpec("yellow_guard_ring", "hilt", (-2.15, 8.1, -2.15), (4.3, 0.55, 4.3), "accent"),
+            CubeSpec("yellow_pommel_guard", "hilt", (-2.0, 0.2, -2.0), (4.0, 0.5, 4.0), "light"),
+            CubeSpec("yellow_temple_switch", "hilt", (-0.7, 6.6, -1.75), (1.4, 1.0, 0.4), "accent"),
+        ),
+        "white": (
+            CubeSpec("white_split_grip_west", "hilt", (-1.85, 2.0, -1.0), (0.6, 3.4, 2.0), "light"),
+            CubeSpec("white_split_grip_east", "hilt", (1.25, 2.0, -1.0), (0.6, 3.4, 2.0), "light"),
+            CubeSpec("white_emitter_window", "hilt", (-1.05, 8.75, -1.9), (2.1, 0.7, 0.45), "accent"),
+        ),
+    }
+    specs.extend(variant_details[name])
     return tuple(specs)
 
 
@@ -196,7 +244,7 @@ def paint_region(
                   fill=(*clamp(base, -30), 255))
 
 
-def build_geometry(specs: tuple[CubeSpec, ...], layout: Layout) -> dict:
+def build_geometry(name: str, specs: tuple[CubeSpec, ...], layout: Layout) -> dict:
     bones = {
         "root": {"name": "root", "pivot": [0, 0, 0], "cubes": []},
         "hilt": {"name": "hilt", "parent": "root", "pivot": [0, 0, 0], "cubes": []},
@@ -214,7 +262,7 @@ def build_geometry(specs: tuple[CubeSpec, ...], layout: Layout) -> dict:
         "format_version": "1.12.0",
         "minecraft:geometry": [{
             "description": {
-                "identifier": "geometry.galacticwars.item.lightsaber",
+                "identifier": f"geometry.galacticwars.item.lightsaber.{name}",
                 "texture_width": ATLAS_SIZE,
                 "texture_height": ATLAS_SIZE,
                 "visible_bounds_width": 4,
@@ -242,8 +290,8 @@ def write_variant(name: str, palette: Palette, specs: tuple[CubeSpec, ...], layo
 
     texture_path = TEXTURE_ROOT / f"{name}.png"
     glow_path = TEXTURE_ROOT / f"{name}_glowmask.png"
-    texture.save(texture_path)
-    glowmask.save(glow_path)
+    save_png(texture, texture_path)
+    save_png(glowmask, glow_path)
     metadata = {"animation": {"frametime": 2, "interpolate": True}}
     for path in (texture_path, glow_path):
         path.with_suffix(".png.mcmeta").write_text(
@@ -269,15 +317,15 @@ def write_icon(name: str, palette: Palette) -> None:
             draw.point((x - 1, y), fill=(*palette.blade, 238))
         if y - 1 >= 0:
             draw.point((x, y - 1), fill=(*palette.glow, 210))
-    icon.save(ITEM_TEXTURE_ROOT / f"{name}_lightsaber.png")
+    save_png(icon, ITEM_TEXTURE_ROOT / f"{name}_lightsaber.png")
 
 
 def write_item_files() -> None:
     display = {
-        "thirdperson_righthand": {"rotation": [0, -90, 55], "translation": [0, 4.0, 0.5], "scale": [0.55, 0.55, 0.55]},
-        "thirdperson_lefthand": {"rotation": [0, 90, -55], "translation": [0, 4.0, 0.5], "scale": [0.55, 0.55, 0.55]},
-        "firstperson_righthand": {"rotation": [0, -90, 25], "translation": [1.13, 3.2, 1.13], "scale": [0.46, 0.46, 0.46]},
-        "firstperson_lefthand": {"rotation": [0, 90, -25], "translation": [-1.13, 3.2, 1.13], "scale": [0.46, 0.46, 0.46]},
+        "thirdperson_righthand": {"rotation": [0, -90, 30], "translation": [0, 0.5, -0.75], "scale": [0.52, 0.52, 0.52]},
+        "thirdperson_lefthand": {"rotation": [0, 90, -30], "translation": [0, 0.5, -0.75], "scale": [0.52, 0.52, 0.52]},
+        "firstperson_righthand": {"rotation": [0, -90, 15], "translation": [0.45, 0.8, -0.65], "scale": [0.43, 0.43, 0.43]},
+        "firstperson_lefthand": {"rotation": [0, 90, -15], "translation": [-0.45, 0.8, -0.65], "scale": [0.43, 0.43, 0.43]},
         "gui": {"rotation": [18, 225, 0], "translation": [0, -5.4, 0], "scale": [0.31, 0.31, 0.31]},
         "ground": {"rotation": [0, 0, 0], "translation": [0, 2.0, 0], "scale": [0.22, 0.22, 0.22]},
         "fixed": {"rotation": [0, 180, 38], "translation": [0, -4.0, 0], "scale": [0.36, 0.36, 0.36]},
@@ -304,14 +352,10 @@ def write_item_files() -> None:
 
 def generate_all() -> None:
     for directory in (
-            MODEL_PATH.parent, ANIMATION_PATH.parent, TEXTURE_ROOT,
+            MODEL_ROOT, ANIMATION_ROOT, TEXTURE_ROOT,
             ITEM_TEXTURE_ROOT, ITEM_MODEL_ROOT, ITEM_DEFINITION_ROOT):
         directory.mkdir(parents=True, exist_ok=True)
-    specs = cubes()
-    layout = Layout()
-    geometry = build_geometry(specs, layout)
-    MODEL_PATH.write_text(json.dumps(geometry, indent=2) + "\n", encoding="utf-8")
-    ANIMATION_PATH.write_text(json.dumps({
+    animation = {
         "format_version": "1.8.0",
         "animations": {
             "animation.lightsaber.idle": {
@@ -328,11 +372,18 @@ def generate_all() -> None:
                 },
             }
         },
-    }, indent=2) + "\n", encoding="utf-8")
+    }
     for name, palette in PALETTES.items():
+        specs = cubes(name)
+        layout = Layout()
+        geometry = build_geometry(name, specs, layout)
+        (MODEL_ROOT / f"{name}.geo.json").write_text(
+            json.dumps(geometry, indent=2) + "\n", encoding="utf-8")
+        (ANIMATION_ROOT / f"{name}.animation.json").write_text(
+            json.dumps(animation, indent=2) + "\n", encoding="utf-8")
         write_variant(name, palette, specs, layout)
     write_item_files()
-    print(f"Generated one GeckoLib lightsaber model and {len(PALETTES)} animated material sets")
+    print(f"Generated {len(PALETTES)} distinct GeckoLib lightsaber models and animated material sets")
 
 
 if __name__ == "__main__":

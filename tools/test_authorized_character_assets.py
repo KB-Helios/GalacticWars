@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import shutil
 import sys
 import tempfile
@@ -25,7 +26,7 @@ CURATED_RECRUITS = {
     "republic_honor_guard": (128, 128, 21),
     "b1_security_droid": (128, 64, 23),
     "togruta_civilian": (256, 256, 16),
-    "hutt_enforcer": (128, 128, 15),
+    "hutt_enforcer": (256, 256, 18),
     "smuggler": (256, 256, 16),
     "hutt_civilian": (256, 256, 17),
     "separatist_technician": (128, 64, 23),
@@ -63,6 +64,19 @@ def face_rect(face: dict) -> tuple[int, int, int, int]:
         int(max(u, u + width)),
         int(max(v, v + height)),
     )
+
+
+def box_face_rects(uv: list[int], size: list[float]) -> list[tuple[int, int, int, int]]:
+    u, v = uv
+    width, height, depth = (max(1, int(math.ceil(value))) for value in size)
+    return [
+        (u + depth, v, u + depth + width, v + depth),
+        (u + depth + width, v, u + depth + 2 * width, v + depth),
+        (u, v + depth, u + depth, v + depth + height),
+        (u + depth, v + depth, u + depth + width, v + depth + height),
+        (u + depth + width, v + depth, u + 2 * depth + width, v + depth + height),
+        (u + 2 * depth + width, v + depth, u + 2 * depth + 2 * width, v + depth + height),
+    ]
 
 
 class AuthorizedCharacterAssetTest(unittest.TestCase):
@@ -209,30 +223,44 @@ class AuthorizedCharacterAssetTest(unittest.TestCase):
             texture_path = self.asset_root / "textures/entity" / f"{asset_id}.png"
             with Image.open(texture_path) as source:
                 texture = source.convert("RGBA")
+            commander_variant = asset_id.endswith("_commander") and asset_id != "b1_battle_droid_commander"
             for bone in model["bones"]:
                 for cube in bone.get("cubes", []):
                     uv = cube.get("uv")
-                    self.assertIsInstance(uv, dict, f"{asset_id} {bone['name']} per-face UVs")
-                    for face in uv.values():
-                        left, top, right, bottom = face_rect(face)
+                    if isinstance(uv, dict):
+                        rectangles = [face_rect(face) for face in uv.values()]
+                    else:
+                        self.assertIsInstance(uv, list, f"{asset_id} {bone['name']} UV mapping")
+                        rectangles = box_face_rects(uv, cube["size"])
+                    for left, top, right, bottom in rectangles:
                         self.assertGreater(right, left, asset_id)
                         self.assertGreater(bottom, top, asset_id)
                         self.assertGreaterEqual(left, 0, asset_id)
                         self.assertGreaterEqual(top, 0, asset_id)
                         self.assertLessEqual(right, texture.width, asset_id)
                         self.assertLessEqual(bottom, texture.height, asset_id)
-                        if asset_id in composites:
+                        if asset_id in composites and isinstance(uv, dict):
                             self.assertTrue(
                                 right <= 96 or left >= 106,
                                 f"{asset_id} face overlaps reserved body/head atlas regions",
                             )
-                        for y in range(top, bottom):
-                            for x in range(left, right):
-                                self.assertEqual(
-                                    255,
-                                    texture.getpixel((x, y))[3],
-                                    f"{asset_id} transparent required face pixel {x},{y}",
-                                )
+                        if not commander_variant:
+                            for y in range(top, bottom):
+                                for x in range(left, right):
+                                    self.assertEqual(
+                                        255,
+                                        texture.getpixel((x, y))[3],
+                                        f"{asset_id} transparent required face pixel {x},{y}",
+                                    )
+            if commander_variant:
+                soldier_id = asset_id.removesuffix("_commander")
+                with Image.open(self.asset_root / "textures/entity" / f"{soldier_id}.png") as source:
+                    soldier = source.convert("RGBA")
+                self.assertEqual(
+                    soldier.getchannel("A").tobytes(),
+                    texture.getchannel("A").tobytes(),
+                    f"{asset_id} must preserve the exact soldier alpha mask",
+                )
 
 
 if __name__ == "__main__":

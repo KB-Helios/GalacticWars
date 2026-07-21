@@ -116,6 +116,8 @@ def texture_sheet(entries: list[tuple[Path, str]], columns: int, output: Path) -
 
 
 def main() -> None:
+    from render_asset_turnarounds import main as render_turnarounds
+    render_turnarounds()
     entity_models = ASSETS / "geckolib/models/entity"
     entity_textures = ASSETS / "textures/entity"
     recruits = [

@@ -1,6 +1,6 @@
 {
   "id": "galacticwars:hutt_civilian",
-  "display_name": "Cartel Civilian",
+  "display_name": "Rodian Civilian",
   "faction": "galacticwars:hutt_cartel",
   "entity_type": "galacticwars:hutt_civilian",
   "professions": ["merchant", "courier", "cook", "animal_farmer"],

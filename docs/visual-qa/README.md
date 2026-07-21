@@ -4,6 +4,22 @@ This checklist is the repeatable creative-world acceptance pass for player-facin
 Galactic Wars content. Run it with the built JAR in the GDLauncher NeoForge 26.2
 instance and YACL plus GeckoLib enabled.
 
+## 2026-07-21 complete 3D visual overhaul
+
+- The full generator was run twice and 764 tracked asset outputs retained identical SHA-256 hashes.
+  The turnaround renderer produced 54 front/side/back inspections across the seven sheets in
+  `build/previews/turnarounds`.
+- Fabric and NeoForge development clients both reached resource reload with the Galactic Wars client
+  foundation active. GeckoLib reported 49 models and 49 animations on each loader, with no missing or
+  invalid `galacticwars` model, texture, animation, or GeckoLib parser warning.
+- Minecraft 26.2 emits one loader-level `Missing block model: minecraft:builtin/entity` warning on
+  each loader. `builtin/entity` is the GeckoLib-required base for special item rendering; there is no
+  missing project resource behind this warning.
+- Automated desktop capture could enumerate the GLFW client windows but could not activate them.
+  The 54 deterministic turnaround views are reviewed evidence, but interactive NPC animation,
+  equipped/ridden vehicles, held-item clipping, and every GUI/first/third/dropped/framed context remain
+  a manual release pass and are not claimed by this run.
+
 ## 2026-07-20 NPC and clone-armor overhaul
 
 - `tools/generate_character_models.py` was run twice after the source import and every character
@@ -92,3 +108,14 @@ Capture idle, walk, attack/held-item, and seated views where applicable.
 
 Any missing `galacticwars` model/texture line in `latest.log` is a release
 failure, even if Minecraft substitutes a fallback model.
+
+## Automated turnaround command
+
+Run `python tools/render_asset_turnarounds.py` with a Pillow-enabled Python. Seven QA sheets are
+written under `build/previews/turnarounds` for 26 NPCs, commanders, armor, vehicles, lightsabers,
+blasters, and capsules. Each cell contains front/side/back orthographic views after local and bone
+hierarchy rotations. These sheets are diagnostic evidence; NeoForge and Fabric client passes remain
+the authority for hand anchors, riding, GUI lighting, and animation.
+
+The active checklist is 26 NPCs, all three commander variants, six armor families, five vehicles,
+six saber colors, and four blasters in GUI, first person, third person, dropped, and item-frame views.

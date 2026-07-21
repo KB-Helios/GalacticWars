@@ -7,8 +7,11 @@ change cannot silently leave a texture pointing at an unrelated UV layout.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import math
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +39,19 @@ ARMOR_TEXEL_DENSITY = 6
 
 
 Color = tuple[int, int, int]
+
+
+def save_png(image: Image.Image, destination: Path, *, optimize: bool = False) -> None:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=optimize)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(dir=destination.parent, suffix=".png")
+    try:
+        with os.fdopen(descriptor, "wb") as temporary:
+            temporary.write(buffer.getvalue())
+        os.replace(temporary_name, destination)
+    finally:
+        Path(temporary_name).unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -608,7 +624,7 @@ class ModelBuilder:
             }],
         }
         model_path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-        self.atlas.image.save(texture_path)
+        save_png(self.atlas.image, texture_path)
 
 
 def humanoid_bones(builder: ModelBuilder) -> None:
@@ -650,6 +666,10 @@ def recruit_child_bones(builder: ModelBuilder, design: RecruitDesign) -> None:
         builder.bone("right_foot", [-2, 1, -1], "right_shin")
         builder.bone("left_foot", [2, 1, -1], "left_shin")
         builder.bone("utility_pack", [0, 18, 2], "body")
+        if design.variant == "b2":
+            builder.bone("forearm_cannon", [-6, 16, -2], "right_forearm")
+        elif design.variant == "commando":
+            builder.bone("commando_head_profile", [0, 28, 0], "head")
         if design.variant == "technician":
             builder.bone("headgear", [0, 29, 0], "head")
             builder.bone("utility_belt", [0, 13, 0], "body")
@@ -658,6 +678,9 @@ def recruit_child_bones(builder: ModelBuilder, design: RecruitDesign) -> None:
         builder.bone("robe_mantle", [0, 22, 0], "body")
         builder.bone("robe_skirt", [0, 12, 0], "body")
         builder.bone("utility_gear", [0, 15, 0], "body")
+        builder.bone("cloth_panels", [0, 12, 0], "robe_skirt")
+        if design.variant == "archer":
+            builder.bone("quiver", [3, 19, 2], "body")
     elif design.style == "civilian":
         builder.bone("hair", [0, 29, 0], "head")
         builder.bone("outerwear", [0, 20, 0], "body")
@@ -680,6 +703,8 @@ def recruit_child_bones(builder: ModelBuilder, design: RecruitDesign) -> None:
         builder.bone("right_bracer", [-7, 15, 0], "right_arm")
         builder.bone("left_bracer", [7, 15, 0], "left_arm")
         builder.bone("horns", [0, 31, 0], "head")
+        if design.variant == "nightbrother":
+            builder.bone("face_tattoo_vertical", [0, 28, -4], "head")
         if design.variant == "enforcer":
             builder.bone("shoulder_armor", [0, 22, 0], "chest_armor")
             builder.bone("utility_belt", [0, 12, 0], "body")
@@ -765,6 +790,11 @@ def add_plate_details(builder: ModelBuilder, variant: str) -> None:
         builder.cube(helmet, "visor_lower", [-0.75, 24.3, -4.82], [1.5, 4.2, 0.3], "accent")
         pack_bone = "jetpack" if "jetpack" in builder.bones else "backpack"
         builder.cube(pack_bone, "jetpack", [-2.8, 15.0, 2.0], [5.6, 7.4, 2.2], "dark")
+    if variant == "hunter":
+        builder.cube("backpack", "weathered_cape", [1.0, 9.0, 2.35], [4.2, 12.5, 0.7], "cloth",
+                     rotation=[0, 0, -4], pivot=[2.5, 20, 2])
+        builder.cube(chest, "hunter_bandolier", [-4.2, 14.5, -2.85], [8.4, 1.35, 0.7], "accent",
+                     rotation=[0, 0, -28], pivot=[0, 18, -2.5])
     if variant == "heavy":
         builder.cube(chest, "heavy_collar", [-5.0, 20.7, -2.8], [10, 2.7, 5.6], "light")
         builder.cube("right_arm", "right_heavy_shoulder", [-9.7, 17.8, -3.2], [6.4, 5.8, 6.4], "light")
@@ -780,13 +810,26 @@ def add_robe_details(builder: ModelBuilder, variant: str) -> None:
     builder.cube("robe_mantle", "cross_tunic", [-4.25, 15.5, -2.45], [8.5, 7.8, 4.9], "light")
     builder.cube("utility_gear", "sash", [-4.45, 12.1, -2.55], [8.9, 2.0, 5.1], "accent")
     builder.cube("robe_skirt", "robe_skirt", [-4.3, 7.4, -2.4], [8.6, 4.8, 4.8], "base")
+    builder.cube("cloth_panels", "right_front_panel", [-3.8, 4.2, -2.72], [3.3, 7.7, 0.72], "cloth",
+                 rotation=[0, 0, 3], pivot=[-1.9, 11.5, -2.3])
+    builder.cube("cloth_panels", "left_front_panel", [0.5, 4.2, -2.72], [3.3, 7.7, 0.72], "light",
+                 rotation=[0, 0, -3], pivot=[1.9, 11.5, -2.3])
+    builder.cube("robe_mantle", "right_wrap", [-4.15, 18.2, -2.72], [5.0, 1.1, 0.7], "cloth",
+                 rotation=[0, 0, -24], pivot=[0, 19, -2.5])
+    builder.cube("robe_mantle", "left_wrap", [-0.85, 18.2, -2.78], [5.0, 1.1, 0.72], "light",
+                 rotation=[0, 0, 24], pivot=[0, 19, -2.5])
     builder.cube("right_leg", "right_boot", [-4.15, 0, -2.2], [4.1, 5.5, 4.4], "shadow")
     builder.cube("left_leg", "left_boot", [0.05, 0, -2.2], [4.1, 5.5, 4.4], "shadow", mirror=True)
     if variant in ("acolyte", "archer"):
         builder.cube("robe_mantle", "right_talisman", [-3.2, 13.5, -2.7], [1.2, 7.5, 0.8], "accent")
         builder.cube("robe_mantle", "left_talisman", [2.0, 13.5, -2.7], [1.2, 7.5, 0.8], "accent")
+        builder.cube("right_arm", "right_cloth_wrap", [-8.25, 13.0, -2.35], [4.5, 2.0, 4.7], "light")
+        builder.cube("left_arm", "left_cloth_wrap", [3.75, 13.0, -2.35], [4.5, 2.0, 4.7], "light")
     if variant == "archer":
-        builder.cube("utility_gear", "quiver", [2.5, 15.0, 1.8], [2.6, 8.5, 2.6], "shadow", rotation=[0, 0, -12], pivot=[3.5, 18, 2])
+        builder.cube("quiver", "quiver_case", [2.5, 15.0, 1.8], [2.6, 8.5, 2.6], "shadow",
+                     rotation=[0, 0, -12], pivot=[3.5, 18, 2])
+        for index, x in enumerate((2.8, 3.6, 4.4)):
+            builder.cube("quiver", f"arrow_{index}", [x, 22.2, 2.45], [0.35, 3.5, 0.35], "accent")
 
 
 def add_civilian_details(builder: ModelBuilder, variant: str) -> None:
@@ -798,6 +841,11 @@ def add_civilian_details(builder: ModelBuilder, variant: str) -> None:
     builder.cube("left_leg", "left_boot", [0.1, 0, -2.2], [4, 4.5, 4.4], "shadow", mirror=True)
     if variant == "republic":
         builder.cube("outerwear", "republic_vest", [-3.5, 15.5, -2.7], [7, 7.2, 1.0], "light")
+        builder.cube("outerwear", "right_lapel", [-3.3, 18.0, -2.95], [3.2, 1.0, 0.55], "accent",
+                     rotation=[0, 0, -30], pivot=[0, 20, -2.5])
+        builder.cube("outerwear", "left_lapel", [0.1, 18.0, -2.95], [3.2, 1.0, 0.55], "base",
+                     rotation=[0, 0, 30], pivot=[0, 20, -2.5])
+        builder.cube("outerwear", "comlink_badge", [2.2, 18.0, -3.02], [1.2, 1.7, 0.4], "accent")
     elif variant == "clansperson":
         builder.cube("helmet", "clan_work_helmet", [-4.1, 29.6, -4.1], [8.2, 2.4, 8.2], "base")
         builder.cube("chest_armor", "clan_shoulder", [-6.1, 18.2, -2.6], [3.8, 4.6, 5.2], "light")
@@ -825,15 +873,26 @@ def add_droid(builder: ModelBuilder, style: str, variant: str) -> None:
             builder.cube(bone, f"{side}_shoulder_pivot", [x + 1.35, 21.4, -1.65], [3.3, 3.3, 3.3], "shadow")
             builder.cube(f"{side}_forearm", f"{side}_heavy_forearm", [x + 0.25, 11.5, -2.75], [5.5, 6.0, 5.5], "base")
             builder.cube(f"{side}_forearm", f"{side}_wrist", [x + 0.7, 10.5, -2.5], [4.6, 2.0, 5], "shadow")
+        builder.cube("forearm_cannon", "cannon_shroud", [-9.35, 11.1, -4.2], [6.2, 5.8, 2.2], "dark")
+        builder.cube("forearm_cannon", "cannon_barrel", [-7.9, 11.8, -8.4], [3.3, 3.3, 5.2], "shadow")
+        builder.cube("forearm_cannon", "cannon_emitter", [-8.15, 12.0, -8.85], [3.8, 2.9, 0.65], "accent")
         for side, bone, x in (("right", "right_leg", -4.4), ("left", "left_leg", 0.4)):
             builder.cube(bone, f"{side}_heavy_thigh", [x, 6.0, -2.5], [4.4, 6.5, 5], "base")
             builder.cube(f"{side}_shin", f"{side}_heavy_shin", [x, 0.5, -2.5], [4.4, 5.7, 5], "base")
             builder.cube(f"{side}_foot", f"{side}_foot_plate", [x - 0.2, -0.2, -3.4], [4.8, 2.5, 6.8], "dark")
         return
     half_width = {"b1": 4.0, "commando": 4.6, "technician": 4.8}[variant]
-    head_y = 25.2 if variant == "b1" else 24.7
-    builder.cube("head", "droid_head", [-3.8, head_y, -4.4], [7.6, 5.5, 8.8], "base")
-    builder.cube("head", "optic_bar", [-3.2, head_y + 2.2, -5.0], [6.4, 1.0, 0.8], "accent")
+    if variant == "commando":
+        head_y = 25.1
+        builder.cube("head", "droid_head", [-3.0, head_y, -5.4], [6.0, 5.0, 9.6], "base")
+        builder.cube("head", "optic_bar", [-2.55, head_y + 2.0, -5.95], [5.1, 0.9, 0.8], "accent")
+        builder.cube("commando_head_profile", "angular_brow", [-3.35, 28.6, -5.2], [6.7, 1.0, 7.8], "shadow",
+                     rotation=[-5, 0, 0], pivot=[0, 28.5, 0])
+        builder.cube("commando_head_profile", "rear_wedge", [-2.5, 25.4, 3.2], [5.0, 3.5, 2.3], "dark")
+    else:
+        head_y = 25.2
+        builder.cube("head", "droid_head", [-3.8, head_y, -4.4], [7.6, 5.5, 8.8], "base")
+        builder.cube("head", "optic_bar", [-3.2, head_y + 2.2, -5.0], [6.4, 1.0, 0.8], "accent")
     builder.cube("neck", "neck_piston", [-1.2, 23.2, -1.2], [2.4, 3.0, 2.4], "dark")
     builder.cube("body", "droid_chest", [-3.5, 14, -2.2], [7, 9.5, 4.4], "base")
     builder.cube("torso_core", "droid_core", [-2, 16, -2.8], [4, 4.5, 1.0], "accent")
@@ -851,7 +910,7 @@ def add_droid(builder: ModelBuilder, style: str, variant: str) -> None:
         builder.cube(f"{side}_shin", f"{side}_shin_rod", [x + 0.2, 0, -1.2], [2.1, 6, 2.4], "shadow")
         builder.cube(f"{side}_foot", f"{side}_droid_foot", [x - 0.2, -0.2, -2.7], [3.0, 1.8, 5.4], "dark")
     if variant == "commando":
-        builder.cube("head", "commando_crest", [-1.0, 29.4, -2.5], [2.0, 1.0, 5], "accent")
+        builder.cube("commando_head_profile", "commando_crest", [-0.85, 29.8, -3.6], [1.7, 1.1, 6.0], "accent")
         builder.cube("body", "commando_plate", [-3.8, 17, -2.7], [7.6, 5.5, 1.0], "light")
     elif variant == "technician":
         builder.cube("utility_pack", "tool_pack", [-3.0, 14.0, 2.0], [6, 7, 2.6], "accent")
@@ -881,8 +940,14 @@ def add_brute(builder: ModelBuilder, variant: str) -> None:
         builder.cube("shoulder_armor", "left_shoulder_plate", [3.35, 20.0, -3.05], [3.3, 3.6, 6.1], "base")
         builder.cube("utility_belt", "enforcer_utility_belt", [-5.0, 10.9, -3.0], [10, 1.8, 6], "dark")
     if variant == "nightbrother":
-        builder.cube("horns", "horn_right", [-3.5, 31.2, -1.5], [1.5, 2.2, 2.0], "light")
-        builder.cube("horns", "horn_left", [2.0, 31.2, -1.5], [1.5, 2.2, 2.0], "light")
+        for index, x in enumerate((-3.6, -1.35, 1.05, 3.0)):
+            builder.cube("horns", f"horn_{index}", [x, 31.0, -1.35], [1.15, 2.65, 1.7], "light",
+                         rotation=[0, 0, -10 if x < 0 else 10], pivot=[x + 0.55, 31.0, -0.5])
+        builder.cube("face_tattoo_vertical", "face_tattoo", [-0.45, 24.8, -4.72], [0.9, 6.2, 0.38], "dark")
+        builder.cube("body", "chest_tattoo_right", [-4.9, 15.5, -3.08], [5.0, 1.0, 0.45], "dark",
+                     rotation=[0, 0, -24], pivot=[0, 18, -2.8])
+        builder.cube("body", "chest_tattoo_left", [-0.1, 15.5, -3.08], [5.0, 1.0, 0.45], "dark",
+                     rotation=[0, 0, 24], pivot=[0, 18, -2.8])
 
 
 def build_recruit(design: RecruitDesign) -> None:
@@ -1083,6 +1148,28 @@ def add_common_armor(
         builder.cube(boot_bone, f"{side}_boot_toe", [x - 0.38, -0.35, -3.35], [4.75, 1.3, 6.7], "shadow")
 
 
+def add_nightsister_cloth_base(builder: ModelBuilder) -> None:
+    """Build wearable Dathomirian layers as cloth and wraps, never as rigid plate."""
+    builder.cube("armorBody", "wrapped_tunic", [-4.15, 12, -2.2], [8.3, 12, 4.4], "dark", inflate=0.16)
+    builder.cube("armorBody", "upper_mantle", [-4.6, 19.1, -2.6], [9.2, 3.8, 5.2], "cloth")
+    builder.cube("armorBody", "cross_wrap_right", [-4.2, 16.4, -2.78], [5.2, 1.35, 0.72], "base",
+                 rotation=[0, 0, -27], pivot=[0, 19, -2.5])
+    builder.cube("armorBody", "cross_wrap_left", [-1.0, 16.4, -2.82], [5.2, 1.35, 0.74], "light",
+                 rotation=[0, 0, 27], pivot=[0, 19, -2.5])
+    builder.cube("armorBody", "wide_sash", [-4.55, 11.3, -2.52], [9.1, 2.2, 5.04], "shadow")
+    builder.cube("armorBody", "sash_clasp", [-1.0, 11.0, -2.9], [2, 2.3, 0.65], "accent")
+    for side, bone, x in (("right", "armorRightArm", -8.0), ("left", "armorLeftArm", 4.0)):
+        builder.cube(bone, f"{side}_cloth_sleeve", [x, 12, -2], [4, 12, 4], "cloth", inflate=0.14)
+        builder.cube(bone, f"{side}_upper_wrap", [x - 0.2, 17.1, -2.3], [4.4, 2.0, 4.6], "base")
+        builder.cube(bone, f"{side}_forearm_wrap", [x - 0.2, 12.2, -2.35], [4.4, 3.8, 4.7], "light")
+    for side, leg_bone, boot_bone, x in (
+            ("right", "armorRightLeg", "armorRightBoot", -4.0),
+            ("left", "armorLeftLeg", "armorLeftBoot", 0.0)):
+        builder.cube(leg_bone, f"{side}_legging", [x, 0, -2], [4, 12, 4], "dark", inflate=0.12)
+        builder.cube(boot_bone, f"{side}_wrapped_boot", [x - 0.18, -0.15, -2.45], [4.35, 5.1, 4.9], "shadow")
+        builder.cube(boot_bone, f"{side}_boot_wrap", [x - 0.28, 2.2, -2.62], [4.55, 1.2, 5.25], "base")
+
+
 def add_republic_helmet(builder: ModelBuilder) -> None:
     """Late-war Phase II helmet with compact cheek recesses and blue unit marks."""
     builder.cube("armorHead", "helmet_shell", [-4, 24, -4], [8, 8, 8], "light", inflate=0.42)
@@ -1186,6 +1273,11 @@ def add_family_armor_details(builder: ModelBuilder, family: str) -> None:
         add_separatist_helmet(builder)
         builder.cube("armorBody", "power_cell", [-2.4, 16.5, -3.18], [4.8, 2.8, 0.55], "accent")
         builder.cube("armorBody", "rear_reactor", [-2.6, 15.2, 2.9], [5.2, 5.4, 1.4], "accent")
+        builder.cube("armorBody", "mechanical_spine", [-0.7, 13.4, 4.0], [1.4, 8.2, 0.7], "light")
+        builder.cube("armorRightArm", "right_servo", [-8.65, 15.0, -3.0], [5.3, 2.2, 1.0], "accent")
+        builder.cube("armorLeftArm", "left_servo", [3.35, 15.0, -3.0], [5.3, 2.2, 1.0], "accent")
+        builder.cube("armorRightLeg", "right_knee_piston", [-3.2, 4.2, -3.35], [2.4, 2.1, 0.7], "light")
+        builder.cube("armorLeftLeg", "left_knee_piston", [0.8, 4.2, -3.35], [2.4, 2.1, 0.7], "light")
     elif family == "mandalorian_alloy":
         add_mandalorian_helmet(builder)
         builder.cube("armorBody", "compact_pack", [-2.8, 15.0, 2.8], [5.6, 7.1, 2.0], "shadow")
@@ -1223,7 +1315,10 @@ def build_armor(family: str, palette: Palette) -> None:
         "nightsister_weave": "base",
     }.get(family, "light")
     secondary_plate = "dark" if family == "nightsister_weave" else "base"
-    add_common_armor(builder, primary_plate, secondary_plate)
+    if family == "nightsister_weave":
+        add_nightsister_cloth_base(builder)
+    else:
+        add_common_armor(builder, primary_plate, secondary_plate)
     add_family_armor_details(builder, family)
     builder.write(ARMOR_MODELS / f"{family}.geo.json", ARMOR_TEXTURES / f"{family}.png")
     # GeckoLib parses the declared animation resource even though armor pose
@@ -1285,7 +1380,7 @@ def write_phase_i_clone_inventory_assets() -> None:
             draw.rectangle((9, 12, 13, 14), fill=shadow)
             draw.rectangle((4, 7, 5, 9), fill=accent)
             draw.rectangle((10, 7, 11, 9), fill=accent)
-        image.save(ITEM_TEXTURES / f"{item_id}.png")
+        save_png(image, ITEM_TEXTURES / f"{item_id}.png")
         (ITEM_MODELS / f"{item_id}.json").write_text(json.dumps({
             "parent": "minecraft:item/generated",
             "textures": {"layer0": f"galacticwars:item/{item_id}"},
@@ -1352,7 +1447,7 @@ def write_spawn_capsule_glowmask(texture_path: Path, palette: Palette) -> None:
                 for candidate in competing)
             if accent_distance <= other_distance:
                 glowmask.putpixel((x, y), (red, green, blue, alpha))
-    glowmask.save(texture_path.with_name(texture_path.stem + "_glowmask.png"))
+    save_png(glowmask, texture_path.with_name(texture_path.stem + "_glowmask.png"))
 
 
 def write_spawn_capsule_icon(design: RecruitDesign) -> None:
@@ -1373,7 +1468,7 @@ def write_spawn_capsule_icon(design: RecruitDesign) -> None:
     draw.rectangle((7, 7, 8, 8), fill=accent)
     draw.point((4, 5), fill=(*clamp_color(design.palette.base, 28), 255))
     ITEM_TEXTURES.mkdir(parents=True, exist_ok=True)
-    image.save(ITEM_TEXTURES / f"{design.id}_spawn_egg.png")
+    save_png(image, ITEM_TEXTURES / f"{design.id}_spawn_egg.png")
 
 
 def write_spawn_capsule_item_files(visual_id: str) -> None:
