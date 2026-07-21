@@ -1383,7 +1383,7 @@
           ]
         },
         {
-          "name": "rangefinder",
+          "name": "rangefinder_antenna",
           "parent": "helmet",
           "pivot": [
             0,

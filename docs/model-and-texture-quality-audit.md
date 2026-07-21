@@ -35,7 +35,7 @@ Date: 2026-07-20
   so the hand meets the grip instead of the pommel floating above it.
 - Six four-frame 256x1024 UV atlases and matching emissive glowmasks replace the generic split hilt/blade strips.
 - Minecraft item definitions use `minecraft:special` plus `geckolib:geckolib`; the Java item implements `GeoItem` and renders through `GeoItemRenderer`.
-- Equipped armor uses 24/27 cuboids for permissioned Phase I/Phase II clone sets and 51/54/55/54
+- Equipped armor uses 24/27 cuboids for permissioned Phase I/Phase II clone sets and 56/54/33/54
   cuboids for the project-authored Separatist, Mandalorian, Nightsister, and Beskar sets. The clone
   geometry uses visibly different authored helmet groups and the ARC NPCs add specialist equipment.
 - Clone wearable armor preserves the source 128x128 atlas and source equipment sprites. The other

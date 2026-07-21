@@ -338,11 +338,22 @@ def refine_model(vehicle_id: str, additions: dict[str, list[dict]]) -> int:
     texture_path = TEXTURE_ROOT / f"{vehicle_id}.png"
     with Image.open(texture_path) as source:
         texture = source.convert("RGBA")
+
+    # Build set of pending tile texel coordinates to exclude from base color sampling
+    pending_texels = set()
+    for bone_name, detail, footprint in pending:
+        u, v = detail["uv"]
+        width, height = footprint
+        for py in range(v, v + height):
+            for px in range(u, u + width):
+                pending_texels.add((px, py))
+
     visible_colors = [
         texture.getpixel((x, y))[:3]
         for y in range(texture.height)
         for x in range(texture.width)
-        if texture.getpixel((x, y))[3]
+        if (x, y) not in pending_texels
+        and texture.getpixel((x, y))[3]
         and max(texture.getpixel((x, y))[:3]) > 22
     ]
     if not visible_colors:
