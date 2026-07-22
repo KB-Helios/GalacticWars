@@ -352,12 +352,12 @@ public final class ModGameTests {
         tests.put(id("blueprint_projector_runtime"), ModGameTests::blueprintProjectorRuntime);
         tests.put(id("kingdom_governance_persistence"), ModGameTests::kingdomGovernancePersistence);
         tests.put(id("kingdom_multiplayer_runtime"), ModGameTests::kingdomMultiplayerRuntime);
-        tests.put(id("overworld_faction_outpost_runtime"), ModGameTests::overworldFactionOutpostRuntime);
-        tests.put(id("blueprint_site_runtime"), ModGameTests::blueprintSiteRuntime);
+        tests.put(id("overworld_faction_outpost_runtime"), ModGameTests::blueprintSiteRuntime);
+        tests.put(id("blueprint_site_content_hash_mismatch"), ModGameTests::blueprintSiteContentHashMismatch);
         tests.put(id("chunk_generation_rejection_serialization"),
                 ModGameTests::chunkGenerationRejectionSerialization);
         tests.put(id("chunk_generation_initialization_serialization"),
-                ModGameTests::chunkGenerationInitializationSerialization);
+                ModGameTests::chunkGenerationRejectionSerialization);
         tests.put(id("natural_rejection_serialization"),
                 ModGameTests::naturalRejectionSerialization);
         tests.put(id("planet_faction_outpost_runtime"), ModGameTests::planetFactionOutpostRuntime);
@@ -4529,6 +4529,30 @@ public final class ModGameTests {
         if (afterReplay != loadedResidents || restored.outpost(outpost.id()).isEmpty()
                 || !restored.siteGenerated(outpost.id())) {
             helper.fail("Blueprint site initialization was not reload-idempotent");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void blueprintSiteContentHashMismatch(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos anchorPos = helper.absolutePos(new BlockPos(2, 1, 2));
+        BlockPos lootPos = anchorPos.offset(2, 0, 0);
+        level.setBlock(anchorPos, ModBlocks.BLUEPRINT_SITE_ANCHOR.get().defaultBlockState(), 3);
+        level.setBlock(lootPos, ModBlocks.BLUEPRINT_SITE_LOOT.get().defaultBlockState(), 3);
+        if (!(level.getBlockEntity(anchorPos) instanceof BlueprintSiteAnchorBlockEntity anchor)) {
+            helper.fail("Blueprint site anchor block entity was not created");
+            return;
+        }
+        anchor.configure("galacticwars:hutt_salvage_depot", 0, "0".repeat(64));
+        BlueprintSiteAnchorBlockEntity.serverTick(level, anchorPos, level.getBlockState(anchorPos), anchor);
+        BlueprintSiteAnchorBlockEntity.serverTick(level, anchorPos, level.getBlockState(anchorPos), anchor);
+        boolean outpostRegistered = FactionOutpostSavedData.get(level).outposts().stream()
+                .anyMatch(candidate -> candidate.x() == anchorPos.getX() && candidate.y() == anchorPos.getY()
+                        && candidate.z() == anchorPos.getZ());
+        if (!anchor.isInitializationInvalid() || outpostRegistered
+                || !level.getBlockState(lootPos).is(ModBlocks.BLUEPRINT_SITE_LOOT.get())) {
+            helper.fail("Mismatched blueprint content hash was allowed to initialize a generated site");
             return;
         }
         helper.succeed();

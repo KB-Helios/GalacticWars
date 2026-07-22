@@ -33,45 +33,71 @@ public final class BlueprintStructure extends Structure {
         Holder<?> biome = context.biomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(y),
                 QuartPos.fromBlock(z), context.randomState().sampler());
         String biomeId = biome.unwrapKey().map(key -> key.identifier().toString()).orElse("");
-        List<KingdomBaseBlueprint> eligible = GameplayDataManager.snapshot().blueprints().values().stream()
-                .filter(blueprint -> blueprint.worldgen().isPresent())
-                .filter(blueprint -> blueprint.worldgen().orElseThrow().biomes().contains(biomeId))
-                .filter(blueprint -> y >= blueprint.terrainConstraints().minY()
-                        && y <= blueprint.terrainConstraints().maxY())
-                .sorted(Comparator.comparing(KingdomBaseBlueprint::id))
-                .toList();
+        List<KingdomBaseBlueprint> eligible = eligibleBlueprintsForBiome(y, biomeId);
         if (eligible.isEmpty()) {
             return Optional.empty();
         }
         RandomSource random = RandomSource.create(context.seed()
                 ^ ((long) context.chunkPos().x() * 341873128712L)
                 ^ ((long) context.chunkPos().z() * 132897987541L));
-        int totalWeight = eligible.stream().mapToInt(value -> value.worldgen().orElseThrow().placementWeight()).sum();
-        int selectedWeight = random.nextInt(totalWeight);
-        KingdomBaseBlueprint selected = eligible.getFirst();
-        for (KingdomBaseBlueprint candidate : eligible) {
-            selectedWeight -= candidate.worldgen().orElseThrow().placementWeight();
-            if (selectedWeight < 0) {
-                selected = candidate;
-                break;
-            }
-        }
+        KingdomBaseBlueprint selected = pickByWeight(eligible, random);
         int degrees = selected.allowedRotations().get(random.nextInt(selected.allowedRotations().size()));
         int rotationSteps = degrees / 90;
-        int minX = selected.placements().stream().mapToInt(BaseBlockPlacement::x).min()
-                .orElse(selected.anchor().x());
-        int maxX = selected.placements().stream().mapToInt(BaseBlockPlacement::x).max()
-                .orElse(selected.anchor().x());
-        int minZ = selected.placements().stream().mapToInt(BaseBlockPlacement::z).min()
-                .orElse(selected.anchor().z());
-        int maxZ = selected.placements().stream().mapToInt(BaseBlockPlacement::z).max()
-                .orElse(selected.anchor().z());
+        if (terrainSlopeExceedsLimit(selected, rotationSteps, x, z, context)) {
+            return Optional.empty();
+        }
+        BlockPos position = computePlacementPosition(selected, x, y, z);
+        return Optional.of(new GenerationStub(new BlockPos(x, y, z), builder -> builder.addPiece(
+                new BlueprintStructurePiece(context.structureTemplateManager(), selected, rotationSteps, position))));
+    }
+
+    private static List<KingdomBaseBlueprint> eligibleBlueprintsForBiome(int y, String biomeId) {
+        return GameplayDataManager.snapshot().blueprints().values().stream()
+                .filter(blueprint -> blueprint.worldgen().isPresent())
+                .filter(blueprint -> blueprint.worldgen().orElseThrow().biomes().contains(biomeId))
+                .filter(blueprint -> y >= blueprint.terrainConstraints().minY()
+                        && y <= blueprint.terrainConstraints().maxY())
+                .sorted(Comparator.comparing(KingdomBaseBlueprint::id))
+                .toList();
+    }
+
+    private static KingdomBaseBlueprint pickByWeight(
+            List<KingdomBaseBlueprint> eligible, RandomSource random
+    ) {
+        int totalWeight = eligible.stream()
+                .mapToInt(blueprint -> blueprint.worldgen().orElseThrow().placementWeight())
+                .sum();
+        int selectedWeight = random.nextInt(totalWeight);
+        for (KingdomBaseBlueprint blueprint : eligible) {
+            selectedWeight -= blueprint.worldgen().orElseThrow().placementWeight();
+            if (selectedWeight < 0) {
+                return blueprint;
+            }
+        }
+        return eligible.getFirst();
+    }
+
+    private static boolean terrainSlopeExceedsLimit(
+            KingdomBaseBlueprint blueprint,
+            int rotationSteps,
+            int x,
+            int z,
+            GenerationContext context
+    ) {
+        int minX = blueprint.placements().stream().mapToInt(BaseBlockPlacement::x).min()
+                .orElse(blueprint.anchor().x());
+        int maxX = blueprint.placements().stream().mapToInt(BaseBlockPlacement::x).max()
+                .orElse(blueprint.anchor().x());
+        int minZ = blueprint.placements().stream().mapToInt(BaseBlockPlacement::z).min()
+                .orElse(blueprint.anchor().z());
+        int maxZ = blueprint.placements().stream().mapToInt(BaseBlockPlacement::z).max()
+                .orElse(blueprint.anchor().z());
         int min = Integer.MAX_VALUE;
         int max = Integer.MIN_VALUE;
         for (int templateX : new int[]{minX, maxX}) {
             for (int templateZ : new int[]{minZ, maxZ}) {
-                int relativeX = templateX - selected.anchor().x();
-                int relativeZ = templateZ - selected.anchor().z();
+                int relativeX = templateX - blueprint.anchor().x();
+                int relativeZ = templateZ - blueprint.anchor().z();
                 int dx = switch (rotationSteps) {
                     case 1 -> -relativeZ;
                     case 2 -> -relativeX;
@@ -90,14 +116,11 @@ public final class BlueprintStructure extends Structure {
                 max = Math.max(max, corner);
             }
         }
-        if (max - min > selected.terrainConstraints().maxSlope()) {
-            return Optional.empty();
-        }
-        BlockPos position = new BlockPos(x - selected.anchor().x(), y - selected.anchor().y(),
-                z - selected.anchor().z());
-        KingdomBaseBlueprint blueprint = selected;
-        return Optional.of(new GenerationStub(new BlockPos(x, y, z), builder -> builder.addPiece(
-                new BlueprintStructurePiece(context.structureTemplateManager(), blueprint, rotationSteps, position))));
+        return max - min > blueprint.terrainConstraints().maxSlope();
+    }
+
+    private static BlockPos computePlacementPosition(KingdomBaseBlueprint blueprint, int x, int y, int z) {
+        return new BlockPos(x - blueprint.anchor().x(), y - blueprint.anchor().y(), z - blueprint.anchor().z());
     }
 
     @Override

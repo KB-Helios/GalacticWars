@@ -7,7 +7,9 @@ import net.minecraft.resources.Identifier;
 public record BlueprintRosterEntry(String entityTypeId, int minimum, int maximum, int weight, String serviceBranch) {
     public BlueprintRosterEntry {
         entityTypeId = normalize(entityTypeId, "entityTypeId");
-        if (!Identifier.isValidResourceLocation(entityTypeId)) {
+        try {
+            Identifier.parse(entityTypeId);
+        } catch (RuntimeException exception) {
             throw new IllegalArgumentException("invalid entity type identifier: " + entityTypeId);
         }
         serviceBranch = normalize(serviceBranch, "serviceBranch");

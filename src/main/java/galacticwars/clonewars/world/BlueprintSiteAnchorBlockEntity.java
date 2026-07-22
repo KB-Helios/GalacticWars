@@ -34,6 +34,7 @@ public final class BlueprintSiteAnchorBlockEntity extends BlockEntity {
     private int rotationSteps;
     private String contentHash = "";
     private boolean initialized;
+    private boolean invalid;
 
     public BlueprintSiteAnchorBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntityTypes.BLUEPRINT_SITE_ANCHOR.get(), pos, state);
@@ -48,45 +49,64 @@ public final class BlueprintSiteAnchorBlockEntity extends BlockEntity {
         this.blueprintId = KingdomBaseBlueprint.canonicalId(blueprintId);
         this.rotationSteps = Math.floorMod(rotationSteps, 4);
         this.contentHash = contentHash == null ? "" : contentHash;
+        this.initialized = false;
+        this.invalid = false;
         setChanged();
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, BlueprintSiteAnchorBlockEntity anchor) {
-        if (anchor.initialized || anchor.blueprintId.isBlank() || !(level instanceof ServerLevel serverLevel)
-                || !GameplayDataManager.isReady()) {
+        if (!(level instanceof ServerLevel serverLevel) || !anchor.shouldInitialize()) {
             return;
         }
         anchor.initialize(serverLevel, pos);
     }
 
+    private boolean shouldInitialize() {
+        return !initialized && !invalid && !blueprintId.isBlank() && GameplayDataManager.isReady();
+    }
+
     private void initialize(ServerLevel level, BlockPos pos) {
         KingdomBaseBlueprint blueprint = GameplayDataManager.snapshot().blueprint(blueprintId).orElse(null);
         if (blueprint == null || blueprint.worldgen().isEmpty()) {
-            initialized = true;
-            setChanged();
+            markInvalid();
             return;
         }
-        if (!blueprint.matchesDefinitionHash(contentHash)) {
-            initialized = true;
-            setChanged();
+        if (!contentHash.isEmpty() && !contentHash.equals(blueprint.contentHash())) {
+            markInvalid();
             return;
         }
         var profile = blueprint.worldgen().orElseThrow();
-        String identity = level.dimension().identifier() + ":" + pos.asLong() + ":" + blueprintId;
-        UUID siteId = UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8));
+        UUID siteId = computeSiteId(level, pos);
         FactionOutpostSavedData data = FactionOutpostSavedData.get(level);
         if (data.outpost(siteId).isPresent()) {
-            initialized = true;
-            setChanged();
+            markInitialized();
             return;
         }
 
         RandomSource random = RandomSource.create(siteId.getMostSignificantBits() ^ siteId.getLeastSignificantBits());
+        ResidentPlan plan = buildResidentPlan(siteId, profile.roster(), random);
+
+        // Seal the one-shot transaction before exposing containers or residents.
+        data.registerGeneratedSite(siteId, profile.factionId(), level.dimension().identifier().toString(),
+                pos, profile.siteRadius(), plan.military(), plan.civilians(), level.getGameTime());
+        markInitialized();
+        initializeLoot(level, pos, profile.factionId(), siteId);
+        spawnResidents(level, pos, profile.siteRadius(), siteId, plan.residents());
+    }
+
+    private UUID computeSiteId(ServerLevel level, BlockPos pos) {
+        String identity = level.dimension().identifier() + ":" + pos.asLong() + ":" + blueprintId;
+        return UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static ResidentPlan buildResidentPlan(
+            UUID siteId, List<BlueprintRosterEntry> roster, RandomSource random
+    ) {
         ArrayList<PendingResident> residents = new ArrayList<>();
         ArrayList<UUID> military = new ArrayList<>();
         ArrayList<UUID> civilians = new ArrayList<>();
         int ordinal = 0;
-        for (BlueprintRosterEntry entry : profile.roster()) {
+        for (BlueprintRosterEntry entry : roster) {
             int count = entry.minimum() + random.nextInt(entry.maximum() - entry.minimum() + 1);
             NpcServiceBranch branch = entry.serviceBranch().equals("civilian")
                     ? NpcServiceBranch.CIVILIAN : NpcServiceBranch.MILITARY;
@@ -96,14 +116,21 @@ public final class BlueprintSiteAnchorBlockEntity extends BlockEntity {
                 (branch == NpcServiceBranch.MILITARY ? military : civilians).add(npcId);
             }
         }
+        return new ResidentPlan(List.copyOf(residents), List.copyOf(military), List.copyOf(civilians));
+    }
 
-        // Seal the one-shot transaction before exposing containers or residents.
-        data.registerGeneratedSite(siteId, profile.factionId(), level.dimension().identifier().toString(),
-                pos, profile.siteRadius(), military, civilians, level.getGameTime());
+    private void markInitialized() {
         initialized = true;
         setChanged();
-        initializeLoot(level, pos, profile.factionId(), siteId);
-        spawnResidents(level, pos, profile.siteRadius(), siteId, residents);
+    }
+
+    private void markInvalid() {
+        invalid = true;
+        setChanged();
+    }
+
+    public boolean isInitializationInvalid() {
+        return invalid;
     }
 
     private static void initializeLoot(ServerLevel level, BlockPos center, String factionId, UUID siteId) {
@@ -152,6 +179,7 @@ public final class BlueprintSiteAnchorBlockEntity extends BlockEntity {
         rotationSteps = input.getIntOr("rotation_steps", 0);
         contentHash = input.getStringOr("content_hash", "");
         initialized = input.getBooleanOr("initialized", false);
+        invalid = input.getBooleanOr("invalid", false);
     }
 
     @Override
@@ -161,8 +189,16 @@ public final class BlueprintSiteAnchorBlockEntity extends BlockEntity {
         output.putInt("rotation_steps", rotationSteps);
         output.putString("content_hash", contentHash);
         output.putBoolean("initialized", initialized);
+        output.putBoolean("invalid", invalid);
     }
 
     private record PendingResident(UUID id, String entityTypeId, NpcServiceBranch branch) {
+    }
+
+    private record ResidentPlan(
+            List<PendingResident> residents,
+            List<UUID> military,
+            List<UUID> civilians
+    ) {
     }
 }

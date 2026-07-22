@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 import galacticwars.clonewars.kingdom.BuildProject;
@@ -50,53 +51,17 @@ public record KingdomBaseBlueprint(
         displayName = requireNonBlank(displayName, "displayName");
         anchor = Objects.requireNonNull(anchor, "anchor");
         allowedRotations = normalizeAllowedRotations(allowedRotations);
-        placements = List.copyOf(Objects.requireNonNull(placements, "placements"));
-        if (placements.isEmpty()) {
-            throw new IllegalArgumentException("placements cannot be empty");
-        }
-        HashSet<String> occupiedPositions = new HashSet<>();
-        for (BaseBlockPlacement placement : placements) {
-            Objects.requireNonNull(placement, "placement");
-            String position = placement.x() + ":" + placement.y() + ":" + placement.z();
-            if (!occupiedPositions.add(position)) {
-                throw new IllegalArgumentException("duplicate blueprint placement at " + position);
-            }
-        }
-        if (housingReward < 0 || storageSlotReward < 0 || worksiteCapacity < 0 || commanderSlotReward < 0) {
-            throw new IllegalArgumentException("blueprint rewards cannot be negative");
-        }
-        worksiteType = worksiteType == null ? "" : worksiteType.trim().toLowerCase(Locale.ROOT);
-        if (worksiteType.isBlank() != (worksiteCapacity == 0)) {
-            throw new IllegalArgumentException("worksite type and capacity must be defined together");
-        }
-        if (storageSlotReward > 0) {
-            long containerCount = placements.stream()
-                    .filter(placement -> placement.blockId().equals("minecraft:chest"))
-                    .count();
-            if (containerCount == 0 || storageSlotReward < containerCount) {
-                throw new IllegalArgumentException("storage reward requires enough chest placements");
-            }
-        }
-        templateId = templateId == null || templateId.isBlank() ? "" : canonicalId(templateId);
-        modes = Set.copyOf(Objects.requireNonNull(modes, "modes"));
-        if (modes.isEmpty()) {
-            throw new IllegalArgumentException("blueprint modes cannot be empty");
-        }
+        placements = normalizePlacements(placements);
+        validateRewards(housingReward, storageSlotReward, worksiteCapacity, commanderSlotReward);
+        worksiteType = normalizeWorksiteType(worksiteType, worksiteCapacity);
+        validateStorageReward(storageSlotReward, placements);
+        templateId = normalizeTemplateId(templateId);
+        modes = normalizeModes(modes);
         terrainConstraints = Objects.requireNonNull(terrainConstraints, "terrainConstraints");
-        constructionCostOverrides = Map.copyOf(Objects.requireNonNull(constructionCostOverrides,
-                "constructionCostOverrides"));
+        constructionCostOverrides = normalizeCostOverrides(constructionCostOverrides);
         worldgen = Objects.requireNonNull(worldgen, "worldgen");
-        compatibleDefinitionHashes = Set.copyOf(Objects.requireNonNull(
-                compatibleDefinitionHashes, "compatibleDefinitionHashes"));
-        if (compatibleDefinitionHashes.stream().anyMatch(hash -> !hash.matches("[0-9a-f]{64}"))) {
-            throw new IllegalArgumentException("compatible definition hashes must be lowercase SHA-256 values");
-        }
-        if (modes.contains(BlueprintMode.WORLDGEN) != worldgen.isPresent()) {
-            throw new IllegalArgumentException("worldgen mode and profile must be defined together");
-        }
-        if (modes.contains(BlueprintMode.WORLDGEN) && templateId.isBlank()) {
-            throw new IllegalArgumentException("worldgen blueprints require a template");
-        }
+        compatibleDefinitionHashes = normalizeCompatibleHashes(compatibleDefinitionHashes);
+        validateWorldgenConfiguration(templateId, modes, worldgen);
     }
 
     public KingdomBaseBlueprint(
@@ -127,9 +92,7 @@ public record KingdomBaseBlueprint(
             int commanderSlotReward
     ) {
         this(id, displayName, BlueprintAnchor.ORIGIN, ALL_ROTATIONS, placements,
-                housingReward, storageSlotReward, worksiteType, worksiteCapacity, commanderSlotReward,
-                "", Set.of(BlueprintMode.CONSTRUCTION), BlueprintTerrainConstraints.DEFAULT,
-                Map.of(), Optional.empty(), Set.of());
+                housingReward, storageSlotReward, worksiteType, worksiteCapacity, commanderSlotReward);
     }
 
     private static final List<KingdomBaseBlueprint> ALL_BLUEPRINTS = List.of(
@@ -270,14 +233,8 @@ public record KingdomBaseBlueprint(
             }
             update(digest, placements.size());
             for (BaseBlockPlacement placement : placements) {
-                update(digest, placement.x());
-                update(digest, placement.y());
-                update(digest, placement.z());
-                update(digest, placement.blockId());
-                update(digest, placement.itemId());
-                if (!placement.properties().isEmpty()) {
-                    update(digest, new java.util.TreeMap<>(placement.properties()).toString());
-                }
+                updatePlacementCore(digest, placement);
+                updatePlacementPropertiesAsString(digest, placement);
             }
             update(digest, housingReward);
             update(digest, storageSlotReward);
@@ -308,15 +265,8 @@ public record KingdomBaseBlueprint(
             update(digest, anchor.z());
             allowedRotations.forEach(value -> update(digest, value));
             for (BaseBlockPlacement placement : placements) {
-                update(digest, placement.x());
-                update(digest, placement.y());
-                update(digest, placement.z());
-                update(digest, placement.blockId());
-                update(digest, placement.itemId());
-                new java.util.TreeMap<>(placement.properties()).forEach((key, value) -> {
-                    update(digest, key);
-                    update(digest, value);
-                });
+                updatePlacementCore(digest, placement);
+                updatePlacementPropertiesAsPairs(digest, placement);
             }
             update(digest, housingReward);
             update(digest, storageSlotReward);
@@ -326,7 +276,7 @@ public record KingdomBaseBlueprint(
             update(digest, terrainConstraints.maxSlope());
             update(digest, terrainConstraints.minY());
             update(digest, terrainConstraints.maxY());
-            new java.util.TreeMap<>(constructionCostOverrides).forEach((key, value) -> {
+            new TreeMap<>(constructionCostOverrides).forEach((key, value) -> {
                 update(digest, key);
                 update(digest, value);
             });
@@ -446,6 +396,86 @@ public record KingdomBaseBlueprint(
         return trimmed;
     }
 
+    private static List<BaseBlockPlacement> normalizePlacements(List<BaseBlockPlacement> placements) {
+        List<BaseBlockPlacement> copy = List.copyOf(Objects.requireNonNull(placements, "placements"));
+        if (copy.isEmpty()) {
+            throw new IllegalArgumentException("placements cannot be empty");
+        }
+        HashSet<String> occupiedPositions = new HashSet<>();
+        for (BaseBlockPlacement placement : copy) {
+            Objects.requireNonNull(placement, "placement");
+            String position = placement.x() + ":" + placement.y() + ":" + placement.z();
+            if (!occupiedPositions.add(position)) {
+                throw new IllegalArgumentException("duplicate blueprint placement at " + position);
+            }
+        }
+        return copy;
+    }
+
+    private static void validateRewards(
+            int housingReward, int storageSlotReward, int worksiteCapacity, int commanderSlotReward
+    ) {
+        if (housingReward < 0 || storageSlotReward < 0 || worksiteCapacity < 0 || commanderSlotReward < 0) {
+            throw new IllegalArgumentException("blueprint rewards cannot be negative");
+        }
+    }
+
+    private static String normalizeWorksiteType(String worksiteType, int worksiteCapacity) {
+        String normalized = worksiteType == null ? "" : worksiteType.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank() != (worksiteCapacity == 0)) {
+            throw new IllegalArgumentException("worksite type and capacity must be defined together");
+        }
+        return normalized;
+    }
+
+    private static void validateStorageReward(int storageSlotReward, List<BaseBlockPlacement> placements) {
+        if (storageSlotReward <= 0) {
+            return;
+        }
+        long containerCount = placements.stream()
+                .filter(placement -> placement.blockId().equals("minecraft:chest"))
+                .count();
+        if (containerCount == 0 || storageSlotReward < containerCount) {
+            throw new IllegalArgumentException("storage reward requires enough chest placements");
+        }
+    }
+
+    private static String normalizeTemplateId(String templateId) {
+        return templateId == null || templateId.isBlank() ? "" : canonicalId(templateId);
+    }
+
+    private static Set<BlueprintMode> normalizeModes(Set<BlueprintMode> modes) {
+        Set<BlueprintMode> copy = Set.copyOf(Objects.requireNonNull(modes, "modes"));
+        if (copy.isEmpty()) {
+            throw new IllegalArgumentException("blueprint modes cannot be empty");
+        }
+        return copy;
+    }
+
+    private static Map<String, Integer> normalizeCostOverrides(Map<String, Integer> overrides) {
+        return Map.copyOf(Objects.requireNonNull(overrides, "constructionCostOverrides"));
+    }
+
+    private static Set<String> normalizeCompatibleHashes(Set<String> hashes) {
+        Set<String> copy = Set.copyOf(Objects.requireNonNull(hashes, "compatibleDefinitionHashes"));
+        if (copy.stream().anyMatch(hash -> !hash.matches("[0-9a-f]{64}"))) {
+            throw new IllegalArgumentException("compatible definition hashes must be lowercase SHA-256 values");
+        }
+        return copy;
+    }
+
+    private static void validateWorldgenConfiguration(
+            String templateId, Set<BlueprintMode> modes, Optional<BlueprintWorldgenProfile> worldgen
+    ) {
+        boolean worldgenMode = modes.contains(BlueprintMode.WORLDGEN);
+        if (worldgenMode != worldgen.isPresent()) {
+            throw new IllegalArgumentException("worldgen mode and profile must be defined together");
+        }
+        if (worldgenMode && templateId.isBlank()) {
+            throw new IllegalArgumentException("worldgen blueprints require a template");
+        }
+    }
+
     public static String canonicalId(String value) {
         String normalized = requireNonBlank(value, "id").toLowerCase(Locale.ROOT);
         if (normalized.indexOf(':') < 0) {
@@ -478,6 +508,27 @@ public record KingdomBaseBlueprint(
             throw new IllegalArgumentException("at least one rotation must be allowed");
         }
         return List.copyOf(normalized);
+    }
+
+    private static void updatePlacementCore(MessageDigest digest, BaseBlockPlacement placement) {
+        update(digest, placement.x());
+        update(digest, placement.y());
+        update(digest, placement.z());
+        update(digest, placement.blockId());
+        update(digest, placement.itemId());
+    }
+
+    private static void updatePlacementPropertiesAsString(MessageDigest digest, BaseBlockPlacement placement) {
+        if (!placement.properties().isEmpty()) {
+            update(digest, new TreeMap<>(placement.properties()).toString());
+        }
+    }
+
+    private static void updatePlacementPropertiesAsPairs(MessageDigest digest, BaseBlockPlacement placement) {
+        new TreeMap<>(placement.properties()).forEach((key, value) -> {
+            update(digest, key);
+            update(digest, value);
+        });
     }
 
     private static void update(MessageDigest digest, int value) {

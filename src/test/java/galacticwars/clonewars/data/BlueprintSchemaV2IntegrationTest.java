@@ -6,6 +6,7 @@ import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.nbt.CompoundTag;
@@ -93,6 +94,7 @@ public final class BlueprintSchemaV2IntegrationTest {
             ListTag blocks = template.getListOrEmpty("blocks");
             int anchors = 0;
             int loot = 0;
+            Set<String> templateLootMarkers = new HashSet<>();
             for (int index = 0; index < blocks.size(); index++) {
                 CompoundTag block = blocks.getCompoundOrEmpty(index);
                 int stateIndex = block.getIntOr("state", -1);
@@ -101,10 +103,18 @@ public final class BlueprintSchemaV2IntegrationTest {
                     String marker = block.getCompoundOrEmpty("nbt").getStringOr("metadata", "");
                     anchors += marker.equals("site_anchor") ? 1 : 0;
                     loot += marker.startsWith("loot:") ? 1 : 0;
+                    if (marker.startsWith("loot:")) {
+                        templateLootMarkers.add(marker.substring("loot:".length()));
+                    }
                 }
             }
+            Set<String> configuredLootMarkers = new HashSet<>();
+            worldgen.getAsJsonArray("loot_markers")
+                    .forEach(marker -> configuredLootMarkers.add(marker.getAsString()));
             require(anchors == 1, id + " must contain exactly one site anchor");
-            require(loot == worldgen.getAsJsonArray("loot_markers").size(), id + " loot markers do not match");
+            require(loot == worldgen.getAsJsonArray("loot_markers").size(), id + " loot marker count changed");
+            require(templateLootMarkers.equals(configuredLootMarkers),
+                    id + " loot marker names do not match descriptor");
         }
     }
 
