@@ -9,6 +9,8 @@ import net.minecraft.world.level.block.Block;
 public final class ModBlockTags {
     public static final TagKey<Block> WORKER_LOGS = create("worker_logs");
     public static final TagKey<Block> WORKER_MINEABLE = create("worker_mineable");
+    public static final TagKey<Block> FORCE_MOVABLE = create("force_movable");
+    public static final TagKey<Block> FORCE_IMMOVABLE = create("force_immovable");
 
     private ModBlockTags() {
     }

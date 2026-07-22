@@ -1,0 +1,5 @@
+{
+  "type":"minecraft:crafting_shaped","category":"building","pattern":["PAP"," R ","PAP"],
+  "key":{"P":"minecraft:polished_deepslate","A":"minecraft:amethyst_shard","R":"minecraft:redstone_block"},
+  "result":{"id":"galacticwars:sith_holocron_pedestal","count":1}
+}

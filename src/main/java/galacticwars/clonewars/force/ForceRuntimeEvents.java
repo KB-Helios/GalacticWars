@@ -9,6 +9,9 @@ public final class ForceRuntimeEvents {
     }
 
     public static void onServerTick(MinecraftServer server) {
+        ForceWorldEffectService.tickChannels(server);
+        ForceCollisionDamageService.tick(server);
+        ForceBlockTelekinesisService.tick(server);
         if (server.getTickCount() % 5 != 0) return;
         ForceSavedData data = ForceSavedData.get(server.overworld());
         boolean synchronizeHud = server.getTickCount() % 20 == 0;

@@ -36,6 +36,8 @@ final class GameplayContentFingerprint {
             updateMap(digest, "planet", launch.planets(), GameplayContentFingerprint::canonical);
             updateMap(digest, "vehicle", launch.vehicles(), GameplayContentFingerprint::canonical);
             updateMap(digest, "force", launch.forceAbilities(), GameplayContentFingerprint::canonical);
+            updateMap(digest, "force_tradition", launch.forceTraditions(), GameplayContentFingerprint::canonical);
+            updateMap(digest, "force_node", launch.forceNodes(), GameplayContentFingerprint::canonical);
             updateMap(digest, "quest", launch.quests(), GameplayContentFingerprint::canonical);
             updateMap(digest, "trade", launch.trades(), GameplayContentFingerprint::canonical);
             updateMap(digest, "region", launch.conquestRegions(), GameplayContentFingerprint::canonical);

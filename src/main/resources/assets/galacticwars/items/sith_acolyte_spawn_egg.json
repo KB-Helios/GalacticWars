@@ -1,0 +1,9 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "galacticwars:item/sith_acolyte_spawn_egg",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
+  }
+}

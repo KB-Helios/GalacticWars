@@ -59,18 +59,25 @@ public final class GalacticSystemsService {
         if (!state.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.requiredQuest())) {
             return SystemDecision.rejected("force_quest_locked", state);
         }
-        if (!state.unlocks().contains(ability.activeUnlock())
-                && !state.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.activeUnlock())) {
-            return SystemDecision.rejected("force_unlock_missing", state);
-        }
         String faction = state.factionId().contains(":")
                 ? state.factionId().substring(state.factionId().indexOf(':') + 1) : state.factionId();
-        String path = faction.equals("republic") ? "light" : faction.equals("nightsister") ? "dark" : "";
-        if (!path.equals(ability.path())) {
+        String tradition = switch (faction) {
+            case "republic" -> "jedi";
+            case "separatist" -> "sith";
+            case "nightsister" -> "nightsister";
+            default -> "";
+        };
+        String abilityTradition = ability.path().equals("light") ? "jedi"
+                : ability.path().equals("dark")
+                ? (faction.equals("separatist") ? "sith" : "nightsister") : ability.path();
+        if (!tradition.equals(abilityTradition)) {
             return SystemDecision.rejected("force_path_unavailable", state);
         }
-        return apply(state, new ProgressionEvent(eventId, state.playerId(),
-                ProgressionEventType.FORCE_ABILITY_USED, abilityId, 1));
+        ProgressionDecision decision = CampaignRuntimeService.record(state,
+                new ProgressionEvent(eventId, state.playerId(),
+                        ProgressionEventType.FORCE_ABILITY_USED, abilityId, 1));
+        return new SystemDecision(decision.accepted(), decision.changed(), decision.reason(),
+                decision.state(), decision.changed() ? abilityId : "", decision.changed() ? 1 : 0);
     }
 
     public static SystemDecision captureRegion(

@@ -58,6 +58,7 @@ import galacticwars.clonewars.faction.FactionBalanceService;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.FactionRelation;
 import galacticwars.clonewars.force.ForceWorldEffectService;
+import galacticwars.clonewars.force.ForceShrineService;
 import galacticwars.clonewars.kingdom.BuildProject;
 import galacticwars.clonewars.kingdom.CommandCenterDashboardState;
 import galacticwars.clonewars.kingdom.KingdomRecord;
@@ -104,6 +105,7 @@ import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.progression.ProgressionState;
 import galacticwars.clonewars.progression.ForceSavedData;
 import galacticwars.clonewars.progression.ForceAbilityRuntimeService;
+import galacticwars.clonewars.progression.ForceProgressionService;
 import galacticwars.clonewars.recruitment.RecruitmentAction;
 import galacticwars.clonewars.recruitment.RecruitDuty;
 import galacticwars.clonewars.recruitment.RecruitmentPaymentService;
@@ -580,13 +582,15 @@ public final class ModGameTests {
                 .overworldSpawnProfileForEntity("galacticwars:phase_i_clone_trooper").orElse(null);
         OverworldFactionSpawnProfile phaseIArcOutpost = snapshot
                 .overworldSpawnProfileForEntity("galacticwars:phase_i_arc_trooper").orElse(null);
-        if (snapshot.unitClasses().size() != 20
-                || snapshot.abilities().size() != 30
+        if (snapshot.unitClasses().size() != 21
+                || snapshot.abilities().size() != 33
                 || snapshot.factionPolicies().size() != 5
                 || snapshot.launchContent().planets().size() != 4
                 || snapshot.launchContent().vehicles().size() != 5
-                || snapshot.launchContent().forceAbilities().size() != 6
-                || snapshot.launchContent().quests().size() != 15
+                || snapshot.launchContent().forceAbilities().size() != 31
+                || snapshot.launchContent().forceTraditions().size() != 3
+                || snapshot.launchContent().forceNodes().size() != 39
+                || snapshot.launchContent().quests().size() != 24
                 || snapshot.launchContent().trades().size() != 10
                 || snapshot.launchContent().conquestRegions().size() != 4
                 || snapshot.launchContent().forceAbilities().values().stream()
@@ -2425,6 +2429,7 @@ public final class ModGameTests {
                 new SpawnEggCase(ModItems.MANDALORIAN_MARKSMAN_SPAWN_EGG.get(), ModEntityTypes.MANDALORIAN_MARKSMAN.get()),
                 new SpawnEggCase(ModItems.MANDALORIAN_HEAVY_SPAWN_EGG.get(), ModEntityTypes.MANDALORIAN_HEAVY.get()),
                 new SpawnEggCase(ModItems.B1_BATTLE_DROID_SPAWN_EGG.get(), ModEntityTypes.B1_BATTLE_DROID.get()),
+                new SpawnEggCase(ModItems.SITH_ACOLYTE_SPAWN_EGG.get(), ModEntityTypes.SITH_ACOLYTE.get()),
                 new SpawnEggCase(ModItems.B1_SECURITY_DROID_SPAWN_EGG.get(),
                         ModEntityTypes.B1_SECURITY_DROID.get()),
                 new SpawnEggCase(ModItems.B2_SUPER_BATTLE_DROID_SPAWN_EGG.get(), ModEntityTypes.B2_SUPER_BATTLE_DROID.get()),
@@ -2935,6 +2940,18 @@ public final class ModGameTests {
         light.setXRot(0.0F);
         completeForceCampaign(progression, light, "galacticwars:republic",
                 "clone_trooper", "kamino");
+        BlockPos jediShrine = lightOrigin.offset(2, 0, 0);
+        helper.getLevel().setBlock(jediShrine, ModBlocks.JEDI_MEDITATION_SHRINE.get().defaultBlockState(), 3);
+        if (!ForceShrineService.open(light, jediShrine, "jedi")) {
+            helper.fail("Republic chapter-one player could not initiate at the physical Jedi shrine");
+            return;
+        }
+        force.update(light.getUUID(), state -> ForceProgressionService.gainMastery(
+                state, 10, LaunchContentCatalog.data()).state());
+        force.update(light.getUUID(), state -> ForceProgressionService.learnNode(
+                state, "light_pull", LaunchContentCatalog.data()).state());
+        force.update(light.getUUID(), state -> ForceProgressionService.equip(
+                state, 1, "light_pull", LaunchContentCatalog.data()).state());
 
         GalacticRecruitEntity ally = spawnRecruitAt(
                 helper, ModEntityTypes.CLONE_TROOPER.get(), lightOrigin.offset(0, 0, 3));
@@ -3021,6 +3038,21 @@ public final class ModGameTests {
         dark.setXRot(0.0F);
         completeForceCampaign(progression, dark, "galacticwars:nightsister",
                 "nightsister_acolyte", "coruscant");
+        BlockPos nightsisterShrine = darkOrigin.offset(-2, 0, 0);
+        helper.getLevel().setBlock(nightsisterShrine,
+                ModBlocks.NIGHTSISTER_SPIRIT_ALTAR.get().defaultBlockState(), 3);
+        if (!ForceShrineService.open(dark, nightsisterShrine, "nightsister")) {
+            helper.fail("Nightsister chapter-one player could not initiate at the physical spirit altar");
+            return;
+        }
+        force.update(dark.getUUID(), state -> ForceProgressionService.gainMastery(
+                state, 25, LaunchContentCatalog.data()).state());
+        force.update(dark.getUUID(), state -> ForceProgressionService.learnNode(
+                state, "hex", LaunchContentCatalog.data()).state());
+        force.update(dark.getUUID(), state -> ForceProgressionService.learnNode(
+                state, "spirit_snare", LaunchContentCatalog.data()).state());
+        force.update(dark.getUUID(), state -> ForceProgressionService.equip(
+                state, 2, "spirit_snare", LaunchContentCatalog.data()).state());
 
         var darkPushed = spawnEntityAt(
                 helper, EntityTypes.ZOMBIE, darkOrigin.offset(0, 0, 6));
@@ -3048,13 +3080,44 @@ public final class ModGameTests {
         var choked = spawnEntityAt(
                 helper, EntityTypes.ZOMBIE, darkOrigin.offset(0, 0, 4));
         choked.setNoAi(true);
-        UUID darkChokeId = UUID.randomUUID();
-        if (!ForceWorldEffectService.activate(dark, darkChokeId, 2)
-                || !choked.hasEffect(MobEffects.LEVITATION)
+        UUID spiritSnareId = UUID.randomUUID();
+        if (!ForceWorldEffectService.activate(dark, spiritSnareId, 2)
+                || !choked.hasEffect(MobEffects.SLOWNESS)
                 || !choked.hasEffect(MobEffects.WEAKNESS)
-                || force.state(dark.getUUID()).energy() != 30) {
-            helper.fail("Dark Choke did not apply its physical effects and cost: effects="
+                || force.state(dark.getUUID()).energy() != 55) {
+            helper.fail("Spirit Snare did not apply its physical effects and cost: effects="
                     + choked.getActiveEffects() + ", state=" + force.state(dark.getUUID()));
+            return;
+        }
+        choked.discard();
+
+        dark.setPos(darkOrigin.getX() + 100.5D, darkOrigin.getY(), darkOrigin.getZ() + 0.5D);
+        ServerPlayer sith = makeConnectedMockPlayer(helper, GameType.CREATIVE);
+        sith.setPos(darkOrigin.getX() + 0.5D, darkOrigin.getY(), darkOrigin.getZ() + 0.5D);
+        sith.setYRot(0.0F);
+        sith.setYHeadRot(0.0F);
+        sith.setXRot(0.0F);
+        completeForceCampaign(progression, sith, "galacticwars:separatist",
+                "b1_battle_droid", "geonosis");
+        BlockPos sithShrine = darkOrigin.offset(2, 0, 0);
+        helper.getLevel().setBlock(sithShrine,
+                ModBlocks.SITH_HOLOCRON_PEDESTAL.get().defaultBlockState(), 3);
+        if (!ForceShrineService.open(sith, sithShrine, "sith")) {
+            helper.fail("Separatist chapter-one player could not initiate at the Sith pedestal");
+            return;
+        }
+        force.update(sith.getUUID(), state -> ForceProgressionService.gainMastery(
+                state, 10, LaunchContentCatalog.data()).state());
+        force.update(sith.getUUID(), state -> ForceProgressionService.learnNode(
+                state, "force_lightning", LaunchContentCatalog.data()).state());
+        var shocked = spawnEntityAt(helper, EntityTypes.ZOMBIE, darkOrigin.offset(0, 0, 5));
+        shocked.setNoAi(true);
+        UUID lightningId = UUID.randomUUID();
+        if (!ForceWorldEffectService.activate(sith, lightningId, 2)
+                || shocked.getHealth() >= shocked.getMaxHealth()
+                || force.state(sith.getUUID()).energy() != 90) {
+            helper.fail("Sith Force Lightning did not use the shared damage and energy runtime: "
+                    + shocked.getHealth() + "/" + force.state(sith.getUUID()));
             return;
         }
 
@@ -3064,9 +3127,13 @@ public final class ModGameTests {
                 || restored.state(light.getUUID()).energy() != 40
                 || !restored.state(light.getUUID()).processedActivationIds().contains(lightLeapId)
                 || !restored.state(dark.getUUID()).path().equals("dark")
-                || restored.state(dark.getUUID()).energy() != 30
-                || !restored.state(dark.getUUID()).processedActivationIds().contains(darkChokeId)) {
-            helper.fail("Force paths, energy, cooldowns, or replay IDs did not survive persistence");
+                || !restored.state(dark.getUUID()).traditionId().equals("nightsister")
+                || restored.state(dark.getUUID()).energy() != 55
+                || !restored.state(dark.getUUID()).processedActivationIds().contains(spiritSnareId)
+                || !restored.state(sith.getUUID()).traditionId().equals("sith")
+                || restored.state(sith.getUUID()).energy() != 90
+                || !restored.state(sith.getUUID()).processedActivationIds().contains(lightningId)) {
+            helper.fail("Force traditions, energy, cooldowns, or replay IDs did not survive persistence");
             return;
         }
         helper.succeed();
@@ -3140,17 +3207,6 @@ public final class ModGameTests {
                 applyCampaignSetupEvent(progression, player, ProgressionEventType.RECRUIT_HIRED,
                         path.chapterThreeRecruit());
             }
-            if (path.faction().equals("galacticwars:republic")) {
-                applyCampaignSetupEvent(
-                        progression, player, ProgressionEventType.FORCE_ABILITY_USED, "light_push");
-                applyCampaignSetupEvent(
-                        progression, player, ProgressionEventType.FORCE_ABILITY_USED, "light_pull");
-            } else if (path.faction().equals("galacticwars:nightsister")) {
-                applyCampaignSetupEvent(
-                        progression, player, ProgressionEventType.FORCE_ABILITY_USED, "dark_push");
-                applyCampaignSetupEvent(
-                        progression, player, ProgressionEventType.FORCE_ABILITY_USED, "dark_dash");
-            }
             String factionPath = path.faction().substring(path.faction().indexOf(':') + 1);
             ProgressionState state = progression.state(player.getUUID());
             if (!state.hasSubject(
@@ -3181,26 +3237,12 @@ public final class ModGameTests {
                 progression, player, ProgressionEventType.BUILDING_COMPLETED, "starter_camp");
         applyCampaignSetupEvent(
                 progression, player, ProgressionEventType.RECRUIT_HIRED, firstRecruit);
-        applyCampaignSetupEvent(
-                progression, player, ProgressionEventType.DELIVERY_COMPLETED, campaignDeliverySubject());
-        applyCampaignSetupEvent(
-                progression, player, ProgressionEventType.BUILDING_COMPLETED, "forward_base");
-        applyCampaignSetupEvent(
-                progression, player, ProgressionEventType.PLANET_VISITED, chapterTwoPlanet);
-        applyCampaignSetupEvent(
-                progression, player, ProgressionEventType.VEHICLE_ACQUIRED, "barc_speeder");
-        applyCampaignSetupEvent(
-                progression, player, ProgressionEventType.TRADE_COMPLETED,
-                faction.equals("galacticwars:nightsister") ? "nightsister_matron" : "republic_quartermaster");
-        applyCampaignSetupEvent(
-                progression, player, ProgressionEventType.REGION_CAPTURED,
-                chapterTwoPlanet.equals("coruscant") ? "coruscant_district" : "kamino_platform");
         ProgressionState state = progression.state(player.getUUID());
         String factionPath = faction.substring(faction.indexOf(':') + 1);
-        if (!state.hasSubject(ProgressionEventType.QUEST_ADVANCED, factionPath + "_chapter_2")
-                || state.hasSubject(ProgressionEventType.QUEST_ADVANCED, factionPath + "_chapter_3")) {
+        if (!state.hasSubject(ProgressionEventType.QUEST_ADVANCED, factionPath + "_chapter_1")
+                || state.hasSubject(ProgressionEventType.QUEST_ADVANCED, factionPath + "_chapter_2")) {
             throw new IllegalStateException(
-                    "Force test campaign did not stop at its embodied training gate: " + state);
+                    "Force test campaign did not stop at chapter-one initiation gate: " + state);
         }
     }
 
@@ -4684,6 +4726,9 @@ public final class ModGameTests {
                     || guard.getTarget() == hostile
                     || BrainUtil.getMemory(guard,
                     net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET) == hostile;
+            if (engaged[0] && hostile.isAlive()) {
+                hostile.discard();
+            }
             if (!workerPrepared[0] && outposts.siteGenerated(outpostId)) {
                 workerPrepared[0] = true;
                 civilian.setWorkerProfession(WorkerProfession.BUILDER);
@@ -4759,7 +4804,8 @@ public final class ModGameTests {
             LaunchContentRuntime.install(
                     new LaunchContentDefinitions(
                             liveDefinitions.planets(), liveDefinitions.vehicles(),
-                            liveDefinitions.forceAbilities(), liveDefinitions.quests(),
+                            liveDefinitions.forceAbilities(), liveDefinitions.forceTraditions(),
+                            liveDefinitions.forceNodes(), liveDefinitions.quests(),
                             overriddenTrades, liveDefinitions.conquestRegions()),
                     runtimeSnapshot.factions(), runtimeSnapshot.units());
             overridePreview = PhysicalTradeService.preview(player, "republic_quartermaster");
@@ -4865,7 +4911,8 @@ public final class ModGameTests {
         try {
             LaunchContentRuntime.install(new LaunchContentDefinitions(
                             regionalDefinitions.planets(), regionalDefinitions.vehicles(),
-                            regionalDefinitions.forceAbilities(), regionalDefinitions.quests(),
+                            regionalDefinitions.forceAbilities(), regionalDefinitions.forceTraditions(),
+                            regionalDefinitions.forceNodes(), regionalDefinitions.quests(),
                             regionalTrades, regionalRegions),
                     regionalSnapshot.factions(), regionalSnapshot.units());
             ConquestSavedData conquest = ConquestSavedData.get(helper.getLevel());
@@ -4899,6 +4946,7 @@ public final class ModGameTests {
                     + veteranLocked);
             return;
         }
+        huttPlayer.getInventory().add(new ItemStack(ModItems.CREDIT_CHIP.get(), 68));
         ProgressionDecision captured = progression.apply(new ProgressionEvent(
                 UUID.randomUUID(), huttPlayer.getUUID(), ProgressionEventType.REGION_CAPTURED,
                 "tatooine_spaceport", 1));
@@ -5772,12 +5820,15 @@ public final class ModGameTests {
         shooter.initializeFromSpawnEgg();
         guardian.initializeFromSpawnEgg();
         guardian.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.BLUE_LIGHTSABER.get()));
-        int resourceBeforeRejectedDeflection = guardian.classProgressState().resource();
+        guardian.setYRot(90.0F);
+        guardian.setYHeadRot(90.0F);
+        guardian.setXRot(0.0F);
+        int resourceBeforeRejectedDeflection = guardian.npcForceEnergy();
         BlasterBoltEntity selfOwnedBolt = new BlasterBoltEntity(
                 helper.getLevel(), guardian, new ItemStack(ModItems.BLUE_LIGHTSABER.get()), 5.0D);
         if (LightsaberDeflectionService.tryDeflect(
                 selfOwnedBolt, guardian, helper.getLevel().getGameTime())
-                || guardian.classProgressState().resource() != resourceBeforeRejectedDeflection) {
+                || guardian.npcForceEnergy() != resourceBeforeRejectedDeflection) {
             helper.fail("Rejected self-owned bolt deflection consumed saber guard resources");
             return;
         }
@@ -5789,8 +5840,8 @@ public final class ModGameTests {
         if (!deflected
                 || bolt.getOwner() != guardian
                 || bolt.getDeltaMovement().x >= 0.0D
-                || guardian.classProgressState().resource() >= 100) {
-            helper.fail("Jedi saber guard did not authoritatively deflect and charge the class ability");
+                || guardian.npcForceEnergy() >= resourceBeforeRejectedDeflection) {
+            helper.fail("Jedi saber guard did not authoritatively deflect and spend NPC Force energy");
             return;
         }
         helper.succeed();

@@ -173,7 +173,7 @@ public final class ClassAbilityEffectRegistry {
             actor.addEffect(new MobEffectInstance(MobEffects.SPEED, 60, 0, false, false));
         } else if (id.contains("resistance") || id.contains("ward") || id.contains("beskar")) {
             actor.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 60, 0, false, false));
-        } else if (id.contains("steady") || id.contains("focus")) {
+        } else if (id.contains("steady") || id.contains("focus") || id.contains("weapon_mastery")) {
             actor.addEffect(new MobEffectInstance(MobEffects.STRENGTH, 60, 0, false, false));
         } else {
             actor.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 60, 0, false, false));

@@ -78,15 +78,19 @@ public final class GalacticProgressionCoordinator {
             return ProgressionDecision.rejected("unknown_quest", state);
         }
         String factionPath = faction.substring(faction.indexOf(':') + 1);
-        if (!questId.startsWith(factionPath + "_chapter_")) {
+        boolean campaignChapter = questId.matches(
+                java.util.regex.Pattern.quote(factionPath) + "_chapter_[1-9][0-9]*");
+        boolean forceTraining = questId.matches(
+                java.util.regex.Pattern.quote(factionPath) + "_force_training_[1-3]");
+        if (!campaignChapter && !forceTraining) {
             return ProgressionDecision.rejected("wrong_faction_quest", state);
         }
         if (state.hasSubject(ProgressionEventType.QUEST_ADVANCED, questId)) {
             return ProgressionDecision.accepted(state, state);
         }
-        int chapter = questId.charAt(questId.length() - 1) - '0';
+        int chapter = Integer.parseInt(questId.substring(questId.lastIndexOf('_') + 1));
         if (chapter > 1) {
-            String prerequisite = questId.substring(0, questId.length() - 1) + (chapter - 1);
+            String prerequisite = questId.substring(0, questId.lastIndexOf('_') + 1) + (chapter - 1);
             if (!state.hasSubject(ProgressionEventType.QUEST_ADVANCED, prerequisite)) {
                 return ProgressionDecision.rejected("quest_prerequisite_missing", state);
             }

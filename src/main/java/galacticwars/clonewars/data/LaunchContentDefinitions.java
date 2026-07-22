@@ -12,6 +12,8 @@ public record LaunchContentDefinitions(
         Map<String, PlanetDefinition> planets,
         Map<String, VehicleDefinition> vehicles,
         Map<String, ForceAbilityDefinition> forceAbilities,
+        Map<String, ForceTraditionDefinition> forceTraditions,
+        Map<String, ForceNodeDefinition> forceNodes,
         Map<String, QuestDefinition> quests,
         Map<String, TradeDefinition> trades,
         Map<String, ConquestRegionDefinition> conquestRegions
@@ -26,24 +28,44 @@ public record LaunchContentDefinitions(
         planets = immutable(planets, "planets");
         vehicles = immutable(vehicles, "vehicles");
         forceAbilities = immutable(forceAbilities, "forceAbilities");
+        forceTraditions = immutable(forceTraditions, "forceTraditions");
+        forceNodes = immutable(forceNodes, "forceNodes");
         quests = immutable(quests, "quests");
         trades = immutable(trades, "trades");
         conquestRegions = immutable(conquestRegions, "conquestRegions");
     }
 
     public static LaunchContentDefinitions empty() {
-        return new LaunchContentDefinitions(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+        return new LaunchContentDefinitions(
+                Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+    }
+
+    /** Compatibility constructor for dependency-light tests that do not exercise Force progression. */
+    public LaunchContentDefinitions(
+            Map<String, PlanetDefinition> planets,
+            Map<String, VehicleDefinition> vehicles,
+            Map<String, ForceAbilityDefinition> forceAbilities,
+            Map<String, QuestDefinition> quests,
+            Map<String, TradeDefinition> trades,
+            Map<String, ConquestRegionDefinition> conquestRegions
+    ) {
+        this(planets, vehicles, forceAbilities, Map.of(), Map.of(), quests, trades, conquestRegions);
     }
 
     public List<String> planetIds() { return List.copyOf(planets.keySet()); }
     public List<String> vehicleIds() { return List.copyOf(vehicles.keySet()); }
     public Set<String> forceAbilityIds() { return Set.copyOf(forceAbilities.keySet()); }
+    public Set<String> forceTraditionIds() { return Set.copyOf(forceTraditions.keySet()); }
+    public Set<String> forceNodeIds() { return Set.copyOf(forceNodes.keySet()); }
     public List<String> questIds() { return List.copyOf(quests.keySet()); }
     public Set<String> questUnlocks(String id) { return quests.containsKey(id) ? quests.get(id).unlocks() : Set.of(); }
     public List<QuestObjectiveDefinition> questObjectives(String id) {
         return quests.containsKey(id) ? quests.get(id).objectives() : List.of();
     }
     public int questRewardCredits(String id) { return quests.containsKey(id) ? quests.get(id).rewardCredits() : 0; }
+    public int questRewardMasteryExperience(String id) {
+        return quests.containsKey(id) ? quests.get(id).rewardMasteryExperience() : 0;
+    }
     public int regionRewardCredits(String id) { return conquestRegions.containsKey(id) ? conquestRegions.get(id).rewardCredits() : 0; }
     public Optional<TradeDefinition> trade(String id) { return Optional.ofNullable(trades.get(id)); }
 
@@ -122,17 +144,48 @@ public record LaunchContentDefinitions(
             String effect,
             double range,
             int durationTicks,
-            String activeUnlock
+            String activeUnlock,
+            String nodeId,
+            String activation,
+            String target,
+            String executor,
+            int sustainEnergy,
+            int minChargeTicks,
+            int maxChargeTicks,
+            int requiredRank
     ) {
         public ForceAbilityDefinition {
-            requireIds(id, path, requiredQuest, effect, activeUnlock);
+            requireIds(id, path, requiredQuest, effect, activeUnlock,
+                    activation, target, executor);
+            nodeId = nodeId == null ? "" : nodeId;
             if (energy < 0 || cooldownTicks < 0 || !Double.isFinite(range)
-                    || range < 0.0D || durationTicks < 0) {
+                    || range < 0.0D || range > 32.0D || durationTicks < 0
+                    || sustainEnergy < 0 || minChargeTicks < 0
+                    || maxChargeTicks < minChargeTicks || maxChargeTicks > 100
+                    || requiredRank < 1 || requiredRank > 10) {
                 throw new IllegalArgumentException("Invalid Force ability " + id);
             }
-            if (!path.equals("light") && !path.equals("dark")) {
-                throw new IllegalArgumentException("Invalid Force path for " + id);
+            if (!Set.of("light", "dark", "jedi", "sith", "nightsister").contains(path)) {
+                throw new IllegalArgumentException("Invalid Force tradition for " + id);
             }
+            if (!Set.of("instant", "charged", "channeled").contains(activation)) {
+                throw new IllegalArgumentException("Invalid Force activation for " + id);
+            }
+            if (!Set.of("self", "ray", "cone", "sphere", "projectile", "held_object")
+                    .contains(target)) {
+                throw new IllegalArgumentException("Invalid Force target mode for " + id);
+            }
+        }
+
+        public ForceAbilityDefinition(
+                String id, String path, int energy, int cooldownTicks,
+                String requiredQuest, boolean enabled, String effect,
+                double range, int durationTicks, String activeUnlock
+        ) {
+            this(id, path, energy, cooldownTicks, requiredQuest, enabled,
+                    effect, range, durationTicks, activeUnlock, "",
+                    "instant", range == 0.0D ? "self" : "ray", effect,
+                    0, 0, 0, 1);
         }
 
         public ForceAbilityDefinition(
@@ -141,6 +194,71 @@ public record LaunchContentDefinitions(
         ) {
             this(id, path, energy, cooldownTicks, requiredQuest, enabled,
                     id, 16.0D, 20, requiredQuest);
+        }
+    }
+
+    public record ForceTraditionDefinition(
+            String id,
+            String factionId,
+            String initiationQuest,
+            String displayName,
+            List<String> coreNodes,
+            List<String> branches,
+            List<Integer> rankThresholds
+    ) {
+        public ForceTraditionDefinition {
+            requireIds(id, factionId, initiationQuest);
+            displayName = Objects.requireNonNull(displayName, "displayName for " + id).trim();
+            coreNodes = List.copyOf(Objects.requireNonNull(coreNodes, "coreNodes for " + id));
+            branches = List.copyOf(Objects.requireNonNull(branches, "branches for " + id));
+            rankThresholds = List.copyOf(Objects.requireNonNull(
+                    rankThresholds, "rankThresholds for " + id));
+            if (displayName.isEmpty() || coreNodes.size() != 3 || branches.size() != 2
+                    || rankThresholds.size() != 10 || rankThresholds.getFirst() != 0) {
+                throw new IllegalArgumentException("Invalid Force tradition " + id);
+            }
+            int previous = -1;
+            for (int threshold : rankThresholds) {
+                if (threshold < 0 || threshold <= previous) {
+                    if (threshold != 0 || previous != -1) {
+                        throw new IllegalArgumentException("Force rank thresholds must increase for " + id);
+                    }
+                }
+                previous = threshold;
+            }
+        }
+
+        public int rankForExperience(int experience) {
+            int rank = 1;
+            for (int index = 1; index < rankThresholds.size(); index++) {
+                if (experience < rankThresholds.get(index)) break;
+                rank = index + 1;
+            }
+            return rank;
+        }
+    }
+
+    public record ForceNodeDefinition(
+            String id,
+            String tradition,
+            String branch,
+            int tier,
+            int pointCost,
+            Set<String> prerequisites,
+            String abilityId,
+            boolean passive
+    ) {
+        public ForceNodeDefinition {
+            requireIds(id, tradition, branch);
+            prerequisites = Set.copyOf(Objects.requireNonNull(
+                    prerequisites, "prerequisites for " + id));
+            abilityId = abilityId == null ? "" : abilityId;
+            if (tier < 0 || tier > 5 || pointCost < 0 || pointCost > 1
+                    || (branch.equals("core") && pointCost != 0)
+                    || (!branch.equals("core") && (tier < 1 || pointCost != 1))
+                    || (!passive && abilityId.isBlank())) {
+                throw new IllegalArgumentException("Invalid Force node " + id);
+            }
         }
     }
 
@@ -165,7 +283,8 @@ public record LaunchContentDefinitions(
             String id,
             List<QuestObjectiveDefinition> objectives,
             int rewardCredits,
-            Set<String> unlocks
+            Set<String> unlocks,
+            int rewardMasteryExperience
     ) {
         public QuestDefinition {
             requireIds(id);
@@ -174,10 +293,18 @@ public record LaunchContentDefinitions(
             objectives = List.copyOf(objectives);
             unlocks = Set.copyOf(unlocks);
             if (objectives.isEmpty() || rewardCredits < 0
+                    || rewardMasteryExperience < 0 || rewardMasteryExperience > 320
                     || objectives.stream().map(QuestObjectiveDefinition::id).distinct().count()
                             != objectives.size()) {
                 throw new IllegalArgumentException("Invalid quest " + id);
             }
+        }
+
+        public QuestDefinition(
+                String id, List<QuestObjectiveDefinition> objectives,
+                int rewardCredits, Set<String> unlocks
+        ) {
+            this(id, objectives, rewardCredits, unlocks, 0);
         }
     }
 

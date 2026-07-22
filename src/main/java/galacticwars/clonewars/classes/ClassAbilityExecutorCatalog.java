@@ -22,7 +22,10 @@ public final class ClassAbilityExecutorCatalog {
             Map.entry("beskar_training", Family.PASSIVE), Map.entry("steady_aim", Family.PASSIVE),
             Map.entry("heavy_resistance", Family.PASSIVE), Map.entry("streetwise", Family.PASSIVE),
             Map.entry("bounty_focus", Family.PASSIVE), Map.entry("defensive_ward", Family.PASSIVE),
-            Map.entry("hunter_patience", Family.PASSIVE), Map.entry("knockback_resistance", Family.PASSIVE));
+            Map.entry("hunter_patience", Family.PASSIVE), Map.entry("knockback_resistance", Family.PASSIVE),
+            Map.entry("jedi_weapon_mastery", Family.PASSIVE),
+            Map.entry("sith_weapon_mastery", Family.PASSIVE),
+            Map.entry("nightsister_magick_affinity", Family.PASSIVE));
 
     private ClassAbilityExecutorCatalog() {}
 

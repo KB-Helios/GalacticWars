@@ -45,6 +45,7 @@ public final class CoreContentBindings {
             "galacticwars:phase_i_clone_trooper",
             "galacticwars:republic_honor_guard",
             "galacticwars:senate_commando",
+            "galacticwars:sith_acolyte",
             "galacticwars:smuggler");
 
     private static final Map<String, VehicleBinding> VEHICLES = Map.of(
@@ -60,8 +61,9 @@ public final class CoreContentBindings {
                     "galacticwars:laat_gunship", "galacticwars:laat_gunship_deployment_kit"));
 
     private static final Map<String, List<String>> FORCE_SLOTS = Map.of(
-            "light", List.of("light_push", "light_pull", "light_leap"),
-            "dark", List.of("dark_push", "dark_dash", "dark_choke"));
+            "jedi", List.of("light_push", "light_leap"),
+            "sith", List.of("dark_push", "dark_dash"),
+            "nightsister", List.of("magick_push", "shadow_step"));
 
     private static final Map<String, PlanetBinding> PLANETS = Map.of(
             "tatooine", new PlanetBinding("galacticwars:tatooine", "spaceport"),
@@ -85,7 +87,10 @@ public final class CoreContentBindings {
     }
 
     public static List<String> forceSlots(String path) {
-        return FORCE_SLOTS.getOrDefault(path, List.of());
+        String resolved = path == null ? "" : path;
+        if (resolved.equals("light")) resolved = "jedi";
+        if (resolved.equals("dark")) resolved = "sith";
+        return FORCE_SLOTS.getOrDefault(resolved, List.of());
     }
 
     public static void validate(GameplayDataSnapshot snapshot) {
@@ -119,16 +124,16 @@ public final class CoreContentBindings {
 
         LaunchContentDefinitions launch = snapshot.launchContent();
         requireExactIds("vehicles", VEHICLES.keySet(), launch.vehicles().keySet());
-        requireExactIds("Force abilities", FORCE_SLOTS.values().stream()
-                .flatMap(List::stream).collect(Collectors.toCollection(LinkedHashSet::new)),
-                launch.forceAbilities().keySet());
-        FORCE_SLOTS.forEach((path, abilityIds) -> abilityIds.forEach(abilityId -> {
-            String actualPath = launch.forceAbilities().get(abilityId).path();
-            if (!path.equals(actualPath)) {
+        FORCE_SLOTS.forEach((tradition, abilityIds) -> abilityIds.forEach(abilityId -> {
+            LaunchContentDefinitions.ForceAbilityDefinition ability = launch.forceAbilities().get(abilityId);
+            if (ability == null || !tradition.equals(ability.path())) {
                 throw new IllegalArgumentException("Force ability " + abilityId
-                        + " must remain in the " + path + " path");
+                        + " must remain in the " + tradition + " tradition");
             }
         }));
+        if (!launch.forceTraditions().keySet().equals(FORCE_SLOTS.keySet())) {
+            throw new IllegalArgumentException("Core Force traditions do not match registered bindings");
+        }
 
         requireExactIds("planets", PLANETS.keySet(), launch.planets().keySet());
         PLANETS.forEach((planetId, binding) -> {

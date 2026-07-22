@@ -13,6 +13,12 @@ public final class VehicleClientInputIntegrationTest {
                 .replace("\r\n", "\n");
         String language = Files.readString(Path.of(
                 "src/main/resources/assets/galacticwars/lang/en_us.json"));
+        String forceHud = Files.readString(Path.of(
+                "src/main/java/galacticwars/clonewars/client/gui/ForceHud.java"))
+                .replace("\r\n", "\n");
+        String forceHudPayload = Files.readString(Path.of(
+                "src/main/java/galacticwars/clonewars/network/ForceHudPayload.java"))
+                .replace("\r\n", "\n");
 
         assertContains(input, "key.galacticwars.vehicle_descend",
                 "dedicated vehicle descend mapping");
@@ -26,14 +32,26 @@ public final class VehicleClientInputIntegrationTest {
                 "menu-safe vehicle and Force input");
         assertContains(input, "minecraft.gui.overlay() == null",
                 "overlay-safe vehicle and Force input");
-        assertContains(input, "if (acceptsGameplayInput)",
-                "Force activation input guard");
+        assertContains(input, "boolean down = acceptsGameplayInput && KEYS[slot].isDown()",
+                "press-hold-release Force input guard");
+        assertContains(input, "ForceActivationPhase.CANCEL",
+                "automatic invalid-state Force cancellation");
         assertContains(input, "if (acceptsGameplayInput\n",
                 "vehicle input guard");
         assertNotContains(input, "minecraft.options.keyShift.isDown()",
                 "vanilla sneak dismount binding");
         assertContains(language, "\"key.galacticwars.vehicle_descend\"",
                 "vehicle descend translation");
+        assertContains(forceHudPayload, "int targetValidityMask",
+                "bounded authoritative target-validity HUD state");
+        assertContains(forceHudPayload, "String failureReason",
+                "bounded authoritative failure feedback");
+        assertContains(forceHud, "state.targetValid(slot)",
+                "graphical target-validity indicator");
+        assertContains(forceHud, "friendlyFailure(state.failureReason())",
+                "visible concise server failure feedback");
+        assertContains(forceHud, "drawAbilityBadge",
+                "graphical three-slot Force ability badges");
 
         System.out.println("VehicleClientInputIntegrationTest passed");
     }

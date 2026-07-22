@@ -10,6 +10,8 @@ import java.util.function.Consumer
 object ClientPacketBridge {
     private val noForceHudHandler = Consumer<ForceHudPayload> { }
     private val forceHudHandler = AtomicReference(noForceHudHandler)
+    private val noForceProgressionHandler = Consumer<ForceProgressionPayload> { }
+    private val forceProgressionHandler = AtomicReference(noForceProgressionHandler)
     private val noClassHudHandler = Consumer<ClassHudPayload> { }
     private val classHudHandler = AtomicReference(noClassHudHandler)
     private val noGameplayCatalogHandler = Consumer<GameplayCatalogPayload> { }
@@ -27,6 +29,16 @@ object ClientPacketBridge {
     @JvmStatic
     fun handleForceHud(payload: ForceHudPayload) {
         forceHudHandler.get().accept(payload)
+    }
+
+    @JvmStatic
+    fun installForceProgressionHandler(handler: Consumer<ForceProgressionPayload>) {
+        forceProgressionHandler.set(handler)
+    }
+
+    @JvmStatic
+    fun handleForceProgression(payload: ForceProgressionPayload) {
+        forceProgressionHandler.get().accept(payload)
     }
 
     @JvmStatic
@@ -73,6 +85,7 @@ object ClientPacketBridge {
     @JvmStatic
     fun clearClientHandlers() {
         forceHudHandler.set(noForceHudHandler)
+        forceProgressionHandler.set(noForceProgressionHandler)
         classHudHandler.set(noClassHudHandler)
         gameplayCatalogHandler.set(noGameplayCatalogHandler)
         fieldCommandStateHandler.set(noFieldCommandStateHandler)

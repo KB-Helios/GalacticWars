@@ -41,6 +41,7 @@ import galacticwars.clonewars.faction.FactionBalanceService;
 import galacticwars.clonewars.faction.FactionDefinition;
 import galacticwars.clonewars.faction.FactionId;
 import galacticwars.clonewars.faction.FactionRelation;
+import galacticwars.clonewars.force.NpcForceRuntimeService;
 import galacticwars.clonewars.kingdom.KingdomFactionRelations;
 import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
@@ -275,6 +276,9 @@ public class GalacticRecruitEntity extends TamableAnimal
     private int hunger = 100;
     private int unpaidTicks;
     private ClassProgressState classProgressState = ClassProgressState.unassigned();
+    private int npcForceEnergy = 100;
+    private final long[] npcForceCooldownEnds = new long[3];
+    private int npcForceLoadoutCursor;
     private long armySnapshotGeneration;
     private long nextNaturalProductionGameTime;
 
@@ -364,13 +368,18 @@ public class GalacticRecruitEntity extends TamableAnimal
         output.putInt("Hunger", this.hunger);
         output.putInt("UnpaidTicks", this.unpaidTicks);
         output.store("ClassProgress", ClassProgressCodecs.CODEC, this.classProgressState);
+        output.putInt("NpcForceEnergy", this.npcForceEnergy);
+        output.putInt("NpcForceLoadoutCursor", this.npcForceLoadoutCursor);
+        for (int slot = 0; slot < this.npcForceCooldownEnds.length; slot++) {
+            output.putLong("NpcForceCooldown" + slot, this.npcForceCooldownEnds[slot]);
+        }
         output.putLong("ArmySnapshotGeneration", this.armySnapshotGeneration);
         output.putLong("NextNaturalProductionGameTime", this.nextNaturalProductionGameTime);
         output.putBoolean("NaturalPlanetNpc", this.naturalPlanetNpcInitialized);
         output.putBoolean("PendingNaturalSpawnRemoval", this.pendingNaturalSpawnRemoval);
         output.putBoolean("PendingNaturalSpawnInitialization", this.pendingNaturalSpawnInitialization);
         this.getWorkerProfession().ifPresent(profession -> output.putString("WorkerProfession", profession.id()));
-        output.putInt("RecruitDataVersion", 11);
+        output.putInt("RecruitDataVersion", 12);
         output.storeNullable("KingdomId", UUIDUtil.CODEC, this.kingdomId);
         output.storeNullable("SettlementId", UUIDUtil.CODEC, this.settlementId);
         output.storeNullable("FactionOutpostId", UUIDUtil.CODEC, this.factionOutpostId);
@@ -438,6 +447,12 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.unpaidTicks = Math.max(0, input.getIntOr("UnpaidTicks", 0));
         this.classProgressState = input.read("ClassProgress", ClassProgressCodecs.CODEC)
                 .orElseGet(ClassProgressState::unassigned);
+        this.npcForceEnergy = Math.max(0, Math.min(100, input.getIntOr("NpcForceEnergy", 100)));
+        this.npcForceLoadoutCursor = Math.floorMod(input.getIntOr("NpcForceLoadoutCursor", 0), 3);
+        for (int slot = 0; slot < this.npcForceCooldownEnds.length; slot++) {
+            this.npcForceCooldownEnds[slot] = Math.max(
+                    0L, input.getLongOr("NpcForceCooldown" + slot, 0L));
+        }
         this.armySnapshotGeneration = Math.max(0L, input.getLongOr("ArmySnapshotGeneration", 0L));
         this.nextNaturalProductionGameTime = Math.max(
                 0L, input.getLongOr("NextNaturalProductionGameTime", 0L));
@@ -572,6 +587,7 @@ public class GalacticRecruitEntity extends TamableAnimal
                 this.reconcileWorkerAuthority(serverLevel);
                 this.reconcileArmyGroupOrder(serverLevel);
                 this.tickArmyVitals(serverLevel);
+                NpcForceRuntimeService.tick(serverLevel, this);
             }
             this.tickCommanderCampaign();
             this.syncRecruitStatusState();
@@ -1093,6 +1109,35 @@ public class GalacticRecruitEntity extends TamableAnimal
 
     public ClassProgressState classProgressState() {
         return this.classProgressState;
+    }
+
+    public int npcForceEnergy() {
+        return this.npcForceEnergy;
+    }
+
+    public int npcForceLoadoutCursor() {
+        return this.npcForceLoadoutCursor;
+    }
+
+    public long npcForceCooldownEnd(int slot) {
+        return slot >= 0 && slot < this.npcForceCooldownEnds.length
+                ? this.npcForceCooldownEnds[slot] : Long.MAX_VALUE;
+    }
+
+    public void regenerateNpcForceEnergy(int amount) {
+        if (amount > 0) this.npcForceEnergy = Math.min(100, this.npcForceEnergy + amount);
+    }
+
+    public boolean commitNpcForceCast(
+            int slot, int energyCost, long cooldownEnd, int loadoutSize
+    ) {
+        if (slot < 0 || slot >= this.npcForceCooldownEnds.length
+                || energyCost < 0 || energyCost > this.npcForceEnergy) return false;
+        this.npcForceEnergy -= energyCost;
+        this.npcForceCooldownEnds[slot] = Math.max(
+                this.npcForceCooldownEnds[slot], cooldownEnd);
+        this.npcForceLoadoutCursor = Math.floorMod(slot + 1, Math.max(1, loadoutSize));
+        return true;
     }
 
     public Optional<UnitClassDefinition> unitClassDefinition() {

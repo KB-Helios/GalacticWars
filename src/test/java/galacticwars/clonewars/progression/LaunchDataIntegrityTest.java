@@ -17,17 +17,26 @@ public final class LaunchDataIntegrityTest {
     private static final Path GAMEPLAY = ROOT.resolve("galacticwars");
     private static final Set<String> EXPECTED_QUEST_IDS = Set.of(
             "republic_chapter_1", "republic_chapter_2", "republic_chapter_3",
+            "republic_force_training_1", "republic_force_training_2", "republic_force_training_3",
             "separatist_chapter_1", "separatist_chapter_2", "separatist_chapter_3",
+            "separatist_force_training_1", "separatist_force_training_2", "separatist_force_training_3",
             "mandalorian_chapter_1", "mandalorian_chapter_2", "mandalorian_chapter_3",
             "hutt_cartel_chapter_1", "hutt_cartel_chapter_2", "hutt_cartel_chapter_3",
-            "nightsister_chapter_1", "nightsister_chapter_2", "nightsister_chapter_3");
+            "nightsister_chapter_1", "nightsister_chapter_2", "nightsister_chapter_3",
+            "nightsister_force_training_1", "nightsister_force_training_2", "nightsister_force_training_3");
     private static final Map<String, Set<String>> EXPECTED_QUEST_UNLOCKS = Map.ofEntries(
             Map.entry("republic_chapter_1", Set.of("workforce")),
-            Map.entry("republic_chapter_2", Set.of("barc_speeder", "force_path")),
-            Map.entry("republic_chapter_3", Set.of("conquest", "vehicle_mastery", "force_mastery")),
+            Map.entry("republic_chapter_2", Set.of("barc_speeder")),
+            Map.entry("republic_chapter_3", Set.of("conquest", "vehicle_mastery")),
+            Map.entry("republic_force_training_1", Set.of()),
+            Map.entry("republic_force_training_2", Set.of()),
+            Map.entry("republic_force_training_3", Set.of()),
             Map.entry("separatist_chapter_1", Set.of("workforce")),
             Map.entry("separatist_chapter_2", Set.of("stap")),
             Map.entry("separatist_chapter_3", Set.of("conquest", "vehicle_mastery")),
+            Map.entry("separatist_force_training_1", Set.of()),
+            Map.entry("separatist_force_training_2", Set.of()),
+            Map.entry("separatist_force_training_3", Set.of()),
             Map.entry("mandalorian_chapter_1", Set.of("workforce")),
             Map.entry("mandalorian_chapter_2", Set.of("vehicle_crafting")),
             Map.entry("mandalorian_chapter_3", Set.of("conquest", "vehicle_mastery")),
@@ -35,13 +44,17 @@ public final class LaunchDataIntegrityTest {
             Map.entry("hutt_cartel_chapter_2", Set.of("vehicle_crafting")),
             Map.entry("hutt_cartel_chapter_3", Set.of("conquest", "vehicle_mastery")),
             Map.entry("nightsister_chapter_1", Set.of("workforce")),
-            Map.entry("nightsister_chapter_2", Set.of("force_path")),
-            Map.entry("nightsister_chapter_3", Set.of("conquest", "vehicle_mastery", "force_mastery")));
+            Map.entry("nightsister_chapter_2", Set.of()),
+            Map.entry("nightsister_chapter_3", Set.of("conquest", "vehicle_mastery")),
+            Map.entry("nightsister_force_training_1", Set.of()),
+            Map.entry("nightsister_force_training_2", Set.of()),
+            Map.entry("nightsister_force_training_3", Set.of()));
 
     public static void main(String[] args) throws Exception {
         assertJsonCount(GAMEPLAY.resolve("factions"), 5, "factions");
-        assertJsonCount(GAMEPLAY.resolve("units"), 20, "units");
-        for (String category : Set.of("planets", "vehicles", "force_abilities", "quests", "trades", "conquest_regions")) {
+        assertJsonCount(GAMEPLAY.resolve("units"), 21, "units");
+        for (String category : Set.of("planets", "vehicles", "force_abilities", "force_progression",
+                "quests", "trades", "conquest_regions")) {
             assertTrue(Files.isRegularFile(GAMEPLAY.resolve(category).resolve("launch.json")), category + " launch data");
         }
         String planets = Files.readString(GAMEPLAY.resolve("planets/launch.json"));
@@ -66,12 +79,16 @@ public final class LaunchDataIntegrityTest {
             assertTrue(unlocks.size() == unlockList.size(), questId + " duplicate unlock");
             assertTrue(declaredUnlocks.put(questId, unlocks) == null, questId + " duplicate declaration");
         }
-        assertTrue(quests.stream().filter(quest ->
-                        string(quest, "id").equals("republic_chapter_3")
-                                || string(quest, "id").equals("nightsister_chapter_3"))
-                        .allMatch(quest -> quest.contains("\"event\":\"force_ability_used\"")
-                                && quest.contains("\"required_count\":2")),
-                "Force mastery chapters require embodied basic-ability training");
+        assertTrue(quests.stream().filter(quest -> string(quest, "id").contains("_chapter_"))
+                        .noneMatch(quest -> quest.contains("\"event\":\"force_ability_used\"")),
+                "main faction campaigns remain independent of optional Force training");
+        List<String> forceTraining = quests.stream()
+                .filter(quest -> string(quest, "id").contains("_force_training_")).toList();
+        assertTrue(forceTraining.size() == 9
+                        && forceTraining.stream().filter(quest -> quest.contains("\"mastery_experience\":25")).count() == 3
+                        && forceTraining.stream().filter(quest -> quest.contains("\"mastery_experience\":50")).count() == 3
+                        && forceTraining.stream().filter(quest -> quest.contains("\"mastery_experience\":75")).count() == 3,
+                "each tradition has optional 25, 50, and 75 XP training quests");
         assertTrue(declaredUnlocks.equals(EXPECTED_QUEST_UNLOCKS), "quest unlock contents");
         List<String> vehicles = objects(Files.readString(GAMEPLAY.resolve("vehicles/launch.json")), "vehicles");
         assertTrue(vehicles.stream().anyMatch(vehicle -> string(vehicle, "unlock").equals("vehicle_crafting")

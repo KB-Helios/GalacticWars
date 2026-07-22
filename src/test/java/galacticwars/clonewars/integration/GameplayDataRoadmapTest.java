@@ -68,7 +68,7 @@ public final class GameplayDataRoadmapTest {
                 }
             }
         }
-        assertEquals(20, unitCount, "launch unit count");
+        assertEquals(21, unitCount, "launch unit count");
         assertTrue(Files.exists(UNITS.resolve("mandalorian_warrior.json")), "Mandalorian warrior definition");
         assertTrue(Files.notExists(UNITS.resolve("mandalorian_rider.json")), "legacy rider definition removed");
     }

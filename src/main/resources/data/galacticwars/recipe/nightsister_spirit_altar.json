@@ -1,0 +1,5 @@
+{
+  "type":"minecraft:crafting_shaped","category":"building","pattern":["WBW"," A ","WBW"],
+  "key":{"W":"galacticwars:nightsister_weave_planks","B":"minecraft:bone","A":"minecraft:amethyst_shard"},
+  "result":{"id":"galacticwars:nightsister_spirit_altar","count":1}
+}

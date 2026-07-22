@@ -1,0 +1,6 @@
+{
+  "parent": "galacticwars:item/spawn_capsule_base",
+  "textures": {
+    "particle": "galacticwars:item/sith_acolyte_spawn_egg"
+  }
+}

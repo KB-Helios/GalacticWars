@@ -23,7 +23,7 @@ final class LaunchContentValidator {
     private static final Set<String> RUNTIME_UNLOCKS = Set.of(
             "faction_intro", "treasury", "recruitment", "workforce",
             "commander", "planet_travel", "vehicle_crafting", "advanced_trading",
-            "vehicle_control", "veteran_trades", "supply_depot");
+            "vehicle_control", "veteran_trades", "supply_depot", "force_path");
 
     private LaunchContentValidator() {
     }
@@ -32,17 +32,23 @@ final class LaunchContentValidator {
         Map<String, LaunchContentDefinitions.PlanetDefinition> planets = loadPlanets(manager, factionIds);
         Map<String, LaunchContentDefinitions.VehicleDefinition> vehicles = loadVehicles(manager);
         Map<String, LaunchContentDefinitions.ForceAbilityDefinition> forceAbilities = loadForceAbilities(manager);
+        Map<String, LaunchContentDefinitions.ForceTraditionDefinition> forceTraditions =
+                loadForceTraditions(manager, factionIds);
+        Map<String, LaunchContentDefinitions.ForceNodeDefinition> forceNodes = loadForceNodes(manager);
         Map<String, LaunchContentDefinitions.QuestDefinition> quests = loadQuests(manager);
         Map<String, LaunchContentDefinitions.TradeDefinition> trades = loadTrades(manager, factionIds);
         Map<String, LaunchContentDefinitions.ConquestRegionDefinition> regions =
                 loadRegions(manager, planets.keySet(), factionIds);
         requireCount("planets", planets, 4);
         requireCount("vehicles", vehicles, 5);
-        requireCount("force abilities", forceAbilities, 6);
+        requireMinimum("force abilities", forceAbilities, 24);
+        requireCount("Force traditions", forceTraditions, 3);
+        requireCount("Force nodes", forceNodes, 39);
         requireMinimum("quests", quests, 15);
         requireMinimum("trades", trades, factionIds.size() + regions.size());
         requireCount("conquest regions", regions, 4);
-        validateReferences(vehicles, forceAbilities, quests, trades, regions);
+        validateReferences(vehicles, forceAbilities, forceTraditions, forceNodes,
+                quests, trades, regions, factionIds);
         for (String factionId : factionIds) {
             if (trades.values().stream().noneMatch(trade ->
                     trade.factionId().equals(factionId) && trade.stockTier() == 1)) {
@@ -57,7 +63,8 @@ final class LaunchContentValidator {
                         "Conquest region " + regionId + " requires a veteran trade");
             }
         }
-        return new LaunchContentDefinitions(planets, vehicles, forceAbilities, quests, trades, regions);
+        return new LaunchContentDefinitions(planets, vehicles, forceAbilities,
+                forceTraditions, forceNodes, quests, trades, regions);
     }
 
     static void validateReferences(
@@ -66,7 +73,8 @@ final class LaunchContentValidator {
             Map<String, LaunchContentDefinitions.QuestDefinition> quests,
             Map<String, LaunchContentDefinitions.TradeDefinition> trades
     ) {
-        validateReferences(vehicles, forceAbilities, quests, trades, Map.of());
+        validateReferences(vehicles, forceAbilities, Map.of(), Map.of(),
+                quests, trades, Map.of(), Set.of());
     }
 
     static void validateReferences(
@@ -75,6 +83,20 @@ final class LaunchContentValidator {
             Map<String, LaunchContentDefinitions.QuestDefinition> quests,
             Map<String, LaunchContentDefinitions.TradeDefinition> trades,
             Map<String, LaunchContentDefinitions.ConquestRegionDefinition> regions
+    ) {
+        validateReferences(vehicles, forceAbilities, Map.of(), Map.of(),
+                quests, trades, regions, Set.of());
+    }
+
+    private static void validateReferences(
+            Map<String, LaunchContentDefinitions.VehicleDefinition> vehicles,
+            Map<String, LaunchContentDefinitions.ForceAbilityDefinition> forceAbilities,
+            Map<String, LaunchContentDefinitions.ForceTraditionDefinition> forceTraditions,
+            Map<String, LaunchContentDefinitions.ForceNodeDefinition> forceNodes,
+            Map<String, LaunchContentDefinitions.QuestDefinition> quests,
+            Map<String, LaunchContentDefinitions.TradeDefinition> trades,
+            Map<String, LaunchContentDefinitions.ConquestRegionDefinition> regions,
+            Set<String> factionIds
     ) {
         LinkedHashSet<String> knownUnlocks = new LinkedHashSet<>(RUNTIME_UNLOCKS);
         knownUnlocks.addAll(quests.keySet());
@@ -97,7 +119,19 @@ final class LaunchContentValidator {
             if (!knownUnlocks.contains(ability.activeUnlock())) {
                 throw new IllegalArgumentException("Force ability " + ability.id() + " references unknown unlock");
             }
+            if (!forceTraditions.isEmpty()
+                    && !forceTraditions.containsKey(ability.path())) {
+                throw new IllegalArgumentException("Force ability " + ability.id()
+                        + " references unknown tradition " + ability.path());
+            }
+            if (!forceNodes.isEmpty()
+                    && (!forceNodes.containsKey(ability.nodeId())
+                    || !forceNodes.get(ability.nodeId()).abilityId().equals(ability.id()))) {
+                throw new IllegalArgumentException("Force ability " + ability.id()
+                        + " is not bound by node " + ability.nodeId());
+            }
         }
+        validateForceProgression(forceAbilities, forceTraditions, forceNodes, quests, factionIds);
         for (LaunchContentDefinitions.VehicleDefinition vehicle : vehicles.values()) {
             if (!knownUnlocks.contains(vehicle.requiredUnlock())) {
                 throw new IllegalArgumentException("Vehicle " + vehicle.id() + " references unknown unlock");
@@ -158,15 +192,93 @@ final class LaunchContentValidator {
 
     private static Map<String, LaunchContentDefinitions.ForceAbilityDefinition> loadForceAbilities(ResourceManager manager) throws IOException {
         LinkedHashMap<String, LaunchContentDefinitions.ForceAbilityDefinition> result = new LinkedHashMap<>();
-        for (JsonObject json : objects(manager, "force_abilities", "abilities")) {
+        for (JsonObject json : objects(manager, "force_abilities", "abilities", 2)) {
             var definition = new LaunchContentDefinitions.ForceAbilityDefinition(
                     string(json, "id"), string(json, "path"), integer(json, "energy"),
                     integer(json, "cooldown_ticks"), string(json, "quest"), true,
                     string(json, "effect"), decimal(json, "range"),
-                    integer(json, "duration_ticks"), string(json, "active_unlock"));
+                    integer(json, "duration_ticks"), string(json, "active_unlock"),
+                    string(json, "node"), string(json, "activation"),
+                    string(json, "target"), string(json, "executor"),
+                    integer(json, "sustain_energy"), integer(json, "min_charge_ticks"),
+                    integer(json, "max_charge_ticks"), integer(json, "required_rank"));
             put(result, definition.id(), definition, "Force ability");
         }
         return result;
+    }
+
+    private static Map<String, LaunchContentDefinitions.ForceTraditionDefinition> loadForceTraditions(
+            ResourceManager manager, Set<String> factionIds
+    ) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.ForceTraditionDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "force_progression", "traditions")) {
+            var definition = new LaunchContentDefinitions.ForceTraditionDefinition(
+                    string(json, "id"), string(json, "faction"), string(json, "initiation_quest"),
+                    string(json, "display_name"), strings(json, "core_nodes"),
+                    strings(json, "branches"), integers(json, "rank_thresholds"));
+            if (!factionIds.contains(definition.factionId())) {
+                throw new IllegalArgumentException("Unknown Force tradition faction " + definition.factionId());
+            }
+            put(result, definition.id(), definition, "Force tradition");
+        }
+        return result;
+    }
+
+    private static Map<String, LaunchContentDefinitions.ForceNodeDefinition> loadForceNodes(
+            ResourceManager manager
+    ) throws IOException {
+        LinkedHashMap<String, LaunchContentDefinitions.ForceNodeDefinition> result = new LinkedHashMap<>();
+        for (JsonObject json : objects(manager, "force_progression", "nodes")) {
+            var definition = new LaunchContentDefinitions.ForceNodeDefinition(
+                    string(json, "id"), string(json, "tradition"), string(json, "branch"),
+                    integer(json, "tier"), integer(json, "point_cost"),
+                    json.has("prerequisites") ? Set.copyOf(strings(json, "prerequisites")) : Set.of(),
+                    optionalString(json, "ability"), bool(json, "passive", false));
+            put(result, definition.id(), definition, "Force node");
+        }
+        return result;
+    }
+
+    private static void validateForceProgression(
+            Map<String, LaunchContentDefinitions.ForceAbilityDefinition> abilities,
+            Map<String, LaunchContentDefinitions.ForceTraditionDefinition> traditions,
+            Map<String, LaunchContentDefinitions.ForceNodeDefinition> nodes,
+            Map<String, LaunchContentDefinitions.QuestDefinition> quests,
+            Set<String> factionIds
+    ) {
+        if (traditions.isEmpty() && nodes.isEmpty()) return;
+        for (LaunchContentDefinitions.ForceTraditionDefinition tradition : traditions.values()) {
+            if (!factionIds.contains(tradition.factionId())
+                    || !quests.containsKey(tradition.initiationQuest())) {
+                throw new IllegalArgumentException("Force tradition " + tradition.id()
+                        + " has an invalid faction or initiation quest");
+            }
+            for (String nodeId : tradition.coreNodes()) {
+                LaunchContentDefinitions.ForceNodeDefinition node = nodes.get(nodeId);
+                if (node == null || !node.tradition().equals(tradition.id())
+                        || !node.branch().equals("core")) {
+                    throw new IllegalArgumentException("Invalid core Force node " + nodeId);
+                }
+            }
+        }
+        for (LaunchContentDefinitions.ForceNodeDefinition node : nodes.values()) {
+            LaunchContentDefinitions.ForceTraditionDefinition tradition = traditions.get(node.tradition());
+            if (tradition == null || (!node.branch().equals("core")
+                    && !tradition.branches().contains(node.branch()))) {
+                throw new IllegalArgumentException("Force node " + node.id() + " has an invalid branch");
+            }
+            if (!node.abilityId().isBlank() && !abilities.containsKey(node.abilityId())) {
+                throw new IllegalArgumentException("Force node " + node.id() + " references unknown ability");
+            }
+            for (String prerequisite : node.prerequisites()) {
+                LaunchContentDefinitions.ForceNodeDefinition required = nodes.get(prerequisite);
+                if (required == null || !required.tradition().equals(node.tradition())
+                        || required.tier() >= node.tier()) {
+                    throw new IllegalArgumentException("Force node " + node.id()
+                            + " has invalid prerequisite " + prerequisite);
+                }
+            }
+        }
     }
 
     private static Map<String, LaunchContentDefinitions.QuestDefinition> loadQuests(ResourceManager manager) throws IOException {
@@ -174,7 +286,8 @@ final class LaunchContentValidator {
         for (JsonObject json : objects(manager, "quests", "quests", 2)) {
             var definition = new LaunchContentDefinitions.QuestDefinition(
                     string(json, "id"), questObjectives(json), integer(json, "reward_credits"),
-                    Set.copyOf(strings(json, "unlocks")));
+                    Set.copyOf(strings(json, "unlocks")),
+                    json.has("mastery_experience") ? integer(json, "mastery_experience") : 0);
             put(result, definition.id(), definition, "quest");
         }
         return result;
@@ -296,6 +409,18 @@ final class LaunchContentValidator {
         java.util.ArrayList<String> result = new java.util.ArrayList<>();
         values.forEach(value -> result.add(value.getAsString()));
         return List.copyOf(result);
+    }
+
+    private static List<Integer> integers(JsonObject json, String key) {
+        JsonArray values = json.getAsJsonArray(key);
+        if (values == null) throw new IllegalArgumentException("Missing " + key);
+        java.util.ArrayList<Integer> result = new java.util.ArrayList<>();
+        values.forEach(value -> result.add(value.getAsInt()));
+        return List.copyOf(result);
+    }
+
+    private static boolean bool(JsonObject json, String key, boolean fallback) {
+        return json.has(key) ? json.get(key).getAsBoolean() : fallback;
     }
 
     private static Map<String, Integer> integerMap(JsonObject json, String key) {

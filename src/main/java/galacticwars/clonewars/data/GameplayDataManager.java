@@ -123,6 +123,24 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 requireRegistered(BuiltInRegistries.ENTITY_TYPE, unit.entityTypeId(),
                         "entity type for " + unit.id());
                 validateEquipment(unit);
+                String expectedTradition = switch (unit.factionId().toString()) {
+                    case "galacticwars:republic" -> "jedi";
+                    case "galacticwars:separatist" -> "sith";
+                    case "galacticwars:nightsister" -> "nightsister";
+                    default -> "";
+                };
+                for (String abilityId : unit.forceLoadout()) {
+                    LaunchContentDefinitions.ForceAbilityDefinition forceAbility =
+                            launchContent.forceAbilities().get(abilityId);
+                    if (forceAbility == null) {
+                        throw new IllegalArgumentException("Unit " + unit.id()
+                                + " references unknown Force ability " + abilityId);
+                    }
+                    if (!forceAbility.path().equals(expectedTradition)) {
+                        throw new IllegalArgumentException("Unit " + unit.id()
+                                + " has cross-tradition Force ability " + abilityId);
+                    }
+                }
             }
             for (FactionDefinition faction : factions.values()) {
                 if (faction.pledgeDirectDelta() < faction.minimumHiringAlignment()) {
@@ -330,7 +348,8 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                             string(equipment, "head", ""),
                             string(equipment, "chest", ""),
                             string(equipment, "legs", ""),
-                            string(equipment, "feet", "")));
+                            string(equipment, "feet", "")),
+                    strings(json, "force_loadout"));
             if (!seen.add(id)) {
                 throw new IllegalArgumentException("Duplicate unit id " + id + " in " + resource.id());
             }
@@ -426,7 +445,9 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                         bool(json, "player_assignable", false),
                         abilityIds,
                         requirements,
-                        string(json, "force_path_slot", ""));
+                        json.has("force_tradition_slot")
+                                ? string(json, "force_tradition_slot", "")
+                                : string(json, "force_path_slot", ""));
                 if (definitions.putIfAbsent(definition.id(), definition) != null) {
                     throw new IllegalArgumentException("Duplicate class id " + definition.id()
                             + " in " + resource.id());

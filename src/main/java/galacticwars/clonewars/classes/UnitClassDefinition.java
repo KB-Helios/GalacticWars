@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 public record UnitClassDefinition(
         UnitClassId id,
@@ -33,9 +34,16 @@ public record UnitClassDefinition(
             throw new IllegalArgumentException("A unit class cannot repeat an ability");
         }
         forcePathSlot = forcePathSlot == null ? "" : forcePathSlot.trim().toLowerCase(Locale.ROOT);
-        if (!forcePathSlot.isEmpty() && !forcePathSlot.equals("light") && !forcePathSlot.equals("dark")) {
-            throw new IllegalArgumentException("forcePathSlot must be empty, light, or dark");
+        if (forcePathSlot.equals("light")) forcePathSlot = "jedi";
+        if (forcePathSlot.equals("dark")) forcePathSlot = "nightsister";
+        if (!forcePathSlot.isEmpty() && !Set.of("jedi", "sith", "nightsister").contains(forcePathSlot)) {
+            throw new IllegalArgumentException(
+                    "force tradition slot must be empty, jedi, sith, or nightsister");
         }
+    }
+
+    public String forceTraditionSlot() {
+        return forcePathSlot;
     }
 
     private static String requireNonBlank(String value, String label) {

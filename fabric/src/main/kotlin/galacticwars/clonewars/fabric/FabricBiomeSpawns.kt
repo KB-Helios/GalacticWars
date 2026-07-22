@@ -53,6 +53,8 @@ object FabricBiomeSpawns {
             "minecraft:plains", "minecraft:sunflower_plains", "minecraft:meadow")
         addSpawn(ModEntityTypes.SEPARATIST_TECHNICIAN.get(), 5, 1, 3,
             "minecraft:desert", "minecraft:badlands", "minecraft:wooded_badlands")
+        addSpawn(ModEntityTypes.SITH_ACOLYTE.get(), 2, 1, 1,
+            "minecraft:desert", "minecraft:badlands", "minecraft:wooded_badlands")
         addSpawn(ModEntityTypes.SMUGGLER.get(), 5, 1, 3,
             "minecraft:swamp", "minecraft:mangrove_swamp", "minecraft:desert")
         addSpawn(ModEntityTypes.TOGRUTA_CIVILIAN.get(), 3, 1, 3,
