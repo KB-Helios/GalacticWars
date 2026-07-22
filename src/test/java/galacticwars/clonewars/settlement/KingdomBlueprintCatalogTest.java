@@ -51,16 +51,18 @@ public final class KingdomBlueprintCatalogTest {
         Path file = BLUEPRINT_ROOT.resolve(KingdomBaseBlueprint.path(blueprint.id()) + ".json");
         assertTrue(Files.isRegularFile(file), "data resource for " + blueprint.id());
         String json = Files.readString(file);
-        assertContains(json, "\"schema_version\": 1", "schema version");
-        assertContains(json, "\"id\": \"" + blueprint.id() + "\"", "resource id");
+        var descriptor = JsonParser.parseString(json).getAsJsonObject();
+        assertEquals(2, descriptor.get("schema_version").getAsInt(), "schema version");
+        assertEquals(blueprint.id(), descriptor.get("id").getAsString(), "resource id");
         assertContains(json, "\"anchor\"", "anchor");
         assertContains(json, "\"allowed_rotations\"", "rotation list");
-        assertContains(json, "\"placements\"", "placements");
+        assertContains(json, "\"template\"", "NBT template reference");
+        assertContains(json, "\"construction\"", "construction metadata");
         assertContains(json, "\"rewards\"", "completion rewards");
-        int placementCount = JsonParser.parseString(json).getAsJsonObject()
-                .getAsJsonArray("placements").size();
-        assertEquals(blueprint.placements().size(), placementCount,
-                "resource placement count for " + blueprint.id());
+        String template = descriptor.get("template").getAsString();
+        assertTrue(Files.isRegularFile(Path.of("src/main/resources/data/galacticwars/structure")
+                        .resolve(template.substring(template.indexOf(':') + 1) + ".nbt")),
+                "template file for " + blueprint.id());
     }
 
     private static void assertContains(String value, String fragment, String label) {

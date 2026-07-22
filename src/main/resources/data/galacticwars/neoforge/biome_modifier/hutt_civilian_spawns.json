@@ -1,5 +1,0 @@
-{
-  "type": "neoforge:add_spawns",
-  "biomes": ["minecraft:swamp", "minecraft:mangrove_swamp", "minecraft:desert"],
-  "spawners": {"type": "galacticwars:hutt_civilian", "weight": 6, "minCount": 1, "maxCount": 3}
-}

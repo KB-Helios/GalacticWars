@@ -459,7 +459,7 @@ public record SettlementRecord(
                 || stored.state() == BuildProjectState.COMPLETED
                 || stored.state() == BuildProjectState.CANCELLED
                 || !stored.blueprintId().equals(blueprint.id())
-                || !stored.definitionHash().equals(blueprint.definitionHash())
+                || !blueprint.matchesDefinitionHash(stored.definitionHash())
                 || !blueprint.supportsRotationSteps(stored.rotationSteps())
                 || !stored.hasAllPlacements(blueprint.placements().size())
                 || containsCompletedProject(project)) {

@@ -210,6 +210,30 @@ public final class FactionOutpostSavedData extends SavedData {
         return Optional.of(updated);
     }
 
+    /** Publishes a generated site's complete identity before any residents become visible. */
+    public FactionOutpostRecord registerGeneratedSite(
+            UUID id,
+            String factionId,
+            String dimensionId,
+            BlockPos position,
+            int radius,
+            List<UUID> militaryNpcIds,
+            List<UUID> civilianNpcIds,
+            long gameTime
+    ) {
+        FactionOutpostRecord existing = outpostsById.get(id);
+        if (existing != null) {
+            return existing;
+        }
+        FactionOutpostRecord created = new FactionOutpostRecord(id, factionId, dimensionId,
+                position.getX(), position.getY(), position.getZ(), radius,
+                militaryNpcIds, civilianNpcIds, gameTime);
+        index(created);
+        generatedSiteIds.add(id);
+        this.setDirty();
+        return created;
+    }
+
     public boolean removeNpc(UUID npcId, long gameTime) {
         UUID outpostId = outpostIdsByNpc.remove(npcId);
         FactionOutpostRecord outpost = outpostId == null ? null : outpostsById.get(outpostId);

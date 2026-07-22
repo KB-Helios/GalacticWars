@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 import galacticwars.clonewars.kingdom.BuildProject;
@@ -28,7 +30,13 @@ public record KingdomBaseBlueprint(
         int storageSlotReward,
         String worksiteType,
         int worksiteCapacity,
-        int commanderSlotReward
+        int commanderSlotReward,
+        String templateId,
+        Set<BlueprintMode> modes,
+        BlueprintTerrainConstraints terrainConstraints,
+        Map<String, Integer> constructionCostOverrides,
+        Optional<BlueprintWorldgenProfile> worldgen,
+        Set<String> compatibleDefinitionHashes
 ) {
     public static final String DEFAULT_NAMESPACE = "galacticwars";
     public static final String STARTER_CAMP_ID = DEFAULT_NAMESPACE + ":starter_camp";
@@ -69,6 +77,43 @@ public record KingdomBaseBlueprint(
                 throw new IllegalArgumentException("storage reward requires enough chest placements");
             }
         }
+        templateId = templateId == null || templateId.isBlank() ? "" : canonicalId(templateId);
+        modes = Set.copyOf(Objects.requireNonNull(modes, "modes"));
+        if (modes.isEmpty()) {
+            throw new IllegalArgumentException("blueprint modes cannot be empty");
+        }
+        terrainConstraints = Objects.requireNonNull(terrainConstraints, "terrainConstraints");
+        constructionCostOverrides = Map.copyOf(Objects.requireNonNull(constructionCostOverrides,
+                "constructionCostOverrides"));
+        worldgen = Objects.requireNonNull(worldgen, "worldgen");
+        compatibleDefinitionHashes = Set.copyOf(Objects.requireNonNull(
+                compatibleDefinitionHashes, "compatibleDefinitionHashes"));
+        if (compatibleDefinitionHashes.stream().anyMatch(hash -> !hash.matches("[0-9a-f]{64}"))) {
+            throw new IllegalArgumentException("compatible definition hashes must be lowercase SHA-256 values");
+        }
+        if (modes.contains(BlueprintMode.WORLDGEN) != worldgen.isPresent()) {
+            throw new IllegalArgumentException("worldgen mode and profile must be defined together");
+        }
+        if (modes.contains(BlueprintMode.WORLDGEN) && templateId.isBlank()) {
+            throw new IllegalArgumentException("worldgen blueprints require a template");
+        }
+    }
+
+    public KingdomBaseBlueprint(
+            String id,
+            String displayName,
+            BlueprintAnchor anchor,
+            List<Integer> allowedRotations,
+            List<BaseBlockPlacement> placements,
+            int housingReward,
+            int storageSlotReward,
+            String worksiteType,
+            int worksiteCapacity,
+            int commanderSlotReward
+    ) {
+        this(id, displayName, anchor, allowedRotations, placements, housingReward, storageSlotReward,
+                worksiteType, worksiteCapacity, commanderSlotReward, "", Set.of(BlueprintMode.CONSTRUCTION),
+                BlueprintTerrainConstraints.DEFAULT, Map.of(), Optional.empty(), Set.of());
     }
 
     public KingdomBaseBlueprint(
@@ -82,7 +127,9 @@ public record KingdomBaseBlueprint(
             int commanderSlotReward
     ) {
         this(id, displayName, BlueprintAnchor.ORIGIN, ALL_ROTATIONS, placements,
-                housingReward, storageSlotReward, worksiteType, worksiteCapacity, commanderSlotReward);
+                housingReward, storageSlotReward, worksiteType, worksiteCapacity, commanderSlotReward,
+                "", Set.of(BlueprintMode.CONSTRUCTION), BlueprintTerrainConstraints.DEFAULT,
+                Map.of(), Optional.empty(), Set.of());
     }
 
     private static final List<KingdomBaseBlueprint> ALL_BLUEPRINTS = List.of(
@@ -228,12 +275,75 @@ public record KingdomBaseBlueprint(
                 update(digest, placement.z());
                 update(digest, placement.blockId());
                 update(digest, placement.itemId());
+                if (!placement.properties().isEmpty()) {
+                    update(digest, new java.util.TreeMap<>(placement.properties()).toString());
+                }
             }
             update(digest, housingReward);
             update(digest, storageSlotReward);
             update(digest, worksiteType);
             update(digest, worksiteCapacity);
             update(digest, commanderSlotReward);
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    public boolean matchesDefinitionHash(String hash) {
+        return definitionHash().equals(hash) || compatibleDefinitionHashes.contains(hash);
+    }
+
+    /** Hashes the complete descriptor and parsed template contents for persisted worldgen pieces. */
+    public String contentHash() {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            update(digest, "galacticwars-blueprint-content-v2");
+            update(digest, id);
+            update(digest, displayName);
+            update(digest, templateId);
+            modes.stream().map(Enum::name).sorted().forEach(value -> update(digest, value));
+            update(digest, anchor.x());
+            update(digest, anchor.y());
+            update(digest, anchor.z());
+            allowedRotations.forEach(value -> update(digest, value));
+            for (BaseBlockPlacement placement : placements) {
+                update(digest, placement.x());
+                update(digest, placement.y());
+                update(digest, placement.z());
+                update(digest, placement.blockId());
+                update(digest, placement.itemId());
+                new java.util.TreeMap<>(placement.properties()).forEach((key, value) -> {
+                    update(digest, key);
+                    update(digest, value);
+                });
+            }
+            update(digest, housingReward);
+            update(digest, storageSlotReward);
+            update(digest, worksiteType);
+            update(digest, worksiteCapacity);
+            update(digest, commanderSlotReward);
+            update(digest, terrainConstraints.maxSlope());
+            update(digest, terrainConstraints.minY());
+            update(digest, terrainConstraints.maxY());
+            new java.util.TreeMap<>(constructionCostOverrides).forEach((key, value) -> {
+                update(digest, key);
+                update(digest, value);
+            });
+            worldgen.ifPresent(profile -> {
+                profile.biomes().stream().sorted().forEach(value -> update(digest, value));
+                update(digest, profile.factionId());
+                update(digest, profile.siteRadius());
+                for (BlueprintRosterEntry entry : profile.roster()) {
+                    update(digest, entry.entityTypeId());
+                    update(digest, entry.minimum());
+                    update(digest, entry.maximum());
+                    update(digest, entry.weight());
+                    update(digest, entry.serviceBranch());
+                }
+                profile.lootMarkers().stream().sorted().forEach(value -> update(digest, value));
+                update(digest, profile.placementWeight());
+            });
             return HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
@@ -248,13 +358,13 @@ public record KingdomBaseBlueprint(
         int relativeZ = placement.z() - anchor.z();
         return switch (rotationSteps) {
             case 1 -> new BaseBlockPlacement(-relativeZ, relativeY, relativeX,
-                    placement.blockId(), placement.itemId());
+                    placement.blockId(), placement.itemId(), placement.rotatedProperties(rotationSteps));
             case 2 -> new BaseBlockPlacement(-relativeX, relativeY, -relativeZ,
-                    placement.blockId(), placement.itemId());
+                    placement.blockId(), placement.itemId(), placement.rotatedProperties(rotationSteps));
             case 3 -> new BaseBlockPlacement(relativeZ, relativeY, -relativeX,
-                    placement.blockId(), placement.itemId());
+                    placement.blockId(), placement.itemId(), placement.rotatedProperties(rotationSteps));
             default -> new BaseBlockPlacement(relativeX, relativeY, relativeZ,
-                    placement.blockId(), placement.itemId());
+                    placement.blockId(), placement.itemId(), placement.rotatedProperties(rotationSteps));
         };
     }
 
@@ -315,6 +425,12 @@ public record KingdomBaseBlueprint(
 
     public ResourceInventory requiredResources() {
         ResourceInventory inventory = ResourceInventory.empty();
+        if (!constructionCostOverrides.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : constructionCostOverrides.entrySet()) {
+                inventory = inventory.withAdded(entry.getKey(), entry.getValue());
+            }
+            return inventory;
+        }
         for (BaseBlockPlacement placement : placements) {
             inventory = inventory.withAdded(placement.itemId(), 1);
         }

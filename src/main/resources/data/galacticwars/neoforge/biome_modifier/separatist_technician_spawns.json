@@ -1,5 +1,0 @@
-{
-  "type": "neoforge:add_spawns",
-  "biomes": ["minecraft:desert", "minecraft:badlands", "minecraft:wooded_badlands"],
-  "spawners": {"type": "galacticwars:separatist_technician", "weight": 5, "minCount": 1, "maxCount": 3}
-}

@@ -104,32 +104,23 @@ public final class PlanetFactionEcologyResourcesTest {
         assertContains(naturalWorldSpawn,
                 "this.isTame() || this.kingdomId != null || this.settlementId != null",
                 "failure-atomic deferred initialization guard");
-        assertContains(naturalWorldSpawn, ".overworldSpawnProfileForEntity(entityTypeId)",
-                "common Overworld profile gate");
-        assertContains(naturalWorldSpawn, "data.assignNaturalNpc(",
-                "common Overworld outpost assignment");
-        assertNotContains(naturalWorldSpawn, "FactionOutpostMarkerService.generate(level, outpost)",
-                "world-generation-safe natural spawn initialization");
+        assertContains(naturalWorldSpawn, "Overworld faction residents are created only",
+                "generated-site-only Overworld contract");
+        assertNotContains(naturalWorldSpawn, ".overworldSpawnProfileForEntity(entityTypeId)",
+                "free Overworld profile spawning must be retired");
+        assertNotContains(naturalWorldSpawn, "data.assignNaturalNpc(",
+                "free Overworld outpost assignment must be retired");
         assertContains(naturalWorldSpawn, "PlanetFactionSpawnPolicy.evaluate(",
                 "common planet faction gate");
         assertContains(naturalWorldSpawn, "this.initializeNaturalPlanetNpc(level, evaluation)",
                 "common planet NPC outpost initialization");
 
-        String deferredSiteGeneration = section(
-                entity,
-                "private void tryGenerateFactionOutpostSite(",
-                "/** Finalizes data-driven stats");
-        assertContains(deferredSiteGeneration, "data.claimSiteGenerationAttempt(",
-                "single-authority persisted site attempt claim");
-        assertContains(deferredSiteGeneration,
-                "FactionOutpostMarkerService.generateFirstViableLoadedSite(",
-                "bounded relocated site generation");
-        assertContains(deferredSiteGeneration, "data.completeSiteGeneration(",
-                "atomic relocated site completion");
-        assertContains(deferredSiteGeneration, "this.synchronizeFactionOutpostHome(completed)",
-                "generating resident relocated home reconciliation");
-        assertContains(deferredSiteGeneration, "this.synchronizeFactionOutpostHome(outpost)",
-                "other resident relocated home reconciliation");
+        String siteAnchor = read(Path.of(
+                "src/main/java/galacticwars/clonewars/world/BlueprintSiteAnchorBlockEntity.java"));
+        assertContains(siteAnchor, "data.registerGeneratedSite(",
+                "generated site must publish identity before residents");
+        assertContains(siteAnchor, "initialized = true", "persistent one-shot site initialization");
+        assertContains(siteAnchor, "recruit.setPersistenceRequired()", "persistent site residents");
 
         String marker = read(Path.of(
                 "src/main/java/galacticwars/clonewars/world/FactionOutpostMarkerService.java"));
@@ -165,7 +156,7 @@ public final class PlanetFactionEcologyResourcesTest {
         assertContains(tick, "this.discard()",
                 "first-tick rejected natural spawn removal");
         assertContains(tick, "this.tryGenerateFactionOutpostSite(serverLevel)",
-                "server-tick deferred site generation");
+                "existing planet post-spawn shelter lifecycle");
 
         String initializer = section(
                 entity,

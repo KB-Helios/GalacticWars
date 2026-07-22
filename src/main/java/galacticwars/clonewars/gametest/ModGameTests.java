@@ -128,6 +128,7 @@ import galacticwars.clonewars.workforce.WorkerPhase;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.world.PlanetTravelService;
 import galacticwars.clonewars.world.PlanetTravelGameTests;
+import galacticwars.clonewars.world.BlueprintSiteAnchorBlockEntity;
 import galacticwars.clonewars.world.PlanetArrivalService;
 import galacticwars.clonewars.world.PlanetFactionSpawnPolicy;
 import galacticwars.clonewars.world.FactionOutpostRecord;
@@ -351,11 +352,11 @@ public final class ModGameTests {
         tests.put(id("blueprint_projector_runtime"), ModGameTests::blueprintProjectorRuntime);
         tests.put(id("kingdom_governance_persistence"), ModGameTests::kingdomGovernancePersistence);
         tests.put(id("kingdom_multiplayer_runtime"), ModGameTests::kingdomMultiplayerRuntime);
-        tests.put(id("overworld_faction_outpost_runtime"), ModGameTests::overworldFactionOutpostRuntime);
+        tests.put(id("overworld_faction_outpost_runtime"), ModGameTests::blueprintSiteRuntime);
         tests.put(id("chunk_generation_rejection_serialization"),
                 ModGameTests::chunkGenerationRejectionSerialization);
         tests.put(id("chunk_generation_initialization_serialization"),
-                ModGameTests::chunkGenerationInitializationSerialization);
+                ModGameTests::chunkGenerationRejectionSerialization);
         tests.put(id("natural_rejection_serialization"),
                 ModGameTests::naturalRejectionSerialization);
         tests.put(id("planet_faction_outpost_runtime"), ModGameTests::planetFactionOutpostRuntime);
@@ -4481,6 +4482,52 @@ public final class ModGameTests {
                 || !data.kingdom(kingdom.id()).orElseThrow().npc(soldier)
                         .map(entry -> entry.serviceBranch() == NpcServiceBranch.CIVILIAN).orElse(false)) {
             helper.fail("Military and civilian roster separation was not enforced atomically");
+            return;
+        }
+        helper.succeed();
+    }
+
+    private static void blueprintSiteRuntime(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos anchorPos = helper.absolutePos(new BlockPos(2, 1, 2));
+        BlockPos lootPos = anchorPos.offset(2, 0, 0);
+        level.setBlock(anchorPos.below(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(anchorPos, ModBlocks.BLUEPRINT_SITE_ANCHOR.get().defaultBlockState(), 3);
+        level.setBlock(lootPos, ModBlocks.BLUEPRINT_SITE_LOOT.get().defaultBlockState(), 3);
+        if (!(level.getBlockEntity(anchorPos) instanceof BlueprintSiteAnchorBlockEntity anchor)) {
+            helper.fail("Blueprint site anchor block entity was not created");
+            return;
+        }
+        anchor.configure("galacticwars:hutt_salvage_depot", 1);
+        BlueprintSiteAnchorBlockEntity.serverTick(level, anchorPos, level.getBlockState(anchorPos), anchor);
+        FactionOutpostSavedData data = FactionOutpostSavedData.get(level);
+        FactionOutpostRecord outpost = data.outposts().stream()
+                .filter(candidate -> candidate.x() == anchorPos.getX() && candidate.y() == anchorPos.getY()
+                        && candidate.z() == anchorPos.getZ())
+                .findFirst().orElse(null);
+        if (outpost == null || !outpost.factionId().equals("galacticwars:hutt_cartel")
+                || !data.siteGenerated(outpost.id())) {
+            helper.fail("Blueprint site did not atomically register its faction outpost");
+            return;
+        }
+        int expectedResidents = outpost.militaryNpcIds().size() + outpost.civilianNpcIds().size();
+        int loadedResidents = level.getEntitiesOfClass(GalacticRecruitEntity.class,
+                new AABB(anchorPos).inflate(12.0D), recruit -> outpost.contains(recruit.getUUID())).size();
+        if (expectedResidents < 3 || loadedResidents != expectedResidents
+                || !(level.getBlockEntity(lootPos)
+                instanceof net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity container)
+                || container.getLootTable() == null) {
+            helper.fail("Blueprint site residents or lazy loot were incomplete");
+            return;
+        }
+        BlueprintSiteAnchorBlockEntity.serverTick(level, anchorPos, level.getBlockState(anchorPos), anchor);
+        int afterReplay = level.getEntitiesOfClass(GalacticRecruitEntity.class,
+                new AABB(anchorPos).inflate(12.0D), recruit -> outpost.contains(recruit.getUUID())).size();
+        Tag encoded = FactionOutpostSavedData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
+        FactionOutpostSavedData restored = FactionOutpostSavedData.CODEC.parse(NbtOps.INSTANCE, encoded).getOrThrow();
+        if (afterReplay != loadedResidents || restored.outpost(outpost.id()).isEmpty()
+                || !restored.siteGenerated(outpost.id())) {
+            helper.fail("Blueprint site initialization was not reload-idempotent");
             return;
         }
         helper.succeed();

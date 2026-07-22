@@ -41,7 +41,7 @@ public final class AssetReferenceIntegrityTest {
         modelsReferenceExistingModTextures();
         recruitRenderTexturesExist();
         geckoRecruitAssetsExist();
-        biomeSpawnModifiersReferenceRegisteredEntities();
+        overworldBiomeModifiersContainOnlyResourceFeatures();
         builtJarContainsModAssetsAndData();
 
         System.out.println("AssetReferenceIntegrityTest passed");
@@ -115,7 +115,7 @@ public final class AssetReferenceIntegrityTest {
         }
     }
 
-    private static void biomeSpawnModifiersReferenceRegisteredEntities() throws IOException {
+    private static void overworldBiomeModifiersContainOnlyResourceFeatures() throws IOException {
         String entities = Files.readString(Path.of("src/main/java/galacticwars/clonewars/registry/ModEntityTypes.java"));
         for (String recruit : LAUNCH_UNITS) {
             assertContains(entities, "\"" + recruit + "\"", recruit + " entity registration");
@@ -124,9 +124,12 @@ public final class AssetReferenceIntegrityTest {
         try (Stream<Path> files = Files.walk(MOD_DATA_ROOT.resolve("neoforge/biome_modifier"))) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
                 String content = Files.readString(file);
-                assertContains(content, "galacticwars:", "spawn modifier entity namespace");
-                assertContains(content, "\"type\"", "spawn modifier type field");
-                assertContains(content, "\"neoforge:add_spawns\"", "spawn modifier type value");
+                assertContains(content, "galacticwars:", "feature namespace");
+                assertContains(content, "\"type\"", "biome modifier type field");
+                assertContains(content, "\"neoforge:add_features\"", "resource feature modifier type");
+                if (content.contains("neoforge:add_spawns")) {
+                    throw new AssertionError("Overworld NPC spawn injection must remain disabled: " + file);
+                }
             }
         }
     }

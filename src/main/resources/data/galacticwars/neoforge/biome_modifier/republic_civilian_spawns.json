@@ -1,5 +1,0 @@
-{
-  "type": "neoforge:add_spawns",
-  "biomes": ["minecraft:plains", "minecraft:sunflower_plains", "minecraft:meadow"],
-  "spawners": {"type": "galacticwars:republic_civilian", "weight": 5, "minCount": 1, "maxCount": 3}
-}

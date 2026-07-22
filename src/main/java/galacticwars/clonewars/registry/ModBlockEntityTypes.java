@@ -4,6 +4,7 @@ import dev.architectury.registry.registries.DeferredRegister;
 import dev.architectury.registry.registries.RegistrySupplier;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
+import galacticwars.clonewars.world.BlueprintSiteAnchorBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 
@@ -17,6 +18,10 @@ public final class ModBlockEntityTypes {
             BLOCK_ENTITY_TYPES.register("command_center", () -> new BlockEntityType<>(
                     CommandCenterBlockEntity::new,
                     Set.of(ModBlocks.COMMAND_CENTER.get())));
+    public static final RegistrySupplier<BlockEntityType<BlueprintSiteAnchorBlockEntity>> BLUEPRINT_SITE_ANCHOR =
+            BLOCK_ENTITY_TYPES.register("blueprint_site_anchor", () -> new BlockEntityType<>(
+                    BlueprintSiteAnchorBlockEntity::new,
+                    Set.of(ModBlocks.BLUEPRINT_SITE_ANCHOR.get())));
 
     private ModBlockEntityTypes() {
     }

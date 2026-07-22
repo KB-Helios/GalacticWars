@@ -1,0 +1,161 @@
+package galacticwars.clonewars.world;
+
+import galacticwars.clonewars.data.GameplayDataManager;
+import galacticwars.clonewars.entity.GalacticRecruitEntity;
+import galacticwars.clonewars.recruitment.NpcServiceBranch;
+import galacticwars.clonewars.registry.ModBlockEntityTypes;
+import galacticwars.clonewars.settlement.BlueprintRosterEntry;
+import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
+
+/** Persistent, invisible handoff from worldgen workers to the authoritative server tick. */
+public final class BlueprintSiteAnchorBlockEntity extends BlockEntity {
+    private String blueprintId = "";
+    private int rotationSteps;
+    private String contentHash = "";
+    private boolean initialized;
+
+    public BlueprintSiteAnchorBlockEntity(BlockPos pos, BlockState state) {
+        super(ModBlockEntityTypes.BLUEPRINT_SITE_ANCHOR.get(), pos, state);
+    }
+
+    public void configure(String blueprintId, int rotationSteps) {
+        KingdomBaseBlueprint blueprint = GameplayDataManager.snapshot().blueprint(blueprintId).orElse(null);
+        configure(blueprintId, rotationSteps, blueprint == null ? "" : blueprint.contentHash());
+    }
+
+    public void configure(String blueprintId, int rotationSteps, String contentHash) {
+        this.blueprintId = KingdomBaseBlueprint.canonicalId(blueprintId);
+        this.rotationSteps = Math.floorMod(rotationSteps, 4);
+        this.contentHash = contentHash == null ? "" : contentHash;
+        setChanged();
+    }
+
+    public static void serverTick(Level level, BlockPos pos, BlockState state, BlueprintSiteAnchorBlockEntity anchor) {
+        if (anchor.initialized || anchor.blueprintId.isBlank() || !(level instanceof ServerLevel serverLevel)
+                || !GameplayDataManager.isReady()) {
+            return;
+        }
+        anchor.initialize(serverLevel, pos);
+    }
+
+    private void initialize(ServerLevel level, BlockPos pos) {
+        KingdomBaseBlueprint blueprint = GameplayDataManager.snapshot().blueprint(blueprintId).orElse(null);
+        if (blueprint == null || blueprint.worldgen().isEmpty()) {
+            return;
+        }
+        var profile = blueprint.worldgen().orElseThrow();
+        String identity = level.dimension().identifier() + ":" + pos.asLong() + ":" + blueprintId;
+        UUID siteId = UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8));
+        FactionOutpostSavedData data = FactionOutpostSavedData.get(level);
+        if (data.outpost(siteId).isPresent()) {
+            initialized = true;
+            setChanged();
+            return;
+        }
+
+        RandomSource random = RandomSource.create(siteId.getMostSignificantBits() ^ siteId.getLeastSignificantBits());
+        ArrayList<PendingResident> residents = new ArrayList<>();
+        ArrayList<UUID> military = new ArrayList<>();
+        ArrayList<UUID> civilians = new ArrayList<>();
+        int ordinal = 0;
+        for (BlueprintRosterEntry entry : profile.roster()) {
+            int count = entry.minimum() + random.nextInt(entry.maximum() - entry.minimum() + 1);
+            NpcServiceBranch branch = entry.serviceBranch().equals("civilian")
+                    ? NpcServiceBranch.CIVILIAN : NpcServiceBranch.MILITARY;
+            for (int index = 0; index < count; index++) {
+                UUID npcId = UUID.nameUUIDFromBytes((siteId + ":resident:" + ordinal++).getBytes(StandardCharsets.UTF_8));
+                residents.add(new PendingResident(npcId, entry.entityTypeId(), branch));
+                (branch == NpcServiceBranch.MILITARY ? military : civilians).add(npcId);
+            }
+        }
+
+        // Seal the one-shot transaction before exposing containers or residents.
+        data.registerGeneratedSite(siteId, profile.factionId(), level.dimension().identifier().toString(),
+                pos, profile.siteRadius(), military, civilians, level.getGameTime());
+        initialized = true;
+        setChanged();
+        initializeLoot(level, pos, profile.factionId(), siteId);
+        spawnResidents(level, pos, profile.siteRadius(), siteId, residents);
+    }
+
+    private static void initializeLoot(ServerLevel level, BlockPos center, String factionId, UUID siteId) {
+        String factionPath = factionId.substring(factionId.indexOf(':') + 1);
+        ResourceKey<LootTable> loot = ResourceKey.create(Registries.LOOT_TABLE,
+                Identifier.fromNamespaceAndPath("galacticwars", "chests/faction_site/" + factionPath));
+        for (BlockPos target : BlockPos.betweenClosed(center.offset(-12, -2, -12), center.offset(12, 6, 12))) {
+            if (level.getBlockState(target).is(galacticwars.clonewars.registry.ModBlocks.BLUEPRINT_SITE_LOOT.get())) {
+                level.setBlock(target, Blocks.CHEST.defaultBlockState(), 3);
+                if (level.getBlockEntity(target) instanceof RandomizableContainerBlockEntity container) {
+                    if (container.getLootTable() == null) {
+                        container.setLootTable(loot);
+                        container.setLootTableSeed(siteId.getLeastSignificantBits() ^ target.asLong());
+                        container.setChanged();
+                    }
+                }
+            }
+        }
+    }
+
+    private static void spawnResidents(
+            ServerLevel level, BlockPos center, int radius, UUID siteId, List<PendingResident> residents
+    ) {
+        int index = 0;
+        for (PendingResident pending : residents) {
+            var type = BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.parse(pending.entityTypeId()));
+            Entity entity = type == null ? null : type.create(level, EntitySpawnReason.STRUCTURE);
+            if (!(entity instanceof GalacticRecruitEntity recruit)) {
+                continue;
+            }
+            int dx = (index % 5) - 2;
+            int dz = (index / 5) - 2;
+            index++;
+            recruit.setUUID(pending.id());
+            recruit.snapTo(center.getX() + dx + 0.5D, center.getY() + 1.0D, center.getZ() + dz + 0.5D, 0.0F, 0.0F);
+            recruit.initializeBlueprintSiteResident(siteId, pending.branch(), center, radius);
+            recruit.setPersistenceRequired();
+            level.addFreshEntity(recruit);
+        }
+    }
+
+    @Override
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        blueprintId = input.getStringOr("blueprint_id", "");
+        rotationSteps = input.getIntOr("rotation_steps", 0);
+        contentHash = input.getStringOr("content_hash", "");
+        initialized = input.getBooleanOr("initialized", false);
+    }
+
+    @Override
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        output.putString("blueprint_id", blueprintId);
+        output.putInt("rotation_steps", rotationSteps);
+        output.putString("content_hash", contentHash);
+        output.putBoolean("initialized", initialized);
+    }
+
+    private record PendingResident(UUID id, String entityTypeId, NpcServiceBranch branch) {
+    }
+}

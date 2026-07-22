@@ -239,7 +239,7 @@ public final class StarterCampDeploymentService {
                 .blueprint(KingdomBaseBlueprint.STARTER_CAMP_ID).orElse(null);
         if (project == null || blueprint == null
                 || !project.blueprintId().equals(blueprint.id())
-                || !project.definitionHash().equals(blueprint.definitionHash())) {
+                || !blueprint.matchesDefinitionHash(project.definitionHash())) {
             return Result.rejected("blueprint_changed", Optional.of(deployment));
         }
 

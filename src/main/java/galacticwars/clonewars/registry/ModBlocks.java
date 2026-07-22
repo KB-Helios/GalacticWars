@@ -7,6 +7,7 @@ import galacticwars.clonewars.force.ForceShrineBlock;
 import galacticwars.clonewars.settlement.CommandCenterBlock;
 import galacticwars.clonewars.world.NightsisterWeaveTreeGrower;
 import galacticwars.clonewars.world.PlayerTriggeredSaplingBlock;
+import galacticwars.clonewars.world.BlueprintSiteAnchorBlock;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -58,6 +59,12 @@ public final class ModBlocks {
             "control_beacon", properties -> properties
                     .mapColor(MapColor.METAL).strength(-1.0F, 3_600_000.0F).lightLevel(state -> 10)
                     .sound(SoundType.METAL));
+    public static final RegistrySupplier<BlueprintSiteAnchorBlock> BLUEPRINT_SITE_ANCHOR = register(
+            "blueprint_site_anchor", properties -> new BlueprintSiteAnchorBlock(properties
+                    .mapColor(MapColor.NONE).strength(-1.0F, 3_600_000.0F).noOcclusion()));
+    public static final RegistrySupplier<Block> BLUEPRINT_SITE_LOOT = registerSimple(
+            "blueprint_site_loot", properties -> properties
+                    .mapColor(MapColor.NONE).strength(-1.0F, 3_600_000.0F).noOcclusion());
     public static final RegistrySupplier<ForceShrineBlock> JEDI_MEDITATION_SHRINE = register(
             "jedi_meditation_shrine", properties -> new ForceShrineBlock("jedi", properties
                     .mapColor(MapColor.STONE).strength(3.5F, 12.0F).lightLevel(state -> 8)

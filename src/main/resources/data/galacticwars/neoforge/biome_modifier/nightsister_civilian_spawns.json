@@ -1,5 +1,0 @@
-{
-  "type": "neoforge:add_spawns",
-  "biomes": ["minecraft:dark_forest", "minecraft:swamp", "minecraft:old_growth_pine_taiga"],
-  "spawners": {"type": "galacticwars:nightsister_civilian", "weight": 5, "minCount": 1, "maxCount": 3}
-}

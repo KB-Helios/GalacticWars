@@ -8,13 +8,16 @@ import com.google.gson.JsonParser;
 import dev.architectury.registry.ReloadListenerRegistry;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -41,6 +44,10 @@ import galacticwars.clonewars.faction.FactionStrategyDefinition;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.settlement.BaseBlockPlacement;
 import galacticwars.clonewars.settlement.BlueprintAnchor;
+import galacticwars.clonewars.settlement.BlueprintMode;
+import galacticwars.clonewars.settlement.BlueprintRosterEntry;
+import galacticwars.clonewars.settlement.BlueprintTerrainConstraints;
+import galacticwars.clonewars.settlement.BlueprintWorldgenProfile;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
 import galacticwars.clonewars.world.OverworldFactionSpawnProfile;
 import galacticwars.clonewars.world.CivilianArchetypeDefinition;
@@ -48,6 +55,10 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.Identifier;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -185,7 +196,28 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                             "blueprint block for " + blueprint.id());
                     requireRegistered(BuiltInRegistries.ITEM, placement.itemId(),
                             "blueprint item for " + blueprint.id());
+                    placement.blockState();
                 }
+                blueprint.worldgen().ifPresent(profile -> {
+                    if (!factions.containsKey(FactionId.of(profile.factionId()))) {
+                        throw new IllegalArgumentException("Blueprint " + blueprint.id()
+                                + " references unknown faction " + profile.factionId());
+                    }
+                    for (BlueprintRosterEntry entry : profile.roster()) {
+                        requireRegistered(BuiltInRegistries.ENTITY_TYPE, entry.entityTypeId(),
+                                "worldgen roster entity for " + blueprint.id());
+                        ArmyUnitDefinition unit = units.stream()
+                                .filter(candidate -> candidate.entityTypeId().equals(entry.entityTypeId()))
+                                .findFirst().orElse(null);
+                        CivilianArchetypeDefinition civilian = civilianArchetypes.get(entry.entityTypeId());
+                        String actualFaction = unit != null ? unit.factionId().toString()
+                                : civilian != null ? civilian.factionId() : "";
+                        if (!actualFaction.equals(profile.factionId())) {
+                            throw new IllegalArgumentException("Roster entity " + entry.entityTypeId()
+                                    + " does not belong to " + profile.factionId());
+                        }
+                    }
+                });
             }
             GameplayDataSnapshot loaded = new GameplayDataSnapshot(
                     new FactionCatalog(factions),
@@ -498,7 +530,16 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
     static Map<String, KingdomBaseBlueprint> loadBlueprints(ResourceManager manager) throws IOException {
         LinkedHashMap<String, KingdomBaseBlueprint> blueprints = new LinkedHashMap<>();
         for (ResourceJson resource : resources(manager, "galacticwars/blueprints")) {
-            KingdomBaseBlueprint blueprint = parseBlueprint(resource.id(), resource.json());
+            KingdomBaseBlueprint blueprint = parseBlueprint(manager, resource.id(), resource.json());
+            blueprint.worldgen().ifPresent(profile -> {
+                String factionPath = profile.factionId().substring(profile.factionId().indexOf(':') + 1);
+                Identifier lootResource = Identifier.fromNamespaceAndPath(GalacticWars.MODID,
+                        "loot_table/chests/faction_site/" + factionPath + ".json");
+                if (manager.getResource(lootResource).isEmpty()) {
+                    throw new IllegalArgumentException("Blueprint " + blueprint.id()
+                            + " references missing faction site loot table " + lootResource);
+                }
+            });
             if (blueprints.putIfAbsent(blueprint.id(), blueprint) != null) {
                 throw new IllegalArgumentException("Duplicate blueprint id " + blueprint.id() + " in " + resource.id());
             }
@@ -606,7 +647,12 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
     }
 
     static KingdomBaseBlueprint parseBlueprint(Identifier resourceId, JsonObject json) {
-        if (integer(json, "schema_version", -1) != 1) {
+        return parseBlueprint(null, resourceId, json);
+    }
+
+    static KingdomBaseBlueprint parseBlueprint(ResourceManager manager, Identifier resourceId, JsonObject json) {
+        int schema = integer(json, "schema_version", -1);
+        if (schema != 1 && schema != 2) {
             throw new IllegalArgumentException("Unsupported blueprint schema in " + resourceId);
         }
         String id = GameplayDataSnapshot.normalizeBlueprintId(requiredString(json, "id", resourceId));
@@ -624,18 +670,39 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
         for (JsonElement element : rotationJson) {
             allowedRotations.add(element.getAsInt());
         }
-        JsonArray placementJson = requiredArray(json, "placements", resourceId);
-        ArrayList<BaseBlockPlacement> placements = new ArrayList<>(placementJson.size());
-        for (JsonElement element : placementJson) {
-            JsonObject placement = element.getAsJsonObject();
-            placements.add(new BaseBlockPlacement(
-                    integer(placement, "x", 0),
-                    integer(placement, "y", 0),
-                    integer(placement, "z", 0),
-                    requiredString(placement, "block", resourceId),
-                    requiredString(placement, "item", resourceId)));
-        }
+        String templateId = schema == 2 ? requiredString(json, "template", resourceId) : "";
+        TemplateContents template = schema == 2
+                ? loadTemplate(Objects.requireNonNull(manager, "resource manager for schema v2"), templateId, resourceId)
+                : null;
+        ArrayList<BaseBlockPlacement> placements = schema == 2
+                ? new ArrayList<>(template.placements())
+                : parseInlinePlacements(requiredArray(json, "placements", resourceId), resourceId);
         JsonObject rewards = object(json, "rewards", new JsonObject());
+        Set<BlueprintMode> modes = schema == 2 ? parseModes(json, resourceId) : Set.of(BlueprintMode.CONSTRUCTION);
+        JsonObject terrain = object(json, "terrain", new JsonObject());
+        BlueprintTerrainConstraints constraints = new BlueprintTerrainConstraints(
+                integer(terrain, "max_slope", 4), integer(terrain, "min_y", -64), integer(terrain, "max_y", 320));
+        JsonObject construction = object(json, "construction", new JsonObject());
+        Map<String, Integer> costs = schema == 2 && construction.has("costs")
+                ? integerMap(construction, "costs", resourceId) : Map.of();
+        Optional<BlueprintWorldgenProfile> worldgen = modes.contains(BlueprintMode.WORLDGEN)
+                ? Optional.of(parseWorldgen(requiredObject(json, "worldgen", resourceId), resourceId))
+                : Optional.empty();
+        if (schema == 2 && modes.contains(BlueprintMode.WORLDGEN) && template.siteAnchorCount() != 1) {
+            throw new IllegalArgumentException("Worldgen blueprint " + id
+                    + " template must contain exactly one site_anchor marker");
+        }
+        if (schema == 2 && worldgen.isPresent()
+                && !template.lootMarkers().equals(Set.copyOf(worldgen.orElseThrow().lootMarkers()))) {
+            throw new IllegalArgumentException("Loot markers do not match template contents for " + id);
+        }
+        if (!costs.isEmpty()) {
+            Map<String, Integer> derived = new java.util.TreeMap<>();
+            placements.forEach(placement -> derived.merge(placement.itemId(), 1, Integer::sum));
+            if (!derived.equals(new java.util.TreeMap<>(costs))) {
+                throw new IllegalArgumentException("Construction costs do not match template contents for " + id);
+            }
+        }
         return new KingdomBaseBlueprint(
                 id,
                 requiredString(json, "display_name", resourceId),
@@ -646,7 +713,126 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 integer(rewards, "storage_slots", 0),
                 string(rewards, "worksite", ""),
                 integer(rewards, "worksite_capacity", 0),
-                integer(rewards, "commander_slots", 0));
+                integer(rewards, "commander_slots", 0),
+                templateId,
+                modes,
+                constraints,
+                costs,
+                worldgen,
+                stringSet(json, "compatible_definition_hashes"));
+    }
+
+    private static ArrayList<BaseBlockPlacement> parseInlinePlacements(JsonArray placementJson, Identifier resourceId) {
+        ArrayList<BaseBlockPlacement> placements = new ArrayList<>(placementJson.size());
+        for (JsonElement element : placementJson) {
+            JsonObject placement = element.getAsJsonObject();
+            placements.add(new BaseBlockPlacement(
+                    integer(placement, "x", 0), integer(placement, "y", 0), integer(placement, "z", 0),
+                    requiredString(placement, "block", resourceId), requiredString(placement, "item", resourceId)));
+        }
+        return placements;
+    }
+
+    private static Set<BlueprintMode> parseModes(JsonObject json, Identifier resourceId) {
+        LinkedHashSet<BlueprintMode> modes = new LinkedHashSet<>();
+        for (JsonElement element : requiredArray(json, "modes", resourceId)) {
+            try {
+                modes.add(BlueprintMode.valueOf(element.getAsString().trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Invalid blueprint mode in " + resourceId, exception);
+            }
+        }
+        return Set.copyOf(modes);
+    }
+
+    private static BlueprintWorldgenProfile parseWorldgen(JsonObject json, Identifier resourceId) {
+        ArrayList<BlueprintRosterEntry> roster = new ArrayList<>();
+        for (JsonElement element : requiredArray(json, "roster", resourceId)) {
+            JsonObject entry = element.getAsJsonObject();
+            roster.add(new BlueprintRosterEntry(requiredString(entry, "entity_type", resourceId),
+                    integer(entry, "minimum", 1), integer(entry, "maximum", 1), integer(entry, "weight", 1),
+                    string(entry, "service_branch", "military")));
+        }
+        return new BlueprintWorldgenProfile(strings(json, "biomes"), requiredString(json, "faction", resourceId),
+                integer(json, "site_radius", 32), roster, strings(json, "loot_markers"),
+                integer(json, "placement_weight", 1));
+    }
+
+    private static TemplateContents loadTemplate(ResourceManager manager, String templateId, Identifier descriptorId) {
+        Identifier id = Identifier.parse(templateId);
+        Identifier resourceId = Identifier.fromNamespaceAndPath(id.getNamespace(), "structure/" + id.getPath() + ".nbt");
+        Resource resource = manager.getResource(resourceId).orElseThrow(() ->
+                new IllegalArgumentException("Blueprint " + descriptorId + " references missing template " + templateId));
+        try (InputStream input = resource.open()) {
+            CompoundTag root = NbtIo.readCompressed(input, NbtAccounter.unlimitedHeap());
+            ListTag size = root.getListOrEmpty("size");
+            if (size.size() != 3 || size.getIntOr(0, 0) <= 0 || size.getIntOr(1, 0) <= 0
+                    || size.getIntOr(2, 0) <= 0 || size.getIntOr(0, 0) > 48 || size.getIntOr(1, 0) > 32
+                    || size.getIntOr(2, 0) > 48) {
+                throw new IllegalArgumentException("Unsafe template bounds for " + templateId);
+            }
+            ListTag palette = root.getListOrEmpty("palette");
+            ListTag blocks = root.getListOrEmpty("blocks");
+            ArrayList<BaseBlockPlacement> placements = new ArrayList<>();
+            HashSet<String> occupiedPositions = new HashSet<>();
+            int siteAnchors = 0;
+            LinkedHashSet<String> lootMarkers = new LinkedHashSet<>();
+            for (int index = 0; index < blocks.size(); index++) {
+                CompoundTag block = blocks.getCompoundOrEmpty(index);
+                int paletteIndex = block.getIntOr("state", -1);
+                if (paletteIndex < 0 || paletteIndex >= palette.size()) {
+                    throw new IllegalArgumentException("Invalid palette index in " + templateId);
+                }
+                CompoundTag state = palette.getCompoundOrEmpty(paletteIndex);
+                String blockId = state.getStringOr("Name", "");
+                ListTag position = block.getListOrEmpty("pos");
+                if (position.size() != 3) {
+                    throw new IllegalArgumentException("Invalid block position in " + templateId);
+                }
+                int x = position.getIntOr(0, 0);
+                int y = position.getIntOr(1, 0);
+                int z = position.getIntOr(2, 0);
+                if (x < 0 || x >= size.getIntOr(0, 0)
+                        || y < 0 || y >= size.getIntOr(1, 0)
+                        || z < 0 || z >= size.getIntOr(2, 0)) {
+                    throw new IllegalArgumentException("Block position outside template bounds in " + templateId);
+                }
+                if (!occupiedPositions.add(x + ":" + y + ":" + z)) {
+                    throw new IllegalArgumentException("Duplicate block position in " + templateId);
+                }
+                if (blockId.equals("minecraft:structure_block")) {
+                    String marker = block.getCompoundOrEmpty("nbt").getStringOr("metadata", "");
+                    siteAnchors += marker.equals("site_anchor") ? 1 : 0;
+                    if (marker.startsWith("loot:")) {
+                        String lootMarker = marker.substring("loot:".length());
+                        if (lootMarker.isBlank() || !lootMarkers.add(lootMarker)) {
+                            throw new IllegalArgumentException("Invalid or duplicate loot marker in " + templateId);
+                        }
+                    }
+                    continue;
+                }
+                LinkedHashMap<String, String> properties = new LinkedHashMap<>();
+                state.getCompoundOrEmpty("Properties").forEach((key, value) ->
+                        properties.put(key, state.getCompoundOrEmpty("Properties").getStringOr(key, "")));
+                placements.add(new BaseBlockPlacement(x, y, z, blockId, blockId, properties));
+            }
+            for (int index = 0; index < root.getListOrEmpty("entities").size(); index++) {
+                CompoundTag entity = root.getListOrEmpty("entities").getCompoundOrEmpty(index);
+                String entityId = entity.getCompoundOrEmpty("nbt").getStringOr("id", "");
+                requireRegistered(BuiltInRegistries.ENTITY_TYPE, entityId,
+                        "template entity for " + templateId);
+            }
+            return new TemplateContents(List.copyOf(placements), siteAnchors, Set.copyOf(lootMarkers));
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Could not read template " + templateId, exception);
+        }
+    }
+
+    private record TemplateContents(
+            List<BaseBlockPlacement> placements,
+            int siteAnchorCount,
+            Set<String> lootMarkers
+    ) {
     }
 
     private static void validateRelations(Map<FactionId, FactionDefinition> factions) {
@@ -728,6 +914,10 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
             values.add(value);
         }
         return List.copyOf(values);
+    }
+
+    private static Set<String> stringSet(JsonObject json, String key) {
+        return Set.copyOf(strings(json, key));
     }
 
     private static Map<String, Integer> integerMap(

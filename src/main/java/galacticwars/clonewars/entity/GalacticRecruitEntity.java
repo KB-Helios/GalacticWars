@@ -573,6 +573,8 @@ public class GalacticRecruitEntity extends TamableAnimal
                 && this.factionOutpostId != null
                 && this.tickCount % 20 == 1
                 && this.level() instanceof ServerLevel serverLevel) {
+            // Planet ecology keeps its existing first-resident shelter lifecycle. Overworld
+            // blueprint residents mark this resolved during atomic site initialization.
             this.tryGenerateFactionOutpostSite(serverLevel);
         }
         if (!this.level().isClientSide()
@@ -622,36 +624,12 @@ public class GalacticRecruitEntity extends TamableAnimal
 
     private boolean initializeNaturalWorldSpawn(ServerLevel level) {
         String entityTypeId = BuiltInRegistries.ENTITY_TYPE.getKey(this.getType()).toString();
+        if (this.isTame() || this.kingdomId != null || this.settlementId != null) {
+            return false;
+        }
         if (level.dimension().equals(Level.OVERWORLD)) {
-            if (this.factionOutpostId != null) {
-                return true;
-            }
-            if (this.isTame() || this.kingdomId != null || this.settlementId != null) {
-                return false;
-            }
-            OverworldFactionSpawnProfile profile = GameplayDataManager.snapshot()
-                    .overworldSpawnProfileForEntity(entityTypeId).orElse(null);
-            if (profile == null) {
-                return false;
-            }
-            NpcServiceBranch branch = profile.branchFor(entityTypeId);
-            FactionOutpostSavedData data = FactionOutpostSavedData.get(level);
-            FactionOutpostRecord outpost = data.assignNaturalNpc(
-                    this.getUUID(),
-                    profile,
-                    branch,
-                    level.dimension().identifier().toString(),
-                    this.blockPosition(),
-                    level.getGameTime()).orElse(null);
-            if (outpost == null) {
-                return false;
-            }
-            this.initializeNaturalFactionNpc(
-                    outpost.id(),
-                    branch,
-                    FactionOutpostMarkerService.shelterCenter(outpost),
-                    outpost.radius());
-            return true;
+            // Overworld faction residents are created only by initialized blueprint sites.
+            return false;
         }
 
         PlanetFactionSpawnPolicy.Evaluation evaluation = PlanetFactionSpawnPolicy.evaluate(
@@ -853,6 +831,16 @@ public class GalacticRecruitEntity extends TamableAnimal
     ) {
         initializeNaturalFactionNpc(outpostId, branch);
         this.setHomeTo(Objects.requireNonNull(outpostCenter, "outpostCenter"), outpostRadius);
+    }
+
+    public void initializeBlueprintSiteResident(
+            UUID outpostId,
+            NpcServiceBranch branch,
+            BlockPos outpostCenter,
+            int outpostRadius
+    ) {
+        initializeNaturalFactionNpc(outpostId, branch, outpostCenter, outpostRadius);
+        this.factionOutpostSiteGenerationResolved = true;
     }
 
     public boolean isNaturalPlanetNpcInitialized() {
@@ -2144,7 +2132,7 @@ public class GalacticRecruitEntity extends TamableAnimal
                 this.persistBlockedBuildProject(project, "blueprint_definition_missing");
                 return false;
             }
-            if (!project.definitionHash().equals(blueprint.definitionHash())) {
+            if (!blueprint.matchesDefinitionHash(project.definitionHash())) {
                 this.persistBlockedBuildProject(project, "blueprint_definition_changed");
                 return false;
             }
@@ -2632,7 +2620,7 @@ public class GalacticRecruitEntity extends TamableAnimal
             this.blockWorker("blueprint_definition_missing");
             return;
         }
-        if (!project.definitionHash().equals(blueprint.definitionHash())) {
+        if (!blueprint.matchesDefinitionHash(project.definitionHash())) {
             this.persistBlockedBuildProject(project, "blueprint_definition_changed");
             this.blockWorker("blueprint_definition_changed");
             return;
@@ -3201,7 +3189,7 @@ public class GalacticRecruitEntity extends TamableAnimal
             this.blockWorker("blueprint_position_blocked");
             return;
         }
-        if (!this.level().setBlock(expected, safeConstructionState(block.get()), 3)) {
+        if (!this.level().setBlock(expected, safeConstructionState(placement.blockState()), 3)) {
             this.blockWorker("world_change_rejected");
             return;
         }
@@ -3219,8 +3207,7 @@ public class GalacticRecruitEntity extends TamableAnimal
      * A builder must be able to leave a newly placed work block safely. Campfires are therefore
      * installed unlit; the player can light the completed camp once no worker is pathing across it.
      */
-    private static BlockState safeConstructionState(Block block) {
-        BlockState state = block.defaultBlockState();
+    private static BlockState safeConstructionState(BlockState state) {
         return state.hasProperty(BlockStateProperties.LIT)
                 ? state.setValue(BlockStateProperties.LIT, false)
                 : state;
@@ -4073,7 +4060,7 @@ public class GalacticRecruitEntity extends TamableAnimal
                 || !this.kingdomId.equals(KingdomSavedData.get(serverLevel)
                         .kingdomForPlayer(actor.getUUID()).map(KingdomRecord::id).orElse(null))
                 || !project.blueprintId().equals(blueprint.id())
-                || !project.definitionHash().equals(blueprint.definitionHash())
+                || !blueprint.matchesDefinitionHash(project.definitionHash())
                 || !project.dimensionId().equals(serverLevel.dimension().identifier().toString())
                 || !blueprint.supportsRotationSteps(project.rotationSteps())) {
             sendFeedback(actor, Component.translatable(

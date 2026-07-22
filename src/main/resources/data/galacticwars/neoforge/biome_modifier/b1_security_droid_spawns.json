@@ -1,1 +1,0 @@
-{"type":"neoforge:add_spawns","biomes":["minecraft:desert","minecraft:badlands","minecraft:wooded_badlands"],"spawners":{"type":"galacticwars:b1_security_droid","weight":3,"minCount":1,"maxCount":3}}

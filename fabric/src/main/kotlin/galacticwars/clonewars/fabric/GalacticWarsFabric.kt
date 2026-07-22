@@ -7,6 +7,6 @@ class GalacticWarsFabric : ModInitializer {
     override fun onInitialize() {
         FabricPlayerCampaignAttachments.register()
         GalacticWars.init()
-        FabricBiomeSpawns.register()
+        FabricWorldgenFeatures.register()
     }
 }

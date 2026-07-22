@@ -986,7 +986,7 @@ public final class KingdomSavedData extends SavedData {
             if (!project.blueprintId().equals(authoritative.id()) || project.rotationSteps() != rotationSteps) {
                 return Optional.empty();
             }
-            if (!project.definitionHash().equals(authoritative.definitionHash())) {
+            if (!authoritative.matchesDefinitionHash(project.definitionHash())) {
                 BuildProject blocked = project.block("blueprint_definition_changed");
                 replaceBuildProject(ownerId, blocked);
                 return Optional.of(blocked);
@@ -1364,7 +1364,7 @@ public final class KingdomSavedData extends SavedData {
                     : GameplayDataManager.snapshot().blueprint(project.blueprintId()).orElse(null);
             if (project == null || blueprint == null
                     || worksite.sourceProjectId().filter(project.id()::equals).isEmpty()
-                    || !project.definitionHash().equals(blueprint.definitionHash())
+                    || !blueprint.matchesDefinitionHash(project.definitionHash())
                     || !project.dimensionId().equals(order.dimensionId())
                     || order.targetX() != project.originX()
                     || order.targetY() != project.originY()
