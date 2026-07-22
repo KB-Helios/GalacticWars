@@ -599,6 +599,12 @@ public final class CommandCenterOperationsScreen extends Screen
                         "screen.galacticwars.operations.campaign.veteran_guidance"),
                         panelWidth - 20), bodyTop + 49, ACCENT);
             }
+            state.activeForceTrainingQuest().ifPresent(training -> drawCentered(
+                    graphics, clipped(Component.translatable(
+                            "screen.galacticwars.operations.campaign.force_training",
+                            questTitle(training.questId()), completedObjectives(training),
+                            training.objectives().size()), panelWidth - 20),
+                    bodyTop + 60, MUTED));
             return;
         }
         QuestSummary quest = active.orElseThrow();

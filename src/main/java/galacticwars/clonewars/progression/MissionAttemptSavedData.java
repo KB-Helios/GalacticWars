@@ -141,6 +141,15 @@ public final class MissionAttemptSavedData extends SavedData {
                     failureReason, lastFeedbackAt);
         }
 
+        public MissionAttempt present() {
+            if (absentTicks == 0) {
+                return this;
+            }
+            return new MissionAttempt(playerId, missionId, attempt, phase, targetDimension,
+                    target, startedAt, retryAt, holdTicks, 0, waveSpawned,
+                    failureReason, lastFeedbackAt);
+        }
+
         public MissionAttempt feedback(long gameTime) {
             return new MissionAttempt(playerId, missionId, attempt, phase, targetDimension,
                     target, startedAt, retryAt, holdTicks, absentTicks, waveSpawned,

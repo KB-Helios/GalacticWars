@@ -85,6 +85,10 @@ public final class ClassAbilityRuntimeServiceTest {
                 .activate(AbilityId.of("suppressive_fire"), 15, 200L, 100L);
         assertEquals(ClassProgressState.MAX_RESOURCE, spent.regenerate(Integer.MAX_VALUE).resource(),
                 "resource regeneration saturates without overflow");
+        ClassProgressState missionCredit = ClassProgressState.unassigned()
+                .assign(UnitClassId.of("clone_trooper"))
+                .creditCompletedMissions(Integer.MAX_VALUE);
+        assertEquals(1_000_000, missionCredit.creditedMissions(), "mission credit cap");
     }
 
     private static void playerLoadoutSwitchPreservesProgressAndCombatState() {

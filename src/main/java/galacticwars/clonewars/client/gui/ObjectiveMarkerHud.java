@@ -26,7 +26,7 @@ public final class ObjectiveMarkerHud {
         double scale = ClientConfig.HUD_SCALE_PERCENT.get() / 100.0D;
         int primaryColor = ClientConfig.HIGH_CONTRAST.get() ? 0xFFFFFFFF : 0xFFE8EEF7;
         int actionY = (int) Math.round(12 * scale);
-        drawCentered(graphics, action, actionY + offsetY, offsetX, primaryColor);
+        drawCentered(graphics, action, actionY + offsetY, offsetX, primaryColor, scale);
         if (!state.targetKnown()) {
             return;
         }
@@ -35,7 +35,8 @@ public final class ObjectiveMarkerHud {
         if (!currentDimension.equals(state.dimensionId())) {
             drawCentered(graphics,
                     Component.translatable("hud.galacticwars.objective.travel",
-                            dimensionName(state.dimensionId())), markerY + offsetY, offsetX, 0xFFFFC96B);
+                            dimensionName(state.dimensionId())), markerY + offsetY, offsetX,
+                    0xFFFFC96B, scale);
             return;
         }
         double dx = state.x() + 0.5D - player.getX();
@@ -50,7 +51,7 @@ public final class ObjectiveMarkerHud {
                 : relative >= -67.5D ? "↗" : relative >= -112.5D ? "→" : "↘";
         drawCentered(graphics,
                 Component.translatable("hud.galacticwars.objective.marker", arrow, distance),
-                markerY + offsetY, offsetX, 0xFFFFC96B);
+                markerY + offsetY, offsetX, 0xFFFFC96B, scale);
     }
 
     private static Component dimensionName(String dimensionId) {
@@ -62,10 +63,11 @@ public final class ObjectiveMarkerHud {
     }
 
     private static void drawCentered(
-            GuiGraphicsExtractor graphics, Component text, int y, int offsetX, int color
+            GuiGraphicsExtractor graphics, Component text, int y, int offsetX, int color,
+            double scale
     ) {
-        int x = (graphics.guiWidth() - Minecraft.getInstance().font.width(text)) / 2 + offsetX;
-        graphics.text(Minecraft.getInstance().font, text, x, y, color);
+        HudRenderTransforms.centeredText(graphics, Minecraft.getInstance().font, text,
+                graphics.guiWidth() / 2 + offsetX, y, color, scale);
     }
 
     private static double wrapDegrees(double value) {

@@ -10,7 +10,7 @@ public final class ObjectiveMarkerClientState {
     }
 
     public static void update(ObjectiveMarkerPayload payload) {
-        snapshot = payload;
+        snapshot = payload == null ? ObjectiveMarkerPayload.inactive() : payload;
     }
 
     public static ObjectiveMarkerPayload snapshot() {

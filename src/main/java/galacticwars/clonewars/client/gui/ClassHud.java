@@ -31,7 +31,7 @@ public final class ClassHud {
                 left + barPadding + (width * state.resource() / 100), top + barHeight - barPadding, 0xFFFFB84D);
         int labelOffsetAbove = (int) Math.round(11 * scale);
         int labelOffsetBelow = (int) Math.round(10 * scale);
-        graphics.text(Minecraft.getInstance().font,
+        HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
                 Component.translatable(
                         "hud.galacticwars.class",
                         humanize(state.classId()),
@@ -42,13 +42,13 @@ public final class ClassHud {
                                 ? Component.translatable(
                                         "hud.galacticwars.class.locked_rank", 3).getString()
                                 : slot(state.ability2Id(), state.cooldown2())),
-                left, top - labelOffsetAbove, 0xFFFFE4B8);
+                left, top - labelOffsetAbove, 0xFFFFE4B8, scale);
         if (state.experienceForNextRank() > 0L) {
-            graphics.text(Minecraft.getInstance().font,
+            HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
                     Component.translatable("hud.galacticwars.class.progress",
                             state.experience(), state.experienceForNextRank(),
                             state.nextMilestoneRank()),
-                    left, top + labelOffsetBelow, 0xFFB8C5D6);
+                    left, top + labelOffsetBelow, 0xFFB8C5D6, scale);
         }
     }
 

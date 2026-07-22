@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import net.minecraft.core.BlockPos;
 
 public final class MissionRuntimeServiceTest {
     private MissionRuntimeServiceTest() {
@@ -80,6 +81,16 @@ public final class MissionRuntimeServiceTest {
                 || campaign.subjectTotal(
                 ProgressionEventType.MISSION_STARTED, Set.of(secureMission)) != 2) {
             throw new AssertionError("bounded retry did not create a second active attempt");
+        }
+
+        MissionAttemptSavedData.MissionAttempt returned =
+                new MissionAttemptSavedData.MissionAttempt(
+                        playerId, secureMission, 2, "hold", "minecraft:overworld",
+                        BlockPos.ZERO, 20L, 0L, 40, 80, true, "", 100L)
+                        .present();
+        if (returned.absentTicks() != 0 || returned.holdTicks() != 40
+                || !returned.waveSpawned()) {
+            throw new AssertionError("returning to a mission did not reset only absence time");
         }
         System.out.println("MissionRuntimeServiceTest passed");
     }

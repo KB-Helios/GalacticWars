@@ -29,8 +29,9 @@ public final class VehicleHud {
         graphics.fill(left, top, left + width, top + height, 0xBB080C12);
         int textPadding = (int) Math.round(6 * scale);
         int textY = (int) Math.round(8 * scale);
-        graphics.text(minecraft.font, Component.translatable("hud.galacticwars.vehicle",
-                vehicle.health(), maximumHealth, vehicle.fuel(), maximumFuel),
-                left + textPadding, top + textY, 0xFFBDEBFF);
+        HudRenderTransforms.text(graphics, minecraft.font,
+                Component.translatable("hud.galacticwars.vehicle",
+                        vehicle.health(), maximumHealth, vehicle.fuel(), maximumFuel),
+                left + textPadding, top + textY, 0xFFBDEBFF, scale);
     }
 }

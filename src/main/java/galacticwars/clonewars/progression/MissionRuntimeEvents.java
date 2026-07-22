@@ -134,7 +134,7 @@ public final class MissionRuntimeEvents {
             return;
         }
 
-        MissionAttemptSavedData.MissionAttempt holding = persisted;
+        MissionAttemptSavedData.MissionAttempt holding = persisted.present();
         if (!holding.phase().equals("hold")) {
             spawnWave(targetLevel, holding.target(), mission, holding.attempt());
             holding = holding.holding(true);

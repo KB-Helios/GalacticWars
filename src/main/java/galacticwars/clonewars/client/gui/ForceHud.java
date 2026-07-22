@@ -34,21 +34,23 @@ public final class ForceHud {
         graphics.fill(left, top, left + width, top + borderHeight, accent);
         int padding = (int) Math.round(5 * scale);
         int headerY = (int) Math.round(5 * scale);
-        graphics.text(Minecraft.getInstance().font,
+        HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
                 Component.literal(display(state.tradition()) + "  R" + state.rank()
                         + "  XP " + state.masteryExperience() + "/" + nextRank(state.rank())
                         + (state.unspentPoints() > 0 ? "  +" + state.unspentPoints() : "")),
-                left + padding, top + headerY, 0xFFF3F5FF);
+                left + padding, top + headerY, 0xFFF3F5FF, scale);
         int energyTop = (int) Math.round(16 * scale);
         int energyBottom = (int) Math.round(22 * scale);
         graphics.fill(left + padding, top + energyTop, left + width - padding, top + energyBottom, 0xFF202632);
         int energyWidth = (width - 2 * padding) * state.energy() / 100;
         graphics.fill(left + padding, top + energyTop, left + padding + energyWidth, top + energyBottom, accent);
         int energyLabelY = (int) Math.round(14 * scale);
-        graphics.text(Minecraft.getInstance().font,
+        int energyLabelWidth = (int) Math.round(
+                Minecraft.getInstance().font.width(Integer.toString(state.energy())) * scale);
+        HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
                 Component.literal(Integer.toString(state.energy())),
-                left + width - padding - Minecraft.getInstance().font.width(Integer.toString(state.energy())),
-                top + energyLabelY, 0xFFF5F7FF);
+                left + width - padding - energyLabelWidth,
+                top + energyLabelY, 0xFFF5F7FF, scale);
         int cellWidth = (width - 2 * padding) / 3;
         int cellGap = (int) Math.round(2 * scale);
         for (int slot = 0; slot < 3; slot++) {
@@ -69,14 +71,15 @@ public final class ForceHud {
             String status = cooldown > 0 ? ((cooldown + 19) / 20) + "s" : cast;
             int textOffset = (int) Math.round(19 * scale);
             int labelY = (int) Math.round(29 * scale);
-            graphics.text(Minecraft.getInstance().font,
+            HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
                     Component.literal(KEYS[slot] + " " + compact(ability)),
                     cellLeft + textOffset, top + labelY,
-                    cooldown > 0 ? 0xFF9BA3B2 : 0xFFF1F3FA);
+                    cooldown > 0 ? 0xFF9BA3B2 : 0xFFF1F3FA, scale);
             if (!status.isBlank()) {
                 int statusY = (int) Math.round(40 * scale);
-                graphics.text(Minecraft.getInstance().font, Component.literal(status),
-                        cellLeft + textOffset, top + statusY, active ? accent : 0xFFC2C7D1);
+                HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
+                        Component.literal(status), cellLeft + textOffset, top + statusY,
+                        active ? accent : 0xFFC2C7D1, scale);
             }
             int progressTop = (int) Math.round(50 * scale);
             if (active) {
@@ -90,9 +93,11 @@ public final class ForceHud {
         }
         if (hasFailure) {
             int failureY = (int) Math.round(57 * scale);
-            graphics.text(Minecraft.getInstance().font,
-                    Component.literal(trimToWidth(friendlyFailure(state.failureReason()), width - 2 * padding)),
-                    left + padding, top + failureY, 0xFFFFA4A4);
+            int unscaledWidth = (int) Math.floor((width - 2 * padding) / scale);
+            HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
+                    Component.literal(trimToWidth(
+                            friendlyFailure(state.failureReason()), unscaledWidth)),
+                    left + padding, top + failureY, 0xFFFFA4A4, scale);
         }
     }
 
@@ -114,9 +119,10 @@ public final class ForceHud {
         glyph = glyph.length() > 2 ? glyph.substring(0, 2) : glyph;
         int glyphCenter = (int) Math.round(7 * scale);
         int glyphY = (int) Math.round(2 * scale);
-        int glyphLeft = left + glyphCenter - Minecraft.getInstance().font.width(glyph) / 2;
-        graphics.text(Minecraft.getInstance().font, Component.literal(glyph),
-                glyphLeft, top + glyphY, 0xFFFFFFFF);
+        int glyphWidth = (int) Math.round(Minecraft.getInstance().font.width(glyph) * scale);
+        int glyphLeft = left + glyphCenter - glyphWidth / 2;
+        HudRenderTransforms.text(graphics, Minecraft.getInstance().font,
+                Component.literal(glyph), glyphLeft, top + glyphY, 0xFFFFFFFF, scale);
     }
 
     private static int abilityColor(String ability, int accent) {

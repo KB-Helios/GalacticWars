@@ -52,9 +52,9 @@ public final class BlasterHeatHud {
                 ? "hud.galacticwars.blaster.overheated"
                 : "hud.galacticwars.blaster.heat");
         int labelOffset = (int) Math.round(10 * scale);
-        graphics.centeredText(minecraft.font, label,
-                graphics.guiWidth() / 2 + ClientConfig.HUD_HORIZONTAL_OFFSET.get(), top - labelOffset,
-                overheated ? 0xFFFF665C : 0xFFD7E7F5);
+        HudRenderTransforms.centeredText(graphics, minecraft.font, label,
+                graphics.guiWidth() / 2 + ClientConfig.HUD_HORIZONTAL_OFFSET.get(),
+                top - labelOffset, overheated ? 0xFFFF665C : 0xFFD7E7F5, scale);
     }
 
     private static ItemStack heldBlaster(Minecraft minecraft) {
