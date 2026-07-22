@@ -4029,11 +4029,20 @@ public class GalacticRecruitEntity extends TamableAnimal
         return assignConstructionProjectInternal(actor, project, blueprint, true);
     }
 
-    public void packUpStarterConstruction() {
+    public boolean packUpStarterConstruction() {
         if (!(this.level() instanceof ServerLevel serverLevel) || this.getOwnerReference() == null) {
-            return;
+            return false;
         }
         UUID ownerId = this.getOwnerReference().getUUID();
+        if (!this.workerInventoryIsEmpty()) {
+            KingdomSavedData data = KingdomSavedData.get(serverLevel);
+            boolean returned = this.availableRegisteredStorage(serverLevel, data, ownerId).stream()
+                    .anyMatch(this::insertWorkerInventory);
+            if (!returned) {
+                this.blockWorker("starter_material_return_failed");
+                return false;
+            }
+        }
         this.pauseWorkerNavigation();
         this.releaseCurrentWorkOrder(true);
         this.activeBuildProjectId = null;
@@ -4045,6 +4054,7 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.armyGroupId = data.armyGroupForRecruit(this.getUUID()).map(ArmyGroupRecord::id).orElse(null);
         this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
         this.syncRecruitStatusState();
+        return true;
     }
 
     private boolean assignConstructionProjectInternal(

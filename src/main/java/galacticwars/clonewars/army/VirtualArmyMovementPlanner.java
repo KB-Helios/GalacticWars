@@ -170,7 +170,7 @@ public final class VirtualArmyMovementPlanner {
             int elapsedTicks
     ) {
         return ArmyPatrolOrderPlanner.advance(group, currentLocation.blockPosition(), elapsedTicks)
-                .map(decision -> group.withPatrolPlanAndOrder(decision.nextPlan(), decision.nextOrder()))
+                .map(decision -> group.withPatrolProgressAndOrder(decision.nextPlan(), decision.nextOrder()))
                 .orElse(group);
     }
 

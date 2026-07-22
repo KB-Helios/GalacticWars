@@ -28,6 +28,12 @@ public final class StarterCampDeploymentTest {
                 "failed reassignment remains player-recoverable");
 
         StarterCampDeployment packed = building.packedUp();
+        assertTrue(!StarterCampDeploymentService.canMarkBuilderUnassigned(
+                        packed, project, builder, UUID.randomUUID()),
+                "packed deployments reject stale reassignment rollback");
+        assertTrue(StarterCampDeploymentService.canMarkBuilderUnassigned(
+                        building, project, builder, UUID.randomUUID()),
+                "active matching deployments permit reassignment rollback");
         StarterCampDeployment relocated = packed.relocate("galacticwars:tatooine", 20, 70, -4, 3);
         assertTrue(relocated.contractGranted() && relocated.suppliesGranted(), "relocation cannot duplicate grants");
         assertTrue(relocated.projectId().isEmpty(), "cancelled project is not reused at the new site");

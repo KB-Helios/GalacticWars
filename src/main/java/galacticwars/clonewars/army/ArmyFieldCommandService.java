@@ -327,8 +327,8 @@ public final class ArmyFieldCommandService {
             List<ArmyGroupRecord> groups,
             UnaryOperator<ArmyGroupTactics> mutation
     ) {
-        return applyUpdates(data, player, groups, group -> group.withOrder(group.order())
-                .withTactics(mutation.apply(group.effectiveTactics())));
+        return applyUpdates(data, player, groups,
+                group -> group.withTactics(mutation.apply(group.effectiveTactics())));
     }
 
     private static <T extends Enum<T>> FieldCommandResult applyTacticsOption(
@@ -388,7 +388,7 @@ public final class ArmyFieldCommandService {
             UnaryOperator<ArmyPatrolPlan> mutation
     ) {
         try {
-            return Optional.of(group.withPatrolPlanAndOrder(mutation.apply(plan), group.order()));
+            return Optional.of(group.withPatrolProgressAndOrder(mutation.apply(plan), group.order()));
         } catch (IllegalArgumentException ignored) {
             return Optional.empty();
         }

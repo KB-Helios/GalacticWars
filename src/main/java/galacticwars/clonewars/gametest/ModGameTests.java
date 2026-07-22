@@ -883,6 +883,19 @@ public final class ModGameTests {
                     }
                     return;
                 }
+                if (indexedRecruit.getWorkerCarriedItemCount() == 0
+                        && !moveOneContainerItemToWorker(hall, indexedRecruit, Items.OAK_LOG)) {
+                    scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
+                    helper.fail("Starter builder could not stage a carried material for reassignment conservation");
+                    return;
+                }
+                int suppliesAcrossStorageAndBuilder = countContainerItems(hall)
+                        + indexedRecruit.getWorkerCarriedItemCount();
                 if (!campSetup.clickMenuButton(owner, StarterCampSetupMenu.REASSIGN_BUILDER)) {
                     scenarioRun[0] = true;
                     if (!chunksReleased[0]) {
@@ -896,14 +909,16 @@ public final class ModGameTests {
                 StarterCampDeployment reassigned = kingdomData.starterCampDeployment(kingdom.id()).orElse(null);
                 if (reassigned == null
                         || reassigned.builderId().filter(id -> !id.equals(initialBuilderId)).isEmpty()
-                        || indexedRecruit.getWorkerProfession().isPresent()) {
+                        || indexedRecruit.getWorkerProfession().isPresent()
+                        || indexedRecruit.getWorkerCarriedItemCount() != 0
+                        || countContainerItems(hall) != suppliesAcrossStorageAndBuilder) {
                     scenarioRun[0] = true;
                     if (!chunksReleased[0]) {
                         forcedCampChunks.forEach(chunk ->
                                 helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
                         chunksReleased[0] = true;
                     }
-                    helper.fail("Starter camp reassignment changed the contract or failed to release the prior builder or did not select a different candidate, reassigned=" + reassigned);
+                    helper.fail("Starter camp reassignment changed the contract, stranded materials, failed to release the prior builder, or did not select a different candidate, reassigned=" + reassigned);
                     return;
                 }
                 firstRecruit[0] = reserveBuilder;
@@ -6108,6 +6123,28 @@ public final class ModGameTests {
             }
         }
         throw new IllegalStateException("Test container has no empty slot");
+    }
+
+    private static boolean moveOneContainerItemToWorker(
+            Container container,
+            GalacticRecruitEntity recruit,
+            net.minecraft.world.item.Item item
+    ) {
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack stored = container.getItem(slot);
+            if (!stored.is(item) || stored.isEmpty()) {
+                continue;
+            }
+            stored.shrink(1);
+            if (stored.isEmpty()) {
+                container.setItem(slot, ItemStack.EMPTY);
+            } else {
+                container.setChanged();
+            }
+            setWorkerInventory(recruit, new ItemStack(item));
+            return true;
+        }
+        return false;
     }
 
     private static int countContainerItem(Container container, net.minecraft.world.item.Item item) {

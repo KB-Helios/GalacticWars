@@ -22,6 +22,8 @@ public final class ArmyGroupRecordLegacyFieldsTest {
     public static void main(String[] args) {
         legacyFieldsRemainAbsentWhileEffectiveViewsPreserveCurrentBehavior();
         membershipChangesMaterializeOnlyReconciledFormationSlots();
+        tacticsOnlyUpdatesPreserveActiveMarches();
+        replacingPatrolRoutesResetsActiveMarches();
         directConstructionRejectsIncompletePatrolRoutes();
 
         System.out.println("ArmyGroupRecordLegacyFieldsTest passed");
@@ -61,6 +63,50 @@ public final class ArmyGroupRecordLegacyFieldsTest {
         assertTrue(updated.patrolPlan().isEmpty(), "membership change does not force patrol migration");
         assertTrue(updated.tactics().isEmpty(), "membership change does not force tactics migration");
         assertEquals(1L, updated.simulation().revision(), "membership revision");
+    }
+
+    private static void tacticsOnlyUpdatesPreserveActiveMarches() {
+        ArmyMarchState compressed = new ArmyMarchState(
+                ArmyMarchPhase.COMPRESSED, ArmyFormation.COLUMN, 68, 90.0F, 120L);
+        ArmyGroupRecord marching = legacyGroup().withSimulation(new ArmyGroupSimulation(
+                ArmyGroupLifecycleState.LIVE, PATROL_STOP, 120L, 4L, 0L, "", compressed), List.of());
+
+        ArmyGroupRecord updated = marching.withTactics(
+                ArmyGroupTactics.DEFAULT.withFormationYaw(45.0F));
+
+        assertEquals(compressed, updated.simulation().marchState(),
+                "tactics update preserves active march state");
+        assertEquals(PATROL_STOP, updated.simulation().anchor(),
+                "tactics update preserves active march anchor");
+        assertEquals(5L, updated.simulation().revision(),
+                "tactics update advances optimistic-lock revision");
+    }
+
+    private static void replacingPatrolRoutesResetsActiveMarches() {
+        ArmyPatrolPlan original = ArmyPatrolPlan.fromLegacyRoute(List.of(RALLY, PATROL_STOP)).orElseThrow();
+        ArmyGroupOrder patrolOrder = new ArmyGroupOrder(
+                ArmyCommandType.PATROL_ROUTE, Optional.of(RALLY), Optional.empty(), ArmyFormation.LINE, 2);
+        ArmyMarchState marchingState = new ArmyMarchState(
+                ArmyMarchPhase.MARCHING, ArmyFormation.LINE, 82, 0.0F, 140L);
+        ArmyGroupRecord marching = legacyGroup()
+                .withPatrolPlanAndOrder(original, patrolOrder)
+                .withSimulation(new ArmyGroupSimulation(
+                        ArmyGroupLifecycleState.LIVE, PATROL_STOP, 140L, 7L, 0L, "", marchingState), List.of());
+        ArmyLocation replacementStop = new ArmyLocation("minecraft:overworld", 48, 64, 8);
+        ArmyPatrolPlan replacement = ArmyPatrolPlan.fromLegacyRoute(
+                List.of(RALLY, replacementStop)).orElseThrow();
+
+        ArmyGroupRecord updated = marching.withPatrolPlanAndOrder(replacement, patrolOrder);
+
+        assertEquals(ArmyMarchPhase.FORMING, updated.simulation().marchState().phase(),
+                "new patrol route reforms from live members");
+        assertEquals(PATROL_STOP, updated.simulation().anchor(),
+                "new patrol retains the last authoritative anchor until the live coordinator advances");
+        assertEquals(8L, updated.simulation().revision(), "new patrol revision");
+
+        ArmyGroupRecord paused = marching.withPatrolProgressAndOrder(original.pause(), patrolOrder);
+        assertEquals(marchingState, paused.simulation().marchState(),
+                "patrol controls do not reset an unchanged route");
     }
 
     private static void directConstructionRejectsIncompletePatrolRoutes() {

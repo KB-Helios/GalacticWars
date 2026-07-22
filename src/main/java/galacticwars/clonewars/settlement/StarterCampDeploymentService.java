@@ -116,10 +116,11 @@ public final class StarterCampDeploymentService {
 
         GalacticRecruitEntity builder = resolveBuilder(level, actor, kingdom, faction, deployment);
         if (builder == null) {
-            deployment = store(data, deployment, deployment.blocked("builder_spawn_failed"));
-            return Result.rejected("builder_spawn_failed", Optional.of(deployment));
+            String reason = deployment.contractGranted() ? "builder_unavailable" : "builder_spawn_failed";
+            deployment = store(data, deployment, deployment.blocked(reason));
+            return Result.rejected(reason, Optional.of(deployment));
         }
-        if (!deployment.contractGranted()) {
+        if (deployment.builderId().filter(builder.getUUID()::equals).isEmpty()) {
             deployment = store(data, deployment, deployment.withBuilder(builder.getUUID()));
         }
 
@@ -191,20 +192,16 @@ public final class StarterCampDeploymentService {
                 || deployment.phase() == StarterCampDeploymentPhase.PACKED_UP) {
             return false;
         }
+        GalacticRecruitEntity builder = deployment.builderId()
+                .map(builderId -> findLoadedRecruit(level, builderId)).orElse(null);
+        if (deployment.builderId().isPresent()
+                && (builder == null || !builder.packUpStarterConstruction())) {
+            return false;
+        }
         deployment.projectId().flatMap(projectId -> kingdom.settlement().buildProjects().stream()
                         .filter(project -> project.id().equals(projectId)).findFirst())
                 .filter(project -> !project.state().terminal())
                 .ifPresent(project -> data.replaceBuildProject(ownerId, project.cancel()));
-        deployment.builderId().ifPresent(builderId -> {
-            if (level.getEntity(builderId) instanceof GalacticRecruitEntity recruit) {
-                recruit.packUpStarterConstruction();
-            } else {
-                data.releaseWorkerAssignments(ownerId, builderId);
-                data.setNpcServiceBranch(ownerId, builderId,
-                        galacticwars.clonewars.recruitment.NpcServiceBranch.MILITARY);
-                data.addRecruitToArmy(ownerId, builderId);
-            }
-        });
         return data.storeStarterCampDeployment(deployment.packedUp(), deployment.revision());
     }
 
@@ -249,6 +246,7 @@ public final class StarterCampDeploymentService {
         UUID previousBuilderId = deployment.builderId().orElse(null);
         GalacticRecruitEntity replacement = kingdom.settlement().recruitIds().stream()
                 .filter(recruitId -> !recruitId.equals(previousBuilderId))
+                .filter(recruitId -> data.armyGroupForRecruit(recruitId).isEmpty())
                 .map(level::getEntity)
                 .filter(GalacticRecruitEntity.class::isInstance)
                 .map(GalacticRecruitEntity.class::cast)
@@ -268,12 +266,13 @@ public final class StarterCampDeploymentService {
         }
 
         GalacticRecruitEntity previousBuilder = previousBuilderId == null
-                ? null : level.getEntity(previousBuilderId) instanceof GalacticRecruitEntity recruit
-                        && recruit.isAlive() ? recruit : null;
+                ? null : findLoadedRecruit(level, previousBuilderId);
         if (previousBuilder != null) {
-            previousBuilder.packUpStarterConstruction();
+            if (!previousBuilder.packUpStarterConstruction()) {
+                return Result.rejected("builder_material_return_failed", Optional.of(deployment));
+            }
         } else if (previousBuilderId != null) {
-            data.releaseWorkerAssignments(actor.getUUID(), previousBuilderId);
+            return Result.rejected("builder_unavailable", Optional.of(deployment));
         }
         if (!replacement.assignStarterConstructionProject(actor, project, blueprint)) {
             if (previousBuilder == null
@@ -309,11 +308,7 @@ public final class StarterCampDeploymentService {
             UUID replacementBuilderId
     ) {
         StarterCampDeployment current = data.starterCampDeployment(deployment.kingdomId()).orElse(deployment);
-        boolean sameProject = current.projectId().filter(projectId::equals).isPresent();
-        boolean expectedBuilder = current.builderId().isEmpty()
-                || current.builderId().filter(builderId -> builderId.equals(previousBuilderId)
-                        || builderId.equals(replacementBuilderId)).isPresent();
-        if (!current.terminal() && sameProject && expectedBuilder) {
+        if (canMarkBuilderUnassigned(current, projectId, previousBuilderId, replacementBuilderId)) {
             StarterCampDeployment blocked = current.blockedWithoutBuilder(
                     "builder_reassignment_rollback_failed");
             if (data.storeStarterCampDeployment(blocked, current.revision())) {
@@ -321,6 +316,22 @@ public final class StarterCampDeploymentService {
             }
         }
         return Result.rejected("state_changed", data.starterCampDeployment(deployment.kingdomId()));
+    }
+
+    static boolean canMarkBuilderUnassigned(
+            StarterCampDeployment current,
+            UUID projectId,
+            UUID previousBuilderId,
+            UUID replacementBuilderId
+    ) {
+        boolean sameProject = current.projectId().filter(projectId::equals).isPresent();
+        boolean expectedBuilder = current.builderId().isEmpty()
+                || current.builderId().filter(builderId -> builderId.equals(previousBuilderId)
+                        || builderId.equals(replacementBuilderId)).isPresent();
+        return !current.terminal()
+                && current.phase() != StarterCampDeploymentPhase.PACKED_UP
+                && sameProject
+                && expectedBuilder;
     }
 
     private static GalacticRecruitEntity resolveBuilder(
@@ -335,7 +346,22 @@ public final class StarterCampDeploymentService {
             return existing;
         }
         if (deployment.contractGranted()) {
-            return null;
+            return kingdom.settlement().recruitIds().stream()
+                    .filter(recruitId -> !recruitId.equals(builderId))
+                    .filter(recruitId -> KingdomSavedData.get(level).armyGroupForRecruit(recruitId).isEmpty())
+                    .map(level::getEntity)
+                    .filter(GalacticRecruitEntity.class::isInstance)
+                    .map(GalacticRecruitEntity.class::cast)
+                    .filter(GalacticRecruitEntity::isAlive)
+                    .filter(candidate -> kingdom.id().equals(candidate.getKingdomId()))
+                    .filter(candidate -> candidate.isOwnedBy(actor))
+                    .filter(candidate -> candidate.getRecruitDuty() == RecruitDuty.SOLDIER)
+                    .min(Comparator.<GalacticRecruitEntity>comparingDouble(candidate -> candidate.distanceToSqr(
+                                    deployment.originX() + 0.5D,
+                                    deployment.originY() + 0.5D,
+                                    deployment.originZ() + 0.5D))
+                            .thenComparing(candidate -> candidate.getUUID().toString()))
+                    .orElse(null);
         }
         ArmyUnitDefinition unit = GameplayDataManager.snapshot().unit(faction.starterUnitId()).orElse(null);
         if (unit == null) {
@@ -382,6 +408,16 @@ public final class StarterCampDeploymentService {
             }
         }
         return recruit;
+    }
+
+    private static GalacticRecruitEntity findLoadedRecruit(ServerLevel level, UUID recruitId) {
+        for (ServerLevel candidateLevel : level.getServer().getAllLevels()) {
+            if (candidateLevel.getEntity(recruitId) instanceof GalacticRecruitEntity recruit
+                    && recruit.isAlive()) {
+                return recruit;
+            }
+        }
+        return null;
     }
 
     private static Optional<BlockPos> findSafeSpawn(ServerLevel level, BlockPos center) {

@@ -241,7 +241,7 @@ public record ArmyGroupRecord(
     }
 
     public ArmyGroupRecord withPatrolPlan(ArmyPatrolPlan patrolPlan) {
-        return withPatrolPlanAndOrder(patrolPlan, order);
+        return withPatrolProgressAndOrder(patrolPlan, order);
     }
 
     /**
@@ -250,15 +250,27 @@ public record ArmyGroupRecord(
      * an intermediate route state that another tick can observe.
      */
     public ArmyGroupRecord withPatrolPlanAndOrder(ArmyPatrolPlan patrolPlan, ArmyGroupOrder nextOrder) {
+        return updatePatrolPlanAndOrder(patrolPlan, nextOrder, true);
+    }
+
+    /** Advances or edits an existing patrol without interrupting its current formation march. */
+    public ArmyGroupRecord withPatrolProgressAndOrder(ArmyPatrolPlan patrolPlan, ArmyGroupOrder nextOrder) {
+        return updatePatrolPlanAndOrder(patrolPlan, nextOrder, false);
+    }
+
+    private ArmyGroupRecord updatePatrolPlanAndOrder(
+            ArmyPatrolPlan patrolPlan,
+            ArmyGroupOrder nextOrder,
+            boolean resetMarch
+    ) {
         Objects.requireNonNull(patrolPlan, "patrolPlan");
         Objects.requireNonNull(nextOrder, "nextOrder");
         if (this.patrolPlan.filter(patrolPlan::equals).isPresent() && order.equals(nextOrder)) {
             return this;
         }
-        ArmyGroupSimulation nextSimulation = new ArmyGroupSimulation(
-                simulation.lifecycleState(), simulation.anchor(), simulation.lastSimulationGameTime(),
-                simulation.revision() + 1, simulation.snapshotGeneration(), simulation.blockedReason(),
-                simulation.marchState());
+        ArmyGroupSimulation nextSimulation = resetMarch
+                ? simulation.resetMarch(nextOrder.formation())
+                : simulation.touch(simulation.blockedReason());
         return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, nextOrder, nextSimulation, snapshots,
                 name, rallyPoint, patrolPlan.locations(), defendedClaimId, supplyUnits, formationSlotAssignments,
                 Optional.of(patrolPlan), tactics);
@@ -284,7 +296,11 @@ public record ArmyGroupRecord(
 
     public ArmyGroupRecord withTactics(ArmyGroupTactics tactics) {
         Objects.requireNonNull(tactics, "tactics");
-        return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order, simulation, snapshots,
+        if (this.tactics.filter(tactics::equals).isPresent()) {
+            return this;
+        }
+        return new ArmyGroupRecord(id, ownerId, kingdomId, commanderId, memberIds, order,
+                simulation.touch(simulation.blockedReason()), snapshots,
                 name, rallyPoint, patrolRoute, defendedClaimId, supplyUnits, formationSlotAssignments,
                 patrolPlan, Optional.of(tactics));
     }

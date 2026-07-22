@@ -856,6 +856,7 @@
   "message.galacticwars.starter_camp.builder_spawn_failed": "Starter contract blocked: clear a safe two-block-high spawn near the Command Center and retry.",
   "message.galacticwars.starter_camp.builder_unavailable": "Starter builder is unavailable. Return with the builder loaded and retry.",
   "message.galacticwars.starter_camp.builder_assignment_failed": "Starter builder could not take the project assignment. Clear assignments and retry.",
+  "message.galacticwars.starter_camp.builder_material_return_failed": "Builder handoff paused because the Command Center cannot accept the carried camp materials. Free storage space and retry.",
   "message.galacticwars.starter_camp.builder_reassigned": "The nearest loaded reserve soldier has taken over the unfinished starter camp.",
   "message.galacticwars.starter_camp.builder_reassignment_unavailable": "No loaded reserve soldier is available to take over this starter camp.",
   "message.galacticwars.starter_camp.builder_reassignment_rollback_failed": "Builder handoff could not be restored. The project is safely blocked; choose Reassign Builder to recover it.",
