@@ -89,7 +89,7 @@ public final class CoreContentBindings {
     public static List<String> forceSlots(String path) {
         String resolved = path == null ? "" : path;
         if (resolved.equals("light")) resolved = "jedi";
-        if (resolved.equals("dark")) resolved = "nightsister";
+        if (resolved.equals("dark")) resolved = "sith";
         return FORCE_SLOTS.getOrDefault(resolved, List.of());
     }
 
