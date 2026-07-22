@@ -858,6 +858,7 @@
   "message.galacticwars.starter_camp.builder_assignment_failed": "Starter builder could not take the project assignment. Clear assignments and retry.",
   "message.galacticwars.starter_camp.builder_reassigned": "The nearest loaded reserve soldier has taken over the unfinished starter camp.",
   "message.galacticwars.starter_camp.builder_reassignment_unavailable": "No loaded reserve soldier is available to take over this starter camp.",
+  "message.galacticwars.starter_camp.builder_reassignment_rollback_failed": "Builder handoff could not be restored. The project is safely blocked; choose Reassign Builder to recover it.",
   "message.galacticwars.starter_camp.project_conflict": "Starter camp conflicts with another active project at this position.",
   "message.galacticwars.starter_camp.permission_denied": "You do not have permission to deploy this starter camp.",
   "message.galacticwars.starter_camp.kingdom_changed": "Starter camp authority changed; reclaim the Command Center and retry.",

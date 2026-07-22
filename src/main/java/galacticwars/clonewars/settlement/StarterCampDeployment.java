@@ -72,6 +72,12 @@ public record StarterCampDeployment(
                 builderId, projectId, requireNonBlank(reason, "reason"));
     }
 
+    /** Records that an unfinished project is recoverable but currently has no embodied builder. */
+    public StarterCampDeployment blockedWithoutBuilder(String reason) {
+        return next(StarterCampDeploymentPhase.BLOCKED, contractGranted, suppliesGranted,
+                Optional.empty(), projectId, requireNonBlank(reason, "reason"));
+    }
+
     public StarterCampDeployment complete() {
         return next(StarterCampDeploymentPhase.COMPLETE, contractGranted, suppliesGranted,
                 builderId, projectId, "");

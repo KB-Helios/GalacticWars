@@ -78,44 +78,31 @@ public final class KingdomSavedDataTest {
 
     private static void schema9StarterCampDeploymentsRoundTrip() {
         KingdomSavedData data = new KingdomSavedData();
-        java.util.UUID kingdom1 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
-        java.util.UUID kingdom2 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        java.util.UUID owner1 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+        java.util.UUID owner2 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
         java.util.UUID builder = java.util.UUID.fromString("00000000-0000-0000-0000-0000000000bb");
         java.util.UUID project = java.util.UUID.fromString("00000000-0000-0000-0000-0000000000cc");
+        KingdomRecord kingdom1 = data.foundKingdom(owner1, "galacticwars:republic",
+                "minecraft:overworld", new net.minecraft.core.BlockPos(100, 64, 200));
+        KingdomRecord kingdom2 = data.foundKingdom(owner2, "galacticwars:separatist",
+                "minecraft:the_nether", new net.minecraft.core.BlockPos(-50, 80, -100));
 
         galacticwars.clonewars.settlement.StarterCampDeployment deployment1 =
             galacticwars.clonewars.settlement.StarterCampDeployment.awaiting(
-                kingdom1, "minecraft:overworld", 100, 64, 200, 1)
+                kingdom1.id(), "minecraft:overworld", 100, 64, 200, 1)
             .withSuppliesGranted()
             .withBuilder(builder)
             .building(project);
         galacticwars.clonewars.settlement.StarterCampDeployment deployment2 =
             galacticwars.clonewars.settlement.StarterCampDeployment.awaiting(
-                kingdom2, "minecraft:the_nether", -50, 80, -100, 2);
+                kingdom2.id(), "minecraft:the_nether", -50, 80, -100, 2);
 
-        if (!data.setStarterCampDeployment(deployment1) || !data.setStarterCampDeployment(deployment2)) {
+        if (!data.storeStarterCampDeployment(deployment1, -1)
+                || !data.storeStarterCampDeployment(deployment2, -1)) {
             throw new AssertionError("schema 9 deployment insertion");
         }
-        if (!data.isDirty()) {
-            throw new AssertionError("schema 9 deployment should mark data dirty");
-        }
 
-        java.util.Optional<galacticwars.clonewars.settlement.StarterCampDeployment> retrieved1 =
-            data.starterCampDeployment(kingdom1);
-        java.util.Optional<galacticwars.clonewars.settlement.StarterCampDeployment> retrieved2 =
-            data.starterCampDeployment(kingdom2);
-
-        if (retrieved1.isEmpty() || !retrieved1.get().kingdomId().equals(kingdom1)
-                || retrieved1.get().originX() != 100 || retrieved1.get().rotationSteps() != 1
-                || !retrieved1.get().builderId().equals(java.util.Optional.of(builder))) {
-            throw new AssertionError("schema 9 deployment1 round-trip failed: " + retrieved1);
-        }
-        if (retrieved2.isEmpty() || !retrieved2.get().kingdomId().equals(kingdom2)
-                || retrieved2.get().originZ() != -100 || retrieved2.get().rotationSteps() != 2) {
-            throw new AssertionError("schema 9 deployment2 round-trip failed: " + retrieved2);
-        }
-
-        com.mojang.serialization.DataResult<com.mojang.serialization.JsonElement> encoded =
+        com.mojang.serialization.DataResult<com.google.gson.JsonElement> encoded =
             KingdomSavedData.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, data);
         if (encoded.error().isPresent()) {
             throw new AssertionError("schema 9 codec encode failed: " + encoded.error().get());
@@ -128,27 +115,35 @@ public final class KingdomSavedDataTest {
         }
 
         KingdomSavedData roundTripped = decoded.result().get();
-        if (roundTripped.starterCampDeployment(kingdom1).isEmpty()
-                || roundTripped.starterCampDeployment(kingdom2).isEmpty()) {
-            throw new AssertionError("schema 9 codec round-trip lost deployments");
+        galacticwars.clonewars.settlement.StarterCampDeployment retrieved1 =
+                roundTripped.starterCampDeployment(kingdom1.id()).orElseThrow();
+        galacticwars.clonewars.settlement.StarterCampDeployment retrieved2 =
+                roundTripped.starterCampDeployment(kingdom2.id()).orElseThrow();
+        if (retrieved1.originX() != 100 || retrieved1.rotationSteps() != 1
+                || !retrieved1.builderId().equals(java.util.Optional.of(builder))
+                || !retrieved1.projectId().equals(java.util.Optional.of(project))) {
+            throw new AssertionError("schema 9 deployment1 round-trip failed: " + retrieved1);
+        }
+        if (retrieved2.originZ() != -100 || retrieved2.rotationSteps() != 2) {
+            throw new AssertionError("schema 9 deployment2 round-trip failed: " + retrieved2);
+        }
+        if (!roundTripped.storeStarterCampDeployment(
+                retrieved1.blocked("test_obstruction"), retrieved1.revision())
+                || !roundTripped.isDirty()) {
+            throw new AssertionError("starter camp update did not mark decoded saved data dirty");
         }
     }
 
     private static void schema8MigrationPreservesData() {
-        String schema8Json = """
-            {
-                "schema_version": 8,
-                "kingdoms": [],
-                "army_groups": [],
-                "diplomacy": [],
-                "sieges": [],
-                "pending_invites": [],
-                "pending_diplomacy": [],
-                "supply_ledgers": []
-            }
-            """;
-
-        com.google.gson.JsonElement parsed = com.google.gson.JsonParser.parseString(schema8Json);
+        java.util.UUID owner = java.util.UUID.fromString("00000000-0000-0000-0000-000000000008");
+        KingdomSavedData legacy = new KingdomSavedData();
+        legacy.foundKingdom(owner, "galacticwars:republic", "minecraft:overworld",
+                new net.minecraft.core.BlockPos(8, 64, 8));
+        com.google.gson.JsonObject parsed = KingdomSavedData.CODEC.encodeStart(
+                        com.mojang.serialization.JsonOps.INSTANCE, legacy)
+                .result().orElseThrow().getAsJsonObject();
+        parsed.addProperty("schema_version", 8);
+        parsed.remove("starter_camp_deployments");
         com.mojang.serialization.DataResult<KingdomSavedData> result =
             KingdomSavedData.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE, parsed);
 
@@ -157,8 +152,11 @@ public final class KingdomSavedDataTest {
         }
 
         KingdomSavedData migrated = result.result().get();
-        if (migrated.schemaVersion() != 8) {
-            throw new AssertionError("schema version should be preserved as 8, got: " + migrated.schemaVersion());
+        if (migrated.schemaVersion() != KingdomSavedData.CURRENT_SCHEMA_VERSION) {
+            throw new AssertionError("schema 8 should migrate to current schema, got: " + migrated.schemaVersion());
+        }
+        if (migrated.kingdomForOwner(owner).isEmpty()) {
+            throw new AssertionError("schema 8 migration lost existing kingdom data");
         }
         if (!migrated.starterCampDeployments().isEmpty()) {
             throw new AssertionError("schema 8 migration should have empty deployments");

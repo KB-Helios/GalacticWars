@@ -143,6 +143,7 @@ public final class ConstructionProjectService {
         }
         BuildProject project = started.orElseThrow();
         if (!builder.assignStarterConstructionProject(actor, project, blueprint)) {
+            data.replaceBuildProject(kingdom.ownerId(), project.cancel());
             return StartResult.rejected("builder_assignment_failed");
         }
         return StartResult.accepted(project);

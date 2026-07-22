@@ -276,8 +276,10 @@ public final class StarterCampDeploymentService {
             data.releaseWorkerAssignments(actor.getUUID(), previousBuilderId);
         }
         if (!replacement.assignStarterConstructionProject(actor, project, blueprint)) {
-            if (previousBuilder != null) {
-                previousBuilder.assignStarterConstructionProject(actor, project, blueprint);
+            if (previousBuilder == null
+                    || !previousBuilder.assignStarterConstructionProject(actor, project, blueprint)) {
+                return markBuilderUnassigned(data, deployment, project.id(), previousBuilderId,
+                        replacement.getUUID());
             }
             return Result.rejected("builder_assignment_failed", Optional.of(deployment));
         }
@@ -286,12 +288,39 @@ public final class StarterCampDeploymentService {
                 .building(project.id());
         if (!data.storeStarterCampDeployment(reassigned, deployment.revision())) {
             replacement.packUpStarterConstruction();
-            if (previousBuilder != null) {
-                previousBuilder.assignStarterConstructionProject(actor, project, blueprint);
+            StarterCampDeployment current = data.starterCampDeployment(kingdom.id()).orElse(deployment);
+            if (current.projectId().filter(project.id()::equals).isPresent()
+                    && current.builderId().filter(builderId -> builderId.equals(previousBuilderId)).isPresent()
+                    && (previousBuilder == null
+                    || !previousBuilder.assignStarterConstructionProject(actor, project, blueprint))) {
+                return markBuilderUnassigned(data, current, project.id(), previousBuilderId,
+                        replacement.getUUID());
             }
-            return Result.rejected("state_changed", data.starterCampDeployment(kingdom.id()));
+            return Result.rejected("state_changed", Optional.of(current));
         }
         return Result.accepted("builder_reassigned", reassigned);
+    }
+
+    private static Result markBuilderUnassigned(
+            KingdomSavedData data,
+            StarterCampDeployment deployment,
+            UUID projectId,
+            UUID previousBuilderId,
+            UUID replacementBuilderId
+    ) {
+        StarterCampDeployment current = data.starterCampDeployment(deployment.kingdomId()).orElse(deployment);
+        boolean sameProject = current.projectId().filter(projectId::equals).isPresent();
+        boolean expectedBuilder = current.builderId().isEmpty()
+                || current.builderId().filter(builderId -> builderId.equals(previousBuilderId)
+                        || builderId.equals(replacementBuilderId)).isPresent();
+        if (!current.terminal() && sameProject && expectedBuilder) {
+            StarterCampDeployment blocked = current.blockedWithoutBuilder(
+                    "builder_reassignment_rollback_failed");
+            if (data.storeStarterCampDeployment(blocked, current.revision())) {
+                return Result.rejected("builder_reassignment_rollback_failed", Optional.of(blocked));
+            }
+        }
+        return Result.rejected("state_changed", data.starterCampDeployment(deployment.kingdomId()));
     }
 
     private static GalacticRecruitEntity resolveBuilder(

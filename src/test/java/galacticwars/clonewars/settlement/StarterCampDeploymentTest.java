@@ -19,6 +19,14 @@ public final class StarterCampDeploymentTest {
         assertTrue(building.projectId().isPresent() && building.projectId().get().equals(project),
                 "building deployment retains project ID");
 
+        StarterCampDeployment unassigned = building.blockedWithoutBuilder(
+                "builder_reassignment_rollback_failed");
+        assertTrue(unassigned.builderId().isEmpty(), "failed reassignment clears stale builder identity");
+        assertEquals(project, unassigned.projectId().orElseThrow(),
+                "failed reassignment keeps the recoverable project");
+        assertEquals(StarterCampDeploymentPhase.BLOCKED, unassigned.phase(),
+                "failed reassignment remains player-recoverable");
+
         StarterCampDeployment packed = building.packedUp();
         StarterCampDeployment relocated = packed.relocate("galacticwars:tatooine", 20, 70, -4, 3);
         assertTrue(relocated.contractGranted() && relocated.suppliesGranted(), "relocation cannot duplicate grants");
