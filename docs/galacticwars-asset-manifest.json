@@ -58,7 +58,7 @@
       "default_size": "256x256",
       "transparent": true,
       "uv_template": "explicit six-face UV maps; project-authored sets use two texels per model unit while licensed source sets preserve their authored atlas resolution and mirrored face orientation",
-      "ids": ["phase_i_clone_trooper","phase_i_arc_trooper","clone_trooper","arc_trooper","senate_commando","republic_honor_guard","jedi_knight","b1_battle_droid","b1_security_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute","republic_civilian","togruta_civilian","separatist_technician","mandalorian_clansperson","hutt_civilian","nightsister_civilian"],
+      "ids": ["phase_i_clone_trooper","phase_i_arc_trooper","clone_trooper","arc_trooper","senate_commando","republic_honor_guard","jedi_knight","sith_acolyte","b1_battle_droid","b1_security_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute","republic_civilian","togruta_civilian","separatist_technician","mandalorian_clansperson","hutt_civilian","nightsister_civilian"],
       "size_overrides": {
         "phase_i_clone_trooper":"128x128",
         "phase_i_arc_trooper":"128x128",
@@ -102,7 +102,7 @@
     {
       "id": "recruit_spawn_capsules",
       "kind": "geckolib_animated_3d_item",
-      "ids": ["phase_i_clone_trooper","phase_i_arc_trooper","clone_trooper","arc_trooper","senate_commando","republic_honor_guard","jedi_knight","b1_battle_droid","b1_security_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute","republic_civilian","togruta_civilian","separatist_technician","mandalorian_clansperson","hutt_civilian","nightsister_civilian"],
+      "ids": ["phase_i_clone_trooper","phase_i_arc_trooper","clone_trooper","arc_trooper","senate_commando","republic_honor_guard","jedi_knight","sith_acolyte","b1_battle_droid","b1_security_droid","b2_super_battle_droid","commando_droid","mandalorian_warrior","mandalorian_marksman","mandalorian_heavy","hutt_enforcer","bounty_hunter","smuggler","nightsister_acolyte","nightsister_archer","nightbrother_brute","republic_civilian","togruta_civilian","separatist_technician","mandalorian_clansperson","hutt_civilian","nightsister_civilian"],
       "model": "geckolib/models/item/spawn_capsule.geo.json",
       "animation": "geckolib/animations/item/spawn_capsule.animation.json",
       "size": "512x512",

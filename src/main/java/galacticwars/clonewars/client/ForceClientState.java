@@ -17,9 +17,17 @@ public final class ForceClientState {
         long elapsedNanos = Math.max(0L, System.nanoTime() - receivedAtNanos);
         int elapsedTicks = (int) Math.min(Integer.MAX_VALUE, elapsedNanos / CLIENT_TICK_NANOS);
         return new ForceHudPayload(authoritative.energy(),
+                authoritative.rank(), authoritative.masteryExperience(),
+                authoritative.unspentPoints(), authoritative.tradition(),
+                authoritative.abilities(),
                 remaining(authoritative.cooldown1(), elapsedTicks),
                 remaining(authoritative.cooldown2(), elapsedTicks),
-                remaining(authoritative.cooldown3(), elapsedTicks));
+                remaining(authoritative.cooldown3(), elapsedTicks),
+                authoritative.activeSlot(), authoritative.activeMode(),
+                Math.min(100, authoritative.activeTicks() +
+                        (authoritative.activeMode() == 0 ? 0 : elapsedTicks)),
+                authoritative.targetValidityMask(),
+                authoritative.failureReason());
     }
     public static boolean visible() {
         return receivedAtNanos != 0L && System.nanoTime() - receivedAtNanos < HUD_VISIBILITY_NANOS;

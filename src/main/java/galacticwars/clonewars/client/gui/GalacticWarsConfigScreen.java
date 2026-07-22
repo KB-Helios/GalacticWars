@@ -39,6 +39,8 @@ public final class GalacticWarsConfigScreen {
                                 .option(booleanOption("allow_blaster_pvp", Config.ALLOW_BLASTER_PVP))
                                 .option(booleanOption("allow_class_pvp", Config.ALLOW_CLASS_PVP))
                                 .option(booleanOption("allow_force_pvp", Config.ALLOW_FORCE_PVP))
+                                .option(booleanOption("allow_force_block_physics", Config.ALLOW_FORCE_BLOCK_PHYSICS))
+                                .option(booleanOption("allow_force_vehicle_physics", Config.ALLOW_FORCE_VEHICLE_PHYSICS))
                                 .build())
                         .build())
                 .save(Config::save)

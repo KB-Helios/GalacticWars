@@ -19,7 +19,7 @@ public final class ClassAbilityDataIntegrityTest {
     public static void main(String[] args) throws Exception {
         launchClassesReferenceKnownUnitsAndAbilities();
         everyFactionHasRuntimePolicy();
-        forceRuntimeRemainsReserved();
+        forceCareersReserveTheirActiveSlots();
         System.out.println("ClassAbilityDataIntegrityTest passed");
     }
 
@@ -29,19 +29,20 @@ public final class ClassAbilityDataIntegrityTest {
         Set<String> abilityIds = values(abilityData, "id");
         Set<String> classIds = values(classData, "id");
         Set<String> classUnits = values(classData, "unit");
-        assertEquals(30, abilityIds.size(), "ability count");
-        assertEquals(20, classIds.size(), "class count");
-        assertEquals(20, classUnits.size(), "one class per unit");
-        assertEquals(20, count(classData, "\"player_assignable\":true"), "assignable class count");
+        assertEquals(33, abilityIds.size(), "ability count");
+        assertEquals(21, classIds.size(), "class count");
+        assertEquals(21, classUnits.size(), "one class per unit");
+        assertEquals(21, count(classData, "\"player_assignable\":true"), "assignable class count");
         List<List<String>> classAbilities = arrayValueGroups(classData, "abilities");
-        assertEquals(20, classAbilities.size(), "class ability declarations");
+        assertEquals(21, classAbilities.size(), "class ability declarations");
         for (List<String> abilities : classAbilities) {
-            assertEquals(2, abilities.size(), "two abilities per class");
+            assertTrue(abilities.size() == 1 || abilities.size() == 2,
+                    "one passive or two active abilities per class");
             for (String abilityReference : abilities) {
                 assertTrue(abilityIds.contains(abilityReference), "known class ability " + abilityReference);
             }
         }
-        assertEquals(40, classAbilities.stream().mapToInt(List::size).sum(), "total class ability references");
+        assertEquals(39, classAbilities.stream().mapToInt(List::size).sum(), "total class ability references");
         for (String curatedClass : Set.of(
                 "galacticwars:senate_commando",
                 "galacticwars:republic_honor_guard",
@@ -63,12 +64,15 @@ public final class ClassAbilityDataIntegrityTest {
         assertEquals(5, count(policyData, "\"modifiers\""), "policy modifiers");
     }
 
-    private static void forceRuntimeRemainsReserved() throws Exception {
+    private static void forceCareersReserveTheirActiveSlots() throws Exception {
         String abilityData = Files.readString(ROOT.resolve("abilities/initial.json"));
         String classData = Files.readString(ROOT.resolve("classes/initial.json"));
         assertTrue(!abilityData.contains("\"kind\":\"force\""), "no launch Force ability");
         assertContains(classData, "\"id\":\"galacticwars:jedi_guardian\"", "Jedi class exists");
-        assertContains(classData, "\"force_path_slot\":\"light\"", "reserved Jedi Force slot");
+        assertContains(classData, "\"force_tradition_slot\":\"jedi\"", "Jedi Force slot");
+        assertContains(classData, "\"force_tradition_slot\":\"sith\"", "Sith Force slot");
+        assertContains(classData, "\"force_tradition_slot\":\"nightsister\"", "Nightsister Force slot");
+        assertEquals(3, count(classData, "\"force_tradition_slot\""), "Force career count");
     }
 
     private static Set<String> values(String json, String key) {

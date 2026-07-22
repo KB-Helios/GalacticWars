@@ -72,7 +72,7 @@ object PlayerCampaignAttachmentService {
 
     private fun forceProjection(force: ForceRuntimeState): PlayerCampaignAttachmentState.ForceProjection =
         PlayerCampaignAttachmentState.ForceProjection(
-            force.path,
+            force.traditionId,
             force.energy,
             force.cooldownEnds.entries
                 .asSequence()

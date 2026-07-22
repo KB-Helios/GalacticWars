@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.architectury.event.events.client.ClientTickEvent;
 import dev.architectury.registry.client.keymappings.KeyMappingRegistry;
 import galacticwars.clonewars.GalacticWars;
+import galacticwars.clonewars.force.ForceActivationPhase;
 import galacticwars.clonewars.network.ForceActivatePayload;
 import galacticwars.clonewars.network.GalacticNetwork;
 import galacticwars.clonewars.network.VehicleInputPayload;
@@ -38,6 +39,8 @@ public final class ForceKeyMappings {
             KEYS[0], KEYS[1], KEYS[2], VEHICLE_FIRE, VEHICLE_DESCEND);
     private static final AtomicBoolean MAPPINGS_REGISTERED = new AtomicBoolean();
     private static final AtomicBoolean TICK_HANDLER_REGISTERED = new AtomicBoolean();
+    private static final UUID[] ACTIVE_CAST_IDS = new UUID[KEYS.length];
+    private static final boolean[] WAS_DOWN = new boolean[KEYS.length];
 
     private ForceKeyMappings() {
     }
@@ -64,12 +67,27 @@ public final class ForceKeyMappings {
                 && minecraft.gui.screen() == null
                 && minecraft.gui.overlay() == null;
         for (int slot = 0; slot < KEYS.length; slot++) {
-            while (KEYS[slot].consumeClick()) {
-                if (acceptsGameplayInput) {
-                    GalacticNetwork.CHANNEL.sendToServer(
-                            new ForceActivatePayload(UUID.randomUUID(), slot));
-                }
+            if (minecraft.player == null) {
+                ACTIVE_CAST_IDS[slot] = null;
+                WAS_DOWN[slot] = false;
+                while (KEYS[slot].consumeClick()) { /* clear stale disconnected input */ }
+                continue;
             }
+            boolean down = acceptsGameplayInput && KEYS[slot].isDown();
+            if (down && !WAS_DOWN[slot]) {
+                ACTIVE_CAST_IDS[slot] = UUID.randomUUID();
+                GalacticNetwork.CHANNEL.sendToServer(new ForceActivatePayload(
+                        ACTIVE_CAST_IDS[slot], slot, ForceActivationPhase.PRESS));
+            } else if (!down && WAS_DOWN[slot] && ACTIVE_CAST_IDS[slot] != null) {
+                GalacticNetwork.CHANNEL.sendToServer(new ForceActivatePayload(
+                        ACTIVE_CAST_IDS[slot], slot,
+                        acceptsGameplayInput
+                                ? ForceActivationPhase.RELEASE
+                                : ForceActivationPhase.CANCEL));
+                ACTIVE_CAST_IDS[slot] = null;
+            }
+            WAS_DOWN[slot] = down;
+            while (KEYS[slot].consumeClick()) { /* consume vanilla's queued clicks */ }
         }
         boolean fire = VEHICLE_FIRE.consumeClick();
         if (acceptsGameplayInput

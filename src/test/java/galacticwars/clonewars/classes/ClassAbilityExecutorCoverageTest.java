@@ -10,7 +10,8 @@ public final class ClassAbilityExecutorCoverageTest {
             "beskar_training", "target_paint", "steady_aim", "braced_barrage",
             "heavy_resistance", "intimidation", "streetwise", "marked_quarry",
             "bounty_focus", "quick_draw", "smoke_charge", "blade_dance", "defensive_ward",
-            "crippling_shot", "hunter_patience", "berserk", "knockback_resistance");
+            "crippling_shot", "hunter_patience", "berserk", "knockback_resistance",
+            "jedi_weapon_mastery", "sith_weapon_mastery", "nightsister_magick_affinity");
 
     public static void main(String[] args) {
         if (!ClassAbilityExecutorCatalog.registeredIds().equals(ENABLED_LAUNCH_ABILITIES)) {

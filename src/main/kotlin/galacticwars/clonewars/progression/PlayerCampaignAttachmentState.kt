@@ -126,11 +126,16 @@ class PlayerCampaignAttachmentState(
     }
 
     class ForceProjection(
-        path: String?,
+        traditionOrPath: String?,
         energy: Int,
         cooldownEnds: Map<String, Long>,
     ) {
-        val path: String = path.orEmpty()
+        val tradition: String = ForceRuntimeState.normalizeTradition(traditionOrPath)
+        val path: String = when (tradition) {
+            "jedi" -> "light"
+            "sith", "nightsister" -> "dark"
+            else -> ""
+        }
         val energy: Int = energy
         val cooldownEnds: Map<String, Long> = immutableMap(
             cooldownEnds,
@@ -138,8 +143,8 @@ class PlayerCampaignAttachmentState(
             "force cooldowns",
         )
         init {
-            require(this.path.isEmpty() || this.path == "light" || this.path == "dark") {
-                "Unknown Force path ${this.path}"
+            require(this.tradition.isEmpty() || this.tradition in setOf("jedi", "sith", "nightsister")) {
+                "Unknown Force tradition ${this.tradition}"
             }
             require(energy in 0..ForceRuntimeState.MAX_ENERGY) {
                 "Force energy must be between 0 and ${ForceRuntimeState.MAX_ENERGY}"
@@ -151,24 +156,26 @@ class PlayerCampaignAttachmentState(
 
         fun path(): String = path
 
+        fun tradition(): String = tradition
+
         fun energy(): Int = energy
 
         fun cooldownEnds(): Map<String, Long> = cooldownEnds
 
         override fun equals(other: Any?): Boolean = this === other ||
             other is ForceProjection &&
-            path == other.path &&
+            tradition == other.tradition &&
             energy == other.energy &&
             cooldownEnds == other.cooldownEnds
 
         override fun hashCode(): Int {
-            var result = path.hashCode()
+            var result = tradition.hashCode()
             result = 31 * result + energy
             return 31 * result + cooldownEnds.hashCode()
         }
 
         override fun toString(): String = "ForceProjection[" +
-            "path=$path, energy=$energy, cooldownEnds=$cooldownEnds]"
+            "tradition=$tradition, energy=$energy, cooldownEnds=$cooldownEnds]"
     }
 
     companion object {
@@ -218,7 +225,7 @@ class PlayerCampaignAttachmentState(
         private val FORCE_CODEC: Codec<ForceProjection> = RecordCodecBuilder.create { instance ->
             instance.group(
                 Codec.STRING.optionalFieldOf("path", "")
-                    .forGetter { value: ForceProjection -> value.path },
+                    .forGetter { value: ForceProjection -> value.tradition },
                 Codec.intRange(0, ForceRuntimeState.MAX_ENERGY)
                     .optionalFieldOf("energy", ForceRuntimeState.MAX_ENERGY)
                     .forGetter { value: ForceProjection -> value.energy },
@@ -265,7 +272,7 @@ class PlayerCampaignAttachmentState(
             writeEventTotals(buffer, value.campaign.eventTotals)
             writeEventSubjects(buffer, value.campaign.eventSubjects)
             writeStringSet(buffer, value.campaign.unlocks, MAX_UNLOCKS)
-            writeString(buffer, value.force.path)
+            writeString(buffer, value.force.tradition)
             buffer.writeVarInt(value.force.energy)
             writeCooldowns(buffer, value.force.cooldownEnds)
         }

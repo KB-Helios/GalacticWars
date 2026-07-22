@@ -88,6 +88,8 @@ public final class GalacticWarsClient {
         }
 
         ClientPacketBridge.installForceHudHandler(ForceClientState::update);
+        ClientPacketBridge.installForceProgressionHandler(
+                galacticwars.clonewars.client.gui.ForceProgressionScreen::open);
         ClientPacketBridge.installClassHudHandler(ClassClientState::update);
         ClientPacketBridge.installGameplayCatalogHandler(ClientGameplayCatalog::replace);
         ClientPacketBridge.installFieldCommandStateHandler(FieldCommandClientState::update);

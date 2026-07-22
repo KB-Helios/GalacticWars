@@ -82,8 +82,8 @@ object PlayerClassRuntime {
         if (!definition.requirements().all { requirement -> requirementMet(progression, requirement) }) {
             return reject(player, "requirements_locked")
         }
-        if (definition.forcePathSlot().isNotEmpty() &&
-            ForceSavedData.get(player.level()).state(player.uuid).path != definition.forcePathSlot()
+        if (definition.forceTraditionSlot().isNotEmpty() &&
+            ForceSavedData.get(player.level()).state(player.uuid).traditionId != definition.forceTraditionSlot()
         ) {
             return reject(player, "force_path_required")
         }
@@ -178,6 +178,9 @@ object PlayerClassRuntime {
         val state = ClassProgressSavedData.get(level).state(player.uuid)
         val definition = GameplayDataManager.snapshot().unitClass(state.classId()).orElse(null)
             ?: return ClassHudPayload.unassigned()
+        if (definition.forceTraditionSlot().isNotEmpty()) {
+            return ClassHudPayload.unassigned()
+        }
         val abilities = activeAbilities(definition)
         val first = abilities.getOrNull(0)
         val second = abilities.getOrNull(1)

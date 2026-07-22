@@ -25,6 +25,9 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.NIGHTSISTER_WEAVE_SAPLING.get());
                         output.accept(ModItems.COMMAND_CENTER.get());
                         output.accept(ModItems.CONTROL_BEACON.get());
+                        output.accept(ModItems.JEDI_MEDITATION_SHRINE.get());
+                        output.accept(ModItems.SITH_HOLOCRON_PEDESTAL.get());
+                        output.accept(ModItems.NIGHTSISTER_SPIRIT_ALTAR.get());
                         output.accept(ModItems.TATOOINE_SAND.get());
                         output.accept(ModItems.GEONOSIS_ROCK.get());
                         output.accept(ModItems.KAMINO_PANEL.get());
@@ -85,6 +88,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.MANDALORIAN_MARKSMAN_SPAWN_EGG.get());
                         output.accept(ModItems.MANDALORIAN_HEAVY_SPAWN_EGG.get());
                         output.accept(ModItems.B1_BATTLE_DROID_SPAWN_EGG.get());
+                        output.accept(ModItems.SITH_ACOLYTE_SPAWN_EGG.get());
                         output.accept(ModItems.B1_SECURITY_DROID_SPAWN_EGG.get());
                         output.accept(ModItems.B2_SUPER_BATTLE_DROID_SPAWN_EGG.get());
                         output.accept(ModItems.COMMANDO_DROID_SPAWN_EGG.get());

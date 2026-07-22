@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -135,10 +136,14 @@ public record GameplayCatalogPayload(
             factionId = identifier(factionId, "factionId");
             forcePathSlot = Objects.requireNonNull(forcePathSlot, "forcePathSlot")
                     .trim().toLowerCase(Locale.ROOT);
+            if (forcePathSlot.equals("light")) {
+                forcePathSlot = "jedi";
+            } else if (forcePathSlot.equals("dark")) {
+                forcePathSlot = "nightsister";
+            }
             if (!forcePathSlot.isEmpty()
-                    && !forcePathSlot.equals("light")
-                    && !forcePathSlot.equals("dark")) {
-                throw new IllegalArgumentException("invalid Force path slot " + forcePathSlot);
+                    && !Set.of("jedi", "sith", "nightsister").contains(forcePathSlot)) {
+                throw new IllegalArgumentException("invalid Force tradition slot " + forcePathSlot);
             }
             requirements = boundedCopy(
                     requirements, MAX_REQUIREMENTS_PER_CLASS, "class requirements");

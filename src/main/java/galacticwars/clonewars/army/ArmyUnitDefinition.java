@@ -1,5 +1,6 @@
 package galacticwars.clonewars.army;
 
+import java.util.List;
 import java.util.Objects;
 
 import galacticwars.clonewars.faction.FactionId;
@@ -17,7 +18,8 @@ public record ArmyUnitDefinition(
         double movementSpeed,
         double followRange,
         double armor,
-        ArmyEquipmentLoadout equipment
+        ArmyEquipmentLoadout equipment,
+        List<String> forceLoadout
 ) {
     public ArmyUnitDefinition(
             ArmyUnitId id,
@@ -30,7 +32,18 @@ public record ArmyUnitDefinition(
             ArmyFormation defaultFormation
     ) {
         this(id, displayName, factionId, role, hireCost, maxHealth, attackDamage, defaultFormation,
-                "", 0.28D, 24.0D, 0.0D, ArmyEquipmentLoadout.empty());
+                "", 0.28D, 24.0D, 0.0D, ArmyEquipmentLoadout.empty(), List.of());
+    }
+
+    public ArmyUnitDefinition(
+            ArmyUnitId id, String displayName, FactionId factionId, ArmyUnitRole role,
+            int hireCost, int maxHealth, int attackDamage, ArmyFormation defaultFormation,
+            String entityTypeId, double movementSpeed, double followRange, double armor,
+            ArmyEquipmentLoadout equipment
+    ) {
+        this(id, displayName, factionId, role, hireCost, maxHealth, attackDamage,
+                defaultFormation, entityTypeId, movementSpeed, followRange, armor,
+                equipment, List.of());
     }
 
     public ArmyUnitDefinition {
@@ -47,6 +60,12 @@ public record ArmyUnitDefinition(
         requireNonNegative(followRange, "followRange");
         requireNonNegative(armor, "armor");
         equipment = equipment == null ? ArmyEquipmentLoadout.empty() : equipment;
+        forceLoadout = forceLoadout == null ? List.of() : forceLoadout.stream()
+                .map(value -> requireNonBlank(value, "forceLoadout ability").toLowerCase())
+                .toList();
+        if (forceLoadout.size() > 3 || forceLoadout.stream().distinct().count() != forceLoadout.size()) {
+            throw new IllegalArgumentException("forceLoadout must contain at most three unique abilities");
+        }
     }
 
     private static void requireNonNegative(int value, String label) {

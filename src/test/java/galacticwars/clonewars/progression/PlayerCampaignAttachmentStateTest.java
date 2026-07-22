@@ -79,7 +79,11 @@ public final class PlayerCampaignAttachmentStateTest {
                 Map.of(ProgressionEventType.PLANET_VISITED, visited.size()),
                 Map.of(ProgressionEventType.PLANET_VISITED, visited),
                 unlocks);
-        ForceRuntimeState force = new ForceRuntimeState("light", 80, cooldowns, Set.of());
+        ForceRuntimeState force = new ForceRuntimeState(
+                "jedi", 1, 0, 0,
+                Set.of("force_sense", "light_push", "light_leap"),
+                java.util.List.of("light_push", "", "light_leap"),
+                80, cooldowns, Set.of(), 0, 0L, Map.of());
 
         PlayerCampaignAttachmentState projected =
                 PlayerCampaignAttachmentService.fromAuthoritative(progression, force);
@@ -126,7 +130,10 @@ public final class PlayerCampaignAttachmentStateTest {
         cooldowns.entrySet().stream().sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> differentlyOrderedCooldowns.put(entry.getKey(), entry.getValue()));
         ForceRuntimeState differentlyOrderedForce = new ForceRuntimeState(
-                force.path(), force.energy(), differentlyOrderedCooldowns, force.processedActivationIds());
+                force.traditionId(), force.rank(), force.masteryExperience(), force.unspentPoints(),
+                force.learnedNodeIds(), force.equippedAbilityIds(), force.energy(),
+                differentlyOrderedCooldowns, force.processedActivationIds(),
+                force.dailyCombatExperience(), force.combatExperienceDay(), force.recentMasteryKeys());
         assertEquals(projected, PlayerCampaignAttachmentService.fromAuthoritative(
                         differentlyOrderedProgression, differentlyOrderedForce),
                 "projection is independent of authoritative collection iteration order");

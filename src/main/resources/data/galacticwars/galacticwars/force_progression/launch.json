@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "traditions": [
+    {"id":"jedi","faction":"republic","initiation_quest":"republic_chapter_1","display_name":"Jedi","core_nodes":["jedi_force_sense","light_push","light_leap"],"branches":["guardian","consular"],"rank_thresholds":[0,10,25,45,70,100,140,190,250,320]},
+    {"id":"sith","faction":"separatist","initiation_quest":"separatist_chapter_1","display_name":"Sith","core_nodes":["sith_predator_sense","dark_push","dark_dash"],"branches":["marauder","sorcerer"],"rank_thresholds":[0,10,25,45,70,100,140,190,250,320]},
+    {"id":"nightsister","faction":"nightsister","initiation_quest":"nightsister_chapter_1","display_name":"Nightsister","core_nodes":["nightsister_spirit_sight","magick_push","shadow_step"],"branches":["warrior","witch"],"rank_thresholds":[0,10,25,45,70,100,140,190,250,320]}
+  ],
+  "nodes": [
+    {"id":"jedi_force_sense","tradition":"jedi","branch":"core","tier":0,"point_cost":0,"passive":true},
+    {"id":"light_push","tradition":"jedi","branch":"core","tier":0,"point_cost":0,"ability":"light_push","passive":false},
+    {"id":"light_leap","tradition":"jedi","branch":"core","tier":0,"point_cost":0,"ability":"light_leap","passive":false},
+    {"id":"saber_guard","tradition":"jedi","branch":"guardian","tier":1,"point_cost":1,"ability":"saber_guard","passive":false},
+    {"id":"precise_deflection","tradition":"jedi","branch":"guardian","tier":2,"point_cost":1,"prerequisites":["saber_guard"],"passive":true},
+    {"id":"force_repulse","tradition":"jedi","branch":"guardian","tier":3,"point_cost":1,"prerequisites":["precise_deflection"],"ability":"force_repulse","passive":false},
+    {"id":"valor","tradition":"jedi","branch":"guardian","tier":4,"point_cost":1,"prerequisites":["force_repulse"],"passive":true},
+    {"id":"guardian_stand","tradition":"jedi","branch":"guardian","tier":5,"point_cost":1,"prerequisites":["valor"],"ability":"guardian_stand","passive":false},
+    {"id":"light_pull","tradition":"jedi","branch":"consular","tier":1,"point_cost":1,"ability":"light_pull","passive":false},
+    {"id":"stasis","tradition":"jedi","branch":"consular","tier":2,"point_cost":1,"prerequisites":["light_pull"],"ability":"stasis","passive":false},
+    {"id":"mind_trick","tradition":"jedi","branch":"consular","tier":3,"point_cost":1,"prerequisites":["stasis"],"ability":"mind_trick","passive":false},
+    {"id":"healing_meditation","tradition":"jedi","branch":"consular","tier":4,"point_cost":1,"prerequisites":["mind_trick"],"ability":"healing_meditation","passive":false},
+    {"id":"wave_of_balance","tradition":"jedi","branch":"consular","tier":5,"point_cost":1,"prerequisites":["healing_meditation"],"ability":"wave_of_balance","passive":false},
+
+    {"id":"sith_predator_sense","tradition":"sith","branch":"core","tier":0,"point_cost":0,"passive":true},
+    {"id":"dark_push","tradition":"sith","branch":"core","tier":0,"point_cost":0,"ability":"dark_push","passive":false},
+    {"id":"dark_dash","tradition":"sith","branch":"core","tier":0,"point_cost":0,"ability":"dark_dash","passive":false},
+    {"id":"saber_frenzy","tradition":"sith","branch":"marauder","tier":1,"point_cost":1,"ability":"saber_frenzy","passive":false},
+    {"id":"dark_choke","tradition":"sith","branch":"marauder","tier":2,"point_cost":1,"prerequisites":["saber_frenzy"],"ability":"dark_choke","passive":false},
+    {"id":"brutal_throw","tradition":"sith","branch":"marauder","tier":3,"point_cost":1,"prerequisites":["dark_choke"],"ability":"brutal_throw","passive":false},
+    {"id":"rage","tradition":"sith","branch":"marauder","tier":4,"point_cost":1,"prerequisites":["brutal_throw"],"passive":true},
+    {"id":"unrelenting_assault","tradition":"sith","branch":"marauder","tier":5,"point_cost":1,"prerequisites":["rage"],"ability":"unrelenting_assault","passive":false},
+    {"id":"force_lightning","tradition":"sith","branch":"sorcerer","tier":1,"point_cost":1,"ability":"force_lightning","passive":false},
+    {"id":"chain_lightning","tradition":"sith","branch":"sorcerer","tier":2,"point_cost":1,"prerequisites":["force_lightning"],"ability":"chain_lightning","passive":false},
+    {"id":"force_crush","tradition":"sith","branch":"sorcerer","tier":3,"point_cost":1,"prerequisites":["chain_lightning"],"ability":"force_crush","passive":false},
+    {"id":"dark_reserve","tradition":"sith","branch":"sorcerer","tier":4,"point_cost":1,"prerequisites":["force_crush"],"passive":true},
+    {"id":"force_maelstrom","tradition":"sith","branch":"sorcerer","tier":5,"point_cost":1,"prerequisites":["dark_reserve"],"ability":"force_maelstrom","passive":false},
+
+    {"id":"nightsister_spirit_sight","tradition":"nightsister","branch":"core","tier":0,"point_cost":0,"passive":true},
+    {"id":"magick_push","tradition":"nightsister","branch":"core","tier":0,"point_cost":0,"ability":"magick_push","passive":false},
+    {"id":"shadow_step","tradition":"nightsister","branch":"core","tier":0,"point_cost":0,"ability":"shadow_step","passive":false},
+    {"id":"blade_dance_force","tradition":"nightsister","branch":"warrior","tier":1,"point_cost":1,"ability":"blade_dance_force","passive":false},
+    {"id":"spirit_ward","tradition":"nightsister","branch":"warrior","tier":2,"point_cost":1,"prerequisites":["blade_dance_force"],"ability":"spirit_ward","passive":false},
+    {"id":"telekinetic_throw","tradition":"nightsister","branch":"warrior","tier":3,"point_cost":1,"prerequisites":["spirit_ward"],"ability":"telekinetic_throw","passive":false},
+    {"id":"hunter_grace","tradition":"nightsister","branch":"warrior","tier":4,"point_cost":1,"prerequisites":["telekinetic_throw"],"passive":true},
+    {"id":"shadow_hunt","tradition":"nightsister","branch":"warrior","tier":5,"point_cost":1,"prerequisites":["hunter_grace"],"ability":"shadow_hunt","passive":false},
+    {"id":"hex","tradition":"nightsister","branch":"witch","tier":1,"point_cost":1,"ability":"hex","passive":false},
+    {"id":"spirit_snare","tradition":"nightsister","branch":"witch","tier":2,"point_cost":1,"prerequisites":["hex"],"ability":"spirit_snare","passive":false},
+    {"id":"ichor_bolt","tradition":"nightsister","branch":"witch","tier":3,"point_cost":1,"prerequisites":["spirit_snare"],"ability":"ichor_bolt","passive":false},
+    {"id":"life_weave","tradition":"nightsister","branch":"witch","tier":4,"point_cost":1,"prerequisites":["ichor_bolt"],"ability":"life_weave","passive":false},
+    {"id":"ritual_storm","tradition":"nightsister","branch":"witch","tier":5,"point_cost":1,"prerequisites":["life_weave"],"ability":"ritual_storm","passive":false}
+  ]
+}

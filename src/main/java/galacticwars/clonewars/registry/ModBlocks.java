@@ -3,6 +3,7 @@ package galacticwars.clonewars.registry;
 import dev.architectury.registry.registries.DeferredRegister;
 import dev.architectury.registry.registries.RegistrySupplier;
 import galacticwars.clonewars.GalacticWars;
+import galacticwars.clonewars.force.ForceShrineBlock;
 import galacticwars.clonewars.settlement.CommandCenterBlock;
 import galacticwars.clonewars.world.NightsisterWeaveTreeGrower;
 import galacticwars.clonewars.world.PlayerTriggeredSaplingBlock;
@@ -57,6 +58,18 @@ public final class ModBlocks {
             "control_beacon", properties -> properties
                     .mapColor(MapColor.METAL).strength(-1.0F, 3_600_000.0F).lightLevel(state -> 10)
                     .sound(SoundType.METAL));
+    public static final RegistrySupplier<ForceShrineBlock> JEDI_MEDITATION_SHRINE = register(
+            "jedi_meditation_shrine", properties -> new ForceShrineBlock("jedi", properties
+                    .mapColor(MapColor.STONE).strength(3.5F, 12.0F).lightLevel(state -> 8)
+                    .sound(SoundType.AMETHYST).noOcclusion()));
+    public static final RegistrySupplier<ForceShrineBlock> SITH_HOLOCRON_PEDESTAL = register(
+            "sith_holocron_pedestal", properties -> new ForceShrineBlock("sith", properties
+                    .mapColor(MapColor.DEEPSLATE).strength(4.0F, 18.0F).lightLevel(state -> 7)
+                    .sound(SoundType.DEEPSLATE).noOcclusion()));
+    public static final RegistrySupplier<ForceShrineBlock> NIGHTSISTER_SPIRIT_ALTAR = register(
+            "nightsister_spirit_altar", properties -> new ForceShrineBlock("nightsister", properties
+                    .mapColor(MapColor.COLOR_GREEN).strength(3.0F, 10.0F).lightLevel(state -> 9)
+                    .sound(SoundType.WOOD).noOcclusion()));
 
     public static final RegistrySupplier<SandBlock> TATOOINE_SAND = register(
             "tatooine_sand", properties -> new SandBlock(

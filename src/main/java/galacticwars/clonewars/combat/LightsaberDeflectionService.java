@@ -24,34 +24,37 @@ public final class LightsaberDeflectionService {
         if (!holdsLightsaber(defender)) {
             return false;
         }
-        if (defender instanceof ServerPlayer player && !player.isCrouching()) {
-            return false;
-        }
         if (!bolt.canDeflectTowardOwner(defender)) {
             return false;
         }
+        if (defender instanceof ServerPlayer player) {
+            return LightsaberGuardService.tryDeflect(bolt, player, gameTime);
+        }
         if (defender instanceof GalacticRecruitEntity recruit) {
-            var unitClass = recruit.unitClassDefinition().orElse(null);
-            if (unitClass == null || !unitClass.id().toString().equals("galacticwars:jedi_guardian")) {
+            var incomingSourceDirection = bolt.getDeltaMovement().scale(-1.0D);
+            if (incomingSourceDirection.lengthSqr() < 0.01D
+                    || incomingSourceDirection.normalize().dot(recruit.getLookAngle()) < 0.35D) {
                 return false;
             }
-            var activation = recruit.activateClassAbility(
-                    "galacticwars:saber_guard",
-                    gameTime,
-                    false,
-                    0.0D,
-                    false,
-                    () -> bolt.deflectTowardOwner(defender));
-            return activation.accepted();
+            var definition = galacticwars.clonewars.data.GameplayDataManager.snapshot()
+                    .unitForEntityType(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getKey(recruit.getType()).toString())
+                    .orElse(null);
+            int slot = definition == null ? -1 : definition.forceLoadout().indexOf("saber_guard");
+            return slot >= 0
+                    && recruit.npcForceEnergy() >= 5
+                    && recruit.npcForceCooldownEnd(slot) <= gameTime
+                    && recruit.commitNpcForceCast(slot, 5, gameTime + 20, definition.forceLoadout().size())
+                    && bolt.deflectTowardOwner(defender);
         }
-        return bolt.deflectTowardOwner(defender);
+        return false;
     }
 
     public static boolean holdsLightsaber(LivingEntity defender) {
         return isLightsaber(defender.getMainHandItem()) || isLightsaber(defender.getOffhandItem());
     }
 
-    private static boolean isLightsaber(ItemStack stack) {
+    static boolean isLightsaber(ItemStack stack) {
         return !stack.isEmpty() && LIGHTSABERS.contains(stack.getItem());
     }
 }

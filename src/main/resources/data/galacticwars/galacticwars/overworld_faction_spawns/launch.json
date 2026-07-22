@@ -28,6 +28,7 @@
         {"entity_type": "galacticwars:b1_battle_droid", "service_branch": "military"},
         {"entity_type": "galacticwars:b2_super_battle_droid", "service_branch": "military"},
         {"entity_type": "galacticwars:b1_security_droid", "service_branch": "military"},
+        {"entity_type": "galacticwars:sith_acolyte", "service_branch": "military"},
         {"entity_type": "galacticwars:separatist_technician", "service_branch": "civilian"}
       ]
     },

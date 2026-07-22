@@ -19,5 +19,6 @@
     "legs": "galacticwars:nightsister_weave_leggings",
     "feet": "galacticwars:nightsister_weave_boots"
   },
+  "force_loadout": ["magick_push", "spirit_snare", "hex"],
   "default_formation": "line"
 }

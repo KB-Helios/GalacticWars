@@ -7,6 +7,7 @@
     {"id":"galacticwars:combat_mobility","display_name":"Combat Mobility","kind":"martial","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":0.0,"ai_interval_ticks":40,"enabled":true},
     {"id":"galacticwars:saber_guard","display_name":"Saber Guard","kind":"martial","activation":"self","cooldown_ticks":120,"resource_cost":20,"range":6.0,"ai_interval_ticks":20,"enabled":true},
     {"id":"galacticwars:guardian_rally","display_name":"Guardian Rally","kind":"support","activation":"area","cooldown_ticks":200,"resource_cost":25,"range":12.0,"ai_interval_ticks":40,"enabled":true},
+    {"id":"galacticwars:jedi_weapon_mastery","display_name":"Jedi Weapon Mastery","kind":"martial","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":0.0,"ai_interval_ticks":40,"enabled":true},
 
     {"id":"galacticwars:networked_volley","display_name":"Networked Volley","kind":"tactical","activation":"target","cooldown_ticks":100,"resource_cost":15,"range":24.0,"ai_interval_ticks":20,"enabled":true},
     {"id":"galacticwars:droid_link","display_name":"Droid Link","kind":"support","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":10.0,"ai_interval_ticks":40,"enabled":true},
@@ -14,6 +15,7 @@
     {"id":"galacticwars:heavy_fire","display_name":"Heavy Fire","kind":"martial","activation":"target","cooldown_ticks":140,"resource_cost":20,"range":22.0,"ai_interval_ticks":20,"enabled":true},
     {"id":"galacticwars:ambush_dash","display_name":"Ambush Dash","kind":"martial","activation":"target","cooldown_ticks":100,"resource_cost":15,"range":10.0,"ai_interval_ticks":20,"enabled":true},
     {"id":"galacticwars:target_disruption","display_name":"Target Disruption","kind":"tactical","activation":"target","cooldown_ticks":160,"resource_cost":20,"range":16.0,"ai_interval_ticks":40,"enabled":true},
+    {"id":"galacticwars:sith_weapon_mastery","display_name":"Sith Weapon Mastery","kind":"martial","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":0.0,"ai_interval_ticks":40,"enabled":true},
 
     {"id":"galacticwars:close_assault_roll","display_name":"Close Assault Roll","kind":"martial","activation":"self","cooldown_ticks":80,"resource_cost":10,"range":0.0,"ai_interval_ticks":20,"enabled":true},
     {"id":"galacticwars:beskar_training","display_name":"Beskar Training","kind":"martial","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":0.0,"ai_interval_ticks":40,"enabled":true},
@@ -31,6 +33,7 @@
 
     {"id":"galacticwars:blade_dance","display_name":"Blade Dance","kind":"martial","activation":"self","cooldown_ticks":100,"resource_cost":15,"range":5.0,"ai_interval_ticks":20,"enabled":true},
     {"id":"galacticwars:defensive_ward","display_name":"Defensive Ward","kind":"support","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":6.0,"ai_interval_ticks":40,"enabled":true},
+    {"id":"galacticwars:nightsister_magick_affinity","display_name":"Nightsister Magick Affinity","kind":"support","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":0.0,"ai_interval_ticks":40,"enabled":true},
     {"id":"galacticwars:crippling_shot","display_name":"Crippling Shot","kind":"martial","activation":"target","cooldown_ticks":120,"resource_cost":15,"range":24.0,"ai_interval_ticks":20,"enabled":true},
     {"id":"galacticwars:hunter_patience","display_name":"Hunter Patience","kind":"tactical","activation":"passive","cooldown_ticks":0,"resource_cost":0,"range":0.0,"ai_interval_ticks":40,"enabled":true},
     {"id":"galacticwars:berserk","display_name":"Berserk","kind":"martial","activation":"self","cooldown_ticks":200,"resource_cost":25,"range":0.0,"ai_interval_ticks":20,"enabled":true},

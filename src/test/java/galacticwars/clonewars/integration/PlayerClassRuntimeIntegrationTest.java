@@ -26,6 +26,8 @@ public final class PlayerClassRuntimeIntegrationTest {
                 "solid-block target occlusion");
         assertContains(runtime, "PlayerEvent.PLAYER_QUIT",
                 "replay-cache disconnect cleanup");
+        assertContains(runtime, "definition.forceTraditionSlot().isNotEmpty()",
+                "Force career class HUD suppression");
         assertContains(keys, "minecraft.gui.screen() == null",
                 "GUI-safe class hotkeys");
         assertContains(keys, "minecraft.gui.overlay() == null",

@@ -5,6 +5,8 @@ import dev.architectury.networking.NetworkManager;
 import galacticwars.clonewars.GalacticWars;
 import galacticwars.clonewars.army.ArmyFieldCommandService;
 import galacticwars.clonewars.force.ForceWorldEffectService;
+import galacticwars.clonewars.combat.LightsaberGuardService;
+import galacticwars.clonewars.force.ForceShrineService;
 import galacticwars.clonewars.classes.PlayerClassRuntime;
 import galacticwars.clonewars.menu.CommandCenterOperationsMenu;
 import galacticwars.clonewars.menu.MerchantTradeMenu;
@@ -37,6 +39,10 @@ public final class GalacticNetwork {
                 ForceActivatePayload.STREAM_CODEC,
                 GalacticNetwork::handleForceActivate);
         NetworkManager.registerC2S(
+                ForceProgressionActionPayload.TYPE,
+                ForceProgressionActionPayload.STREAM_CODEC,
+                GalacticNetwork::handleForceProgressionAction);
+        NetworkManager.registerC2S(
                 ClassActivatePayload.TYPE,
                 ClassActivatePayload.STREAM_CODEC,
                 GalacticNetwork::handleClassActivate);
@@ -61,6 +67,10 @@ public final class GalacticNetwork {
                 ForceHudPayload.STREAM_CODEC,
                 GalacticNetwork::handleForceHud);
         NetworkManager.registerS2C(
+                ForceProgressionPayload.TYPE,
+                ForceProgressionPayload.STREAM_CODEC,
+                GalacticNetwork::handleForceProgression);
+        NetworkManager.registerS2C(
                 ClassHudPayload.TYPE,
                 ClassHudPayload.STREAM_CODEC,
                 GalacticNetwork::handleClassHud);
@@ -76,7 +86,12 @@ public final class GalacticNetwork {
                 GameplayCatalogPayload.TYPE,
                 GameplayCatalogPayload.STREAM_CODEC,
                 GalacticNetwork::handleGameplayCatalog);
-        PlayerEvent.PLAYER_QUIT.register(player -> ArmyFieldCommandService.clearReplayHistory(player.getUUID()));
+        PlayerEvent.PLAYER_QUIT.register(player -> {
+            ArmyFieldCommandService.clearReplayHistory(player.getUUID());
+            ForceWorldEffectService.cancelAll(player.getUUID());
+            LightsaberGuardService.clear(player.getUUID());
+            ForceShrineService.clearReplayHistory(player.getUUID());
+        });
         GameplayCatalogSync.register();
     }
 
@@ -95,7 +110,7 @@ public final class GalacticNetwork {
     ) {
         if (context.getPlayer() instanceof ServerPlayer player) {
             context.queue(() -> ForceWorldEffectService.activate(
-                    player, payload.activationId(), payload.slot()));
+                    player, payload.activationId(), payload.slot(), payload.phase()));
         }
     }
 
@@ -106,6 +121,15 @@ public final class GalacticNetwork {
         if (context.getPlayer() instanceof ServerPlayer player) {
             context.queue(() -> PlayerClassRuntime.activate(
                     player, payload.activationId(), payload.slot()));
+        }
+    }
+
+    private static void handleForceProgressionAction(
+            ForceProgressionActionPayload payload,
+            NetworkManager.PacketContext context
+    ) {
+        if (context.getPlayer() instanceof ServerPlayer player) {
+            context.queue(() -> ForceShrineService.handle(player, payload));
         }
     }
 
@@ -192,6 +216,13 @@ public final class GalacticNetwork {
             NetworkManager.PacketContext context
     ) {
         context.queue(() -> ClientPacketBridge.handleClassHud(payload));
+    }
+
+    private static void handleForceProgression(
+            ForceProgressionPayload payload,
+            NetworkManager.PacketContext context
+    ) {
+        context.queue(() -> ClientPacketBridge.handleForceProgression(payload));
     }
 
     private static void handleCommandCenterState(

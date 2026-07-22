@@ -1,8 +1,6 @@
 package galacticwars.clonewars.progression
 
 import galacticwars.clonewars.data.LaunchContentDefinitions
-import java.util.LinkedHashMap
-import java.util.LinkedHashSet
 import java.util.UUID
 import kotlin.jvm.JvmRecord
 
@@ -89,18 +87,32 @@ class ForceAbilityRuntimeService private constructor() {
                 return rejected("force_ability_disabled", runtime)
             }
 
-            val allowedPath = factionPath(progression.factionId)
-            val selectedPath = runtime.path.ifEmpty { allowedPath }
-            if (selectedPath.isEmpty() || selectedPath != ability.path()) {
-                return rejected("force_path_unavailable", runtime)
-            }
-            if (!progression.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.requiredQuest())) {
-                return rejected("force_quest_locked", runtime)
-            }
-            if (ability.activeUnlock() !in progression.unlocks &&
-                !progression.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.activeUnlock())
-            ) {
-                return rejected("force_unlock_missing", runtime)
+            val abilityTradition = normalizeAbilityTradition(ability.path(), progression.factionId)
+            val legacyDefinition = content.forceTraditions().isEmpty() || ability.nodeId().isEmpty()
+            if (legacyDefinition) {
+                val allowedTradition = factionTradition(progression.factionId)
+                val selectedTradition = runtime.traditionId.ifEmpty { allowedTradition }
+                if (selectedTradition.isEmpty() || selectedTradition != abilityTradition) {
+                    return rejected("force_path_unavailable", runtime)
+                }
+                if (!progression.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.requiredQuest())) {
+                    return rejected("force_quest_locked", runtime)
+                }
+                if (ability.activeUnlock() !in progression.unlocks &&
+                    !progression.hasSubject(ProgressionEventType.QUEST_ADVANCED, ability.activeUnlock())
+                ) {
+                    return rejected("force_unlock_missing", runtime)
+                }
+            } else {
+                if (!runtime.initiated() || runtime.traditionId != abilityTradition) {
+                    return rejected("force_tradition_unavailable", runtime)
+                }
+                if (!runtime.learned(ability.nodeId())) {
+                    return rejected("force_node_locked", runtime)
+                }
+                if (runtime.rank < ability.requiredRank()) {
+                    return rejected("force_rank_locked", runtime)
+                }
             }
             if (targetsPlayer && !allowForcePvp) {
                 return rejected("force_pvp_disabled", runtime)
@@ -114,20 +126,11 @@ class ForceAbilityRuntimeService private constructor() {
                 return rejected("insufficient_force_energy", runtime)
             }
 
-            val cooldowns = LinkedHashMap(runtime.cooldownEnds)
-            cooldowns[abilityId] = Math.addExact(gameTime, ability.cooldownTicks().toLong())
-            val processed = LinkedHashSet(runtime.processedActivationIds)
-            processed.add(activationId)
-            while (processed.size > ForceRuntimeState.MAX_PROCESSED_ACTIVATIONS) {
-                val iterator = processed.iterator()
-                iterator.next()
-                iterator.remove()
-            }
-            val updated = ForceRuntimeState(
-                selectedPath,
-                runtime.energy - ability.energy(),
-                cooldowns,
-                processed,
+            val updated = runtime.spendAndCooldown(
+                ability.energy(),
+                abilityId,
+                Math.addExact(gameTime, ability.cooldownTicks().toLong()),
+                activationId,
             )
             return ActivationDecision(
                 true,
@@ -138,10 +141,17 @@ class ForceAbilityRuntimeService private constructor() {
             )
         }
 
-        private fun factionPath(factionId: String): String = when (factionId.substringAfter(':', factionId)) {
-            "republic" -> "light"
-            "nightsister" -> "dark"
+        private fun factionTradition(factionId: String): String = when (factionId.substringAfter(':', factionId)) {
+            "republic" -> "jedi"
+            "separatist" -> "sith"
+            "nightsister" -> "nightsister"
             else -> ""
+        }
+
+        private fun normalizeAbilityTradition(path: String, factionId: String): String = when (path) {
+            "light" -> "jedi"
+            "dark" -> if (factionId.substringAfter(':', factionId) == "separatist") "sith" else "nightsister"
+            else -> path
         }
 
         private fun rejected(reason: String, state: ForceRuntimeState): ActivationDecision =

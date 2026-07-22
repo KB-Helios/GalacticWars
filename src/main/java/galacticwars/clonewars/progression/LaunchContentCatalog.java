@@ -37,5 +37,8 @@ public final class LaunchContentCatalog {
         return data().questObjectives(id);
     }
     public static int questRewardCredits(String id) { return data().questRewardCredits(id); }
+    public static int questRewardMasteryExperience(String id) {
+        return data().questRewardMasteryExperience(id);
+    }
     public static int regionRewardCredits(String id) { return data().regionRewardCredits(id); }
 }

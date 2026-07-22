@@ -1,0 +1,9 @@
+{
+  "textures":{"base":"galacticwars:block/nightsister_weave_planks","focus":"minecraft:block/amethyst_block","trim":"minecraft:block/bone_block_side","particle":"galacticwars:block/nightsister_weave_planks"},
+  "elements":[
+    {"from":[0,0,0],"to":[16,3,16],"faces":{"down":{"texture":"#base"},"up":{"texture":"#base"},"north":{"texture":"#base"},"south":{"texture":"#base"},"west":{"texture":"#base"},"east":{"texture":"#base"}}},
+    {"from":[2,3,2],"to":[5,11,5],"faces":{"down":{"texture":"#trim"},"up":{"texture":"#trim"},"north":{"texture":"#trim"},"south":{"texture":"#trim"},"west":{"texture":"#trim"},"east":{"texture":"#trim"}}},
+    {"from":[11,3,11],"to":[14,11,14],"faces":{"down":{"texture":"#trim"},"up":{"texture":"#trim"},"north":{"texture":"#trim"},"south":{"texture":"#trim"},"west":{"texture":"#trim"},"east":{"texture":"#trim"}}},
+    {"from":[6,3,6],"to":[10,10,10],"faces":{"down":{"texture":"#focus"},"up":{"texture":"#focus"},"north":{"texture":"#focus"},"south":{"texture":"#focus"},"west":{"texture":"#focus"},"east":{"texture":"#focus"}}}
+  ]
+}

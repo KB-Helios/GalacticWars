@@ -26,6 +26,10 @@ public final class Config {
             define("allowBlasterFriendlyFire", false);
     public static final BooleanValue ALLOW_BLASTER_PVP = define("allowBlasterPvp", true);
     public static final BooleanValue ALLOW_FORCE_PVP = define("allowForcePvp", true);
+    public static final BooleanValue ALLOW_FORCE_BLOCK_PHYSICS =
+            define("allowForceBlockPhysics", true);
+    public static final BooleanValue ALLOW_FORCE_VEHICLE_PHYSICS =
+            define("allowForceVehiclePhysics", true);
     public static final BooleanValue ALLOW_CLASS_PVP = define("allowClassPvp", false);
 
     private Config() {

@@ -71,6 +71,8 @@ public final class ModEntityTypes {
             registerRecruit("b2_super_battle_droid", 0.82F, 2.05F);
     public static final RegistrySupplier<EntityType<GalacticRecruitEntity>> COMMANDO_DROID =
             registerRecruit("commando_droid", 0.58F, 1.91F);
+    public static final RegistrySupplier<EntityType<GalacticRecruitEntity>> SITH_ACOLYTE =
+            registerRecruit("sith_acolyte", 0.62F, 2.05F);
     public static final RegistrySupplier<EntityType<GalacticRecruitEntity>> HUTT_ENFORCER =
             registerRecruit("hutt_enforcer", 0.84F, 2.00F);
     public static final RegistrySupplier<EntityType<GalacticRecruitEntity>> BOUNTY_HUNTER =
@@ -99,7 +101,7 @@ public final class ModEntityTypes {
     private static final List<RegistrySupplier<EntityType<GalacticRecruitEntity>>> RECRUITS = List.of(
             CLONE_TROOPER, ARC_TROOPER, PHASE_I_CLONE_TROOPER, PHASE_I_ARC_TROOPER, JEDI_KNIGHT,
             SENATE_COMMANDO, REPUBLIC_HONOR_GUARD,
-            B1_BATTLE_DROID, B1_SECURITY_DROID, B2_SUPER_BATTLE_DROID, COMMANDO_DROID,
+            B1_BATTLE_DROID, B1_SECURITY_DROID, B2_SUPER_BATTLE_DROID, COMMANDO_DROID, SITH_ACOLYTE,
             MANDALORIAN_WARRIOR, MANDALORIAN_MARKSMAN, MANDALORIAN_HEAVY,
             HUTT_ENFORCER, BOUNTY_HUNTER, SMUGGLER,
             NIGHTSISTER_ACOLYTE, NIGHTSISTER_ARCHER, NIGHTBROTHER_BRUTE,

@@ -51,6 +51,12 @@ public final class ModItems {
             registerBlockItem("command_center", ModBlocks.COMMAND_CENTER);
     public static final RegistrySupplier<BlockItem> CONTROL_BEACON =
             registerBlockItem("control_beacon", ModBlocks.CONTROL_BEACON);
+    public static final RegistrySupplier<BlockItem> JEDI_MEDITATION_SHRINE =
+            registerBlockItem("jedi_meditation_shrine", ModBlocks.JEDI_MEDITATION_SHRINE);
+    public static final RegistrySupplier<BlockItem> SITH_HOLOCRON_PEDESTAL =
+            registerBlockItem("sith_holocron_pedestal", ModBlocks.SITH_HOLOCRON_PEDESTAL);
+    public static final RegistrySupplier<BlockItem> NIGHTSISTER_SPIRIT_ALTAR =
+            registerBlockItem("nightsister_spirit_altar", ModBlocks.NIGHTSISTER_SPIRIT_ALTAR);
     public static final RegistrySupplier<BlockItem> TATOOINE_SAND =
             registerBlockItem("tatooine_sand", ModBlocks.TATOOINE_SAND);
     public static final RegistrySupplier<BlockItem> GEONOSIS_ROCK =
@@ -183,6 +189,10 @@ public final class ModItems {
             registerItem("b1_battle_droid_spawn_egg",
                     properties -> new RecruitSpawnEggItem(
                             ModEntityTypes.B1_BATTLE_DROID.get(), "b1_battle_droid", properties));
+    public static final RegistrySupplier<RecruitSpawnEggItem> SITH_ACOLYTE_SPAWN_EGG =
+            registerItem("sith_acolyte_spawn_egg",
+                    properties -> new RecruitSpawnEggItem(
+                            ModEntityTypes.SITH_ACOLYTE.get(), "sith_acolyte", properties));
     public static final RegistrySupplier<RecruitSpawnEggItem> B1_SECURITY_DROID_SPAWN_EGG =
             registerItem("b1_security_droid_spawn_egg",
                     properties -> new RecruitSpawnEggItem(

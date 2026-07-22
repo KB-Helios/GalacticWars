@@ -89,6 +89,9 @@ RECRUITS = (
     RecruitDesign("jedi_knight", "robe", "jedi", Palette(
         (185, 124, 79), (78, 47, 29), (48, 31, 23), (160, 118, 68),
         (222, 198, 142), (87, 220, 110), (91, 61, 39))),
+    RecruitDesign("sith_acolyte", "robe", "sith", Palette(
+        (116, 102, 96), (52, 19, 25), (12, 13, 17), (42, 43, 49),
+        (91, 91, 98), (239, 44, 47), (70, 25, 31))),
     RecruitDesign("senate_commando", "plate", "senate_commando", Palette(
         (185, 124, 79), (31, 39, 59), (14, 20, 36), (42, 69, 116),
         (120, 157, 202), (235, 211, 112), (30, 39, 57))),
@@ -802,7 +805,7 @@ def add_plate_details(builder: ModelBuilder, variant: str) -> None:
 
 
 def add_robe_details(builder: ModelBuilder, variant: str) -> None:
-    if variant in ("acolyte", "archer"):
+    if variant in ("acolyte", "archer", "sith"):
         add_open_hood(builder, "ritual_hood")
     else:
         add_hair_cap(builder, "hair", "dark")
@@ -820,11 +823,17 @@ def add_robe_details(builder: ModelBuilder, variant: str) -> None:
                  rotation=[0, 0, 24], pivot=[0, 19, -2.5])
     builder.cube("right_leg", "right_boot", [-4.15, 0, -2.2], [4.1, 5.5, 4.4], "shadow")
     builder.cube("left_leg", "left_boot", [0.05, 0, -2.2], [4.1, 5.5, 4.4], "shadow", mirror=True)
-    if variant in ("acolyte", "archer"):
+    if variant in ("acolyte", "archer", "sith"):
         builder.cube("robe_mantle", "right_talisman", [-3.2, 13.5, -2.7], [1.2, 7.5, 0.8], "accent")
         builder.cube("robe_mantle", "left_talisman", [2.0, 13.5, -2.7], [1.2, 7.5, 0.8], "accent")
         builder.cube("right_arm", "right_cloth_wrap", [-8.25, 13.0, -2.35], [4.5, 2.0, 4.7], "light")
         builder.cube("left_arm", "left_cloth_wrap", [3.75, 13.0, -2.35], [4.5, 2.0, 4.7], "light")
+    if variant == "sith":
+        builder.cube("robe_mantle", "right_armored_pauldron", [-7.4, 20.0, -3.0], [4.0, 3.0, 6.0], "dark")
+        builder.cube("robe_mantle", "left_armored_pauldron", [3.4, 20.0, -3.0], [4.0, 3.0, 6.0], "dark")
+        builder.cube("hood", "mask_brow", [-3.0, 27.6, -4.75], [6.0, 1.0, 0.7], "accent")
+        builder.cube("hood", "mask_guard", [-2.5, 24.4, -4.7], [5.0, 3.3, 0.65], "dark")
+        builder.cube("utility_gear", "sith_belt_clasp", [-1.2, 11.7, -2.9], [2.4, 2.4, 0.6], "light")
     if variant == "archer":
         builder.cube("quiver", "quiver_case", [2.5, 15.0, 1.8], [2.6, 8.5, 2.6], "shadow",
                      rotation=[0, 0, -12], pivot=[3.5, 18, 2])

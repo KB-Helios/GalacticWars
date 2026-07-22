@@ -28,8 +28,8 @@ public final class CrossLoaderBiomeSpawnParityTest {
     public static void main(String[] args) throws IOException {
         Map<String, SpawnEntry> neoForge = readNeoForgeEntries();
         Map<String, SpawnEntry> fabric = readFabricEntries();
-        if (neoForge.size() != 19) {
-            throw new AssertionError("Expected 19 NeoForge Overworld spawn mappings, found "
+        if (neoForge.size() != 20) {
+            throw new AssertionError("Expected 20 NeoForge Overworld spawn mappings, found "
                     + neoForge.keySet());
         }
         if (!fabric.equals(neoForge)) {

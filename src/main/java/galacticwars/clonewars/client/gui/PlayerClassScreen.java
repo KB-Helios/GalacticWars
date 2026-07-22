@@ -135,7 +135,7 @@ public final class PlayerClassScreen extends Screen {
             PlayerCampaignAttachmentState attachment
     ) {
         if (!definition.forcePathSlot().isBlank()
-                && !definition.forcePathSlot().equals(attachment.force().path())) {
+                && !definition.forcePathSlot().equals(attachment.force().tradition())) {
             return false;
         }
         return definition.requirements().stream().allMatch(
@@ -150,7 +150,7 @@ public final class PlayerClassScreen extends Screen {
                 attachment.campaign().factionId(),
                 attachment.campaign().eventSubjects(),
                 attachment.campaign().unlocks(),
-                attachment.force().path());
+                attachment.force().tradition());
     }
 
     private static boolean requirementMet(

@@ -1,0 +1,8 @@
+{
+  "id":"galacticwars:sith_acolyte","display_name":"Sith Acolyte","faction":"galacticwars:separatist",
+  "entity_type":"galacticwars:sith_acolyte","role":"infantry","hire_cost":60,
+  "attributes":{"max_health":34,"attack_damage":9,"movement_speed":0.34,"follow_range":32.0,"armor":3.0},
+  "equipment":{"main_hand":"galacticwars:red_lightsaber","head":"minecraft:air","chest":"minecraft:air","legs":"minecraft:air","feet":"minecraft:air"},
+  "force_loadout":["dark_push","dark_choke","force_lightning"],
+  "default_formation":"wedge"
+}
