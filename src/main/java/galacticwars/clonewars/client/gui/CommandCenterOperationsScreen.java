@@ -789,7 +789,8 @@ public final class CommandCenterOperationsScreen extends Screen
 
     private Component buildLabel(BuildSummary build) {
         String progress = build.completedPlacements() + "/" + build.totalPlacements();
-        String blocked = build.blockedReason().isBlank() ? "" : " | " + humanize(build.blockedReason());
+        String blocked = build.blockedReason().isBlank()
+                ? "" : " | " + reasonText(build.blockedReason()).getString();
         return Component.literal(humanize(build.blueprintId()) + " | "
                 + humanize(build.state()) + " | " + progress + blocked);
     }
@@ -809,7 +810,7 @@ public final class CommandCenterOperationsScreen extends Screen
 
     private Component workerLabel(WorkerSummary worker) {
         return Component.literal(worker.displayName() + " | " + humanize(worker.profession())
-                + " | " + humanize(worker.phase()) + ": " + humanize(worker.reasonCode())
+                + " | " + humanize(worker.phase()) + ": " + reasonText(worker.reasonCode()).getString()
                 + " | " + worker.distanceBlocks() + "m");
     }
 
@@ -1021,6 +1022,18 @@ public final class CommandCenterOperationsScreen extends Screen
 
     private static Component reasonTooltip(String reason) {
         return Component.translatable("reason.galacticwars.operations." + reason);
+    }
+
+    /**
+     * Blocked/status reason codes are curated into {@code reason.galacticwars.operations.*}
+     * as they are surfaced to players. Codes without a curated key still fall back to a
+     * readable humanized string instead of leaking the raw key or snake_case identifier.
+     */
+    private static Component reasonText(String reason) {
+        String key = "reason.galacticwars.operations." + reason;
+        return net.minecraft.locale.Language.getInstance().has(key)
+                ? Component.translatable(key)
+                : Component.literal(humanize(reason));
     }
 
     private static String path(String id) {
