@@ -11,12 +11,16 @@ public final class ArmyFieldCommandClientIntegrationTest {
     public static void main(String[] args) throws Exception {
         String mappings = read("src/main/java/galacticwars/clonewars/client/ArmyFieldCommandKeyMappings.java");
         String screen = read("src/main/java/galacticwars/clonewars/client/gui/ArmyFieldCommandScreen.java");
+        String marker = read("src/main/java/galacticwars/clonewars/item/TacticalCommandMarkerItem.java");
+        String client = read("src/main/java/galacticwars/clonewars/GalacticWarsClient.java");
+        String bridge = read("src/main/kotlin/galacticwars/clonewars/network/ClientPacketBridge.kt");
         String fabric = read("fabric/src/main/kotlin/galacticwars/clonewars/fabric/GalacticWarsFabricClient.kt");
         String neoForge = read("neoforge/src/main/kotlin/galacticwars/clonewars/neoforge/GalacticWarsNeoForgeClient.kt");
         String language = read("src/main/resources/assets/galacticwars/lang/en_us.json");
 
         assertContains(mappings, "GLFW.GLFW_KEY_G", "default G field command key");
         assertContains(mappings, "ArmyFieldCommandScreen", "field command screen opening");
+        assertContains(mappings, "matchesCommandScreen(KeyEvent", "rebindable screen toggle handling");
         assertNotContains(mappings, "boolean acceptsGameplayInput", "stale buffered-click input state");
         assertContains(screen, "FieldCommandRequestPayload.MAX_GROUPS", "bounded multi-squad selection");
         assertContains(screen, "MOVEMENT(\"screen.galacticwars.field_command.category.movement\"",
@@ -32,9 +36,20 @@ public final class ArmyFieldCommandClientIntegrationTest {
                 "per-waypoint patrol wait control");
         assertContains(screen, "FieldCommandAction.RENAME_PATROL_ROUTE",
                 "named patrol route control");
+        assertContains(screen, "selectAllSquads()", "nearby squad batch selection");
+        assertContains(screen, "keyPressed(KeyEvent", "field command keyboard shortcuts");
+        assertContains(screen, "state.formation", "visible current formation state");
+        assertContains(screen, "state.engagement", "visible current engagement state");
+        assertContains(marker, "ClientPacketBridge.openFieldCommandScreen()",
+                "physical command marker opens field command");
+        assertContains(marker, "appendHoverText", "physical command marker usage guidance");
+        assertContains(bridge, "installFieldCommandOpenHandler", "dedicated-server-safe screen bridge");
+        assertContains(client, "installFieldCommandOpenHandler", "client screen bridge installation");
         assertContains(fabric, "GalacticWarsClient.init()", "Fabric client initialization");
         assertContains(neoForge, "ArmyFieldCommandKeyMappings.mappings()", "NeoForge key registration");
         assertContains(language, "\"key.galacticwars.army_command\"", "field command key translation");
+        assertContains(language, "\"tooltip.galacticwars.command_marker.open\"",
+                "command marker open-screen guidance");
 
         System.out.println("ArmyFieldCommandClientIntegrationTest passed");
     }

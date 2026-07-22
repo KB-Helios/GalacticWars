@@ -24,9 +24,11 @@ public final class ClientPacketBridgeTest {
                 || !bridgeSource.contains("installForceHudHandler")
                 || !bridgeSource.contains("installGameplayCatalogHandler")
                 || !bridgeSource.contains("installFieldCommandStateHandler")
+                || !bridgeSource.contains("installFieldCommandOpenHandler")
                 || !clientSource.contains("ClientPacketBridge.installForceHudHandler")
                 || !clientSource.contains("ClientPacketBridge.installGameplayCatalogHandler")
-                || !clientSource.contains("ClientPacketBridge.installFieldCommandStateHandler")) {
+                || !clientSource.contains("ClientPacketBridge.installFieldCommandStateHandler")
+                || !clientSource.contains("ClientPacketBridge.installFieldCommandOpenHandler")) {
             throw new AssertionError("Client packet handoff is not fully installed and dispatched");
         }
         System.out.println("ClientPacketBridgeTest passed");

@@ -25,6 +25,7 @@ import galacticwars.clonewars.army.ArmyLocation;
 import galacticwars.clonewars.army.ArmyMemberSnapshot;
 import galacticwars.clonewars.faction.FactionBalanceService;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
+import galacticwars.clonewars.settlement.StarterCampDeployment;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.workforce.CourierRouteMode;
@@ -39,7 +40,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 public final class KingdomSavedData extends SavedData {
-    public static final int CURRENT_SCHEMA_VERSION = 8;
+    public static final int CURRENT_SCHEMA_VERSION = 9;
     public static final Codec<KingdomSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("schema_version", CURRENT_SCHEMA_VERSION).forGetter(KingdomSavedData::schemaVersion),
             KingdomCodecs.KINGDOM_RECORD.listOf().optionalFieldOf("kingdoms", List.of()).forGetter(KingdomSavedData::kingdoms),
@@ -57,7 +58,10 @@ public final class KingdomSavedData extends SavedData {
                     .forGetter(KingdomSavedData::pendingDiplomacy),
             WorkforceCodecs.SETTLEMENT_SUPPLY_LEDGER.listOf()
                     .optionalFieldOf("supply_ledgers", List.of())
-                    .forGetter(KingdomSavedData::supplyLedgers)
+                    .forGetter(KingdomSavedData::supplyLedgers),
+            KingdomCodecs.STARTER_CAMP_DEPLOYMENT.listOf()
+                    .optionalFieldOf("starter_camp_deployments", List.of())
+                    .forGetter(KingdomSavedData::starterCampDeployments)
     ).apply(instance, KingdomSavedData::new));
     public static final SavedDataType<KingdomSavedData> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath(GalacticWars.MODID, "kingdoms"),
@@ -80,10 +84,11 @@ public final class KingdomSavedData extends SavedData {
     private final Map<UUID, KingdomInvite> invitesById = new LinkedHashMap<>();
     private final Map<UUID, DiplomacyProposal> proposalsById = new LinkedHashMap<>();
     private final Map<UUID, SettlementSupplyLedger> supplyLedgersBySettlement = new LinkedHashMap<>();
+    private final Map<UUID, StarterCampDeployment> starterCampDeploymentsByKingdom = new LinkedHashMap<>();
 
     public KingdomSavedData() {
         this(CURRENT_SCHEMA_VERSION, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                List.of());
+                List.of(), List.of());
     }
 
     private KingdomSavedData(
@@ -95,7 +100,8 @@ public final class KingdomSavedData extends SavedData {
             List<KingdomSiege> sieges,
             List<KingdomInvite> invites,
             List<DiplomacyProposal> proposals,
-            List<SettlementSupplyLedger> supplyLedgers
+            List<SettlementSupplyLedger> supplyLedgers,
+            List<StarterCampDeployment> starterCampDeployments
     ) {
         this.schemaVersion = SavedDataSchemaPolicy.migrate(
                 schemaVersion, CURRENT_SCHEMA_VERSION, "kingdom");
@@ -147,6 +153,11 @@ public final class KingdomSavedData extends SavedData {
                 supplyLedgersBySettlement.put(ledger.settlementId(), ledger);
             }
         }
+        for (StarterCampDeployment deployment : starterCampDeployments) {
+            if (kingdomsById.containsKey(deployment.kingdomId())) {
+                starterCampDeploymentsByKingdom.putIfAbsent(deployment.kingdomId(), deployment);
+            }
+        }
     }
 
     public static KingdomSavedData get(ServerLevel level) {
@@ -163,6 +174,30 @@ public final class KingdomSavedData extends SavedData {
 
     public List<ArmyGroupRecord> armyGroups() {
         return List.copyOf(armyGroupsById.values());
+    }
+
+    public List<StarterCampDeployment> starterCampDeployments() {
+        return List.copyOf(starterCampDeploymentsByKingdom.values());
+    }
+
+    public Optional<StarterCampDeployment> starterCampDeployment(UUID kingdomId) {
+        return Optional.ofNullable(starterCampDeploymentsByKingdom.get(kingdomId));
+    }
+
+    public boolean storeStarterCampDeployment(StarterCampDeployment deployment, int expectedRevision) {
+        Objects.requireNonNull(deployment, "deployment");
+        if (!kingdomsById.containsKey(deployment.kingdomId())) {
+            return false;
+        }
+        StarterCampDeployment current = starterCampDeploymentsByKingdom.get(deployment.kingdomId());
+        if ((current == null && expectedRevision != -1)
+                || (current != null && current.revision() != expectedRevision)
+                || (current != null && deployment.revision() <= current.revision())) {
+            return false;
+        }
+        starterCampDeploymentsByKingdom.put(deployment.kingdomId(), deployment);
+        this.setDirty();
+        return true;
     }
 
     public List<KingdomDiplomacy> diplomacy() {
@@ -910,6 +945,14 @@ public final class KingdomSavedData extends SavedData {
             return false;
         }
         storeKingdom(kingdom.withSettlement(updated));
+        if (KingdomBaseBlueprint.STARTER_CAMP_ID.equals(authoritative.id())) {
+            StarterCampDeployment deployment = starterCampDeploymentsByKingdom.get(kingdom.id());
+            if (deployment != null
+                    && deployment.projectId().filter(project.id()::equals).isPresent()
+                    && deployment.phase() != galacticwars.clonewars.settlement.StarterCampDeploymentPhase.COMPLETE) {
+                starterCampDeploymentsByKingdom.put(kingdom.id(), deployment.complete());
+            }
+        }
         this.setDirty();
         return true;
     }

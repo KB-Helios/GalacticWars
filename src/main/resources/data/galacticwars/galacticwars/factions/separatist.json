@@ -5,6 +5,7 @@
   "hire_cost": 30,
   "minimum_hiring_alignment": 15,
   "max_owned_recruits": 16,
+  "starter_unit": "galacticwars:b1_battle_droid",
   "allies": [],
   "enemies": [
     "galacticwars:republic",

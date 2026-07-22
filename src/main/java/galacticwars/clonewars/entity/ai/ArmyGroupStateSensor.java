@@ -23,7 +23,10 @@ public final class ArmyGroupStateSensor extends ExtendedSensor<GalacticRecruitEn
 
     @Override
     public List<MemoryModuleType<?>> memoriesUsed() {
-        return List.of(ArmyBrainMemoryTypes.ARMY_STATE, ArmyBrainMemoryTypes.PATH_STATUS);
+        return List.of(
+                ArmyBrainMemoryTypes.ARMY_STATE,
+                ArmyBrainMemoryTypes.PATH_STATUS,
+                ArmyBrainMemoryTypes.MARCH_STATE);
     }
 
     @Override
@@ -44,5 +47,19 @@ public final class ArmyGroupStateSensor extends ExtendedSensor<GalacticRecruitEn
         }
         cleanedInvalidGroup = false;
         BrainUtil.setMemory(recruit, ArmyBrainMemoryTypes.ARMY_STATE, next);
+        int slot = next.group().effectiveFormationSlotAssignments().stream()
+                .filter(assignment -> assignment.memberId().equals(recruit.getUUID()))
+                .mapToInt(assignment -> assignment.slotIndex())
+                .findFirst().orElse(-1);
+        var march = next.group().simulation().marchState();
+        BrainUtil.setMemory(recruit, ArmyBrainMemoryTypes.MARCH_STATE, new ArmyMarchMemory(
+                next.group().id(),
+                next.group().order().type(),
+                slot,
+                next.group().simulation().anchor().blockPosition(),
+                march.phase(),
+                march.cohesionPercent(),
+                next.group().order().targetPosition().map(location -> location.blockPosition()).orElse(null),
+                next.group().order().targetEntityId().orElse(null)));
     }
 }

@@ -21,11 +21,13 @@ public record FieldCommandRequestPayload(
         List<UUID> groupIds,
         String patrolRouteName,
         int patrolWaypointIndex,
-        int patrolWaypointWaitTicks
+        int patrolWaypointWaitTicks,
+        String optionId
 ) implements CustomPacketPayload {
     public static final int MAX_GROUPS = 8;
     public static final int MAX_PATROL_ROUTE_NAME_BYTES = 128;
     public static final int MAX_PATROL_WAYPOINTS = 32;
+    public static final int MAX_OPTION_ID_BYTES = 64;
     public static final Type<FieldCommandRequestPayload> TYPE = new Type<>(
             Identifier.fromNamespaceAndPath(GalacticWars.MODID, "field_command_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, FieldCommandRequestPayload> STREAM_CODEC =
@@ -38,6 +40,7 @@ public record FieldCommandRequestPayload(
                         buffer.writeUtf(payload.patrolRouteName(), MAX_PATROL_ROUTE_NAME_BYTES);
                         buffer.writeVarInt(payload.patrolWaypointIndex());
                         buffer.writeVarInt(payload.patrolWaypointWaitTicks());
+                        buffer.writeUtf(payload.optionId(), MAX_OPTION_ID_BYTES);
                     },
                     buffer -> {
                         UUID replayId = buffer.readUUID();
@@ -56,12 +59,26 @@ public record FieldCommandRequestPayload(
                                 groupIds,
                                 buffer.readUtf(MAX_PATROL_ROUTE_NAME_BYTES),
                                 buffer.readVarInt(),
-                                buffer.readVarInt());
+                                buffer.readVarInt(),
+                                buffer.readUtf(MAX_OPTION_ID_BYTES));
                     });
 
     /** Compatibility constructor for non-patrol commands and existing call sites. */
     public FieldCommandRequestPayload(UUID replayId, FieldCommandAction action, List<UUID> groupIds) {
-        this(replayId, action, groupIds, "", 0, 0);
+        this(replayId, action, groupIds, "", 0, 0, "");
+    }
+
+    /** Compatibility constructor for the original patrol-aware request shape. */
+    public FieldCommandRequestPayload(
+            UUID replayId,
+            FieldCommandAction action,
+            List<UUID> groupIds,
+            String patrolRouteName,
+            int patrolWaypointIndex,
+            int patrolWaypointWaitTicks
+    ) {
+        this(replayId, action, groupIds, patrolRouteName, patrolWaypointIndex,
+                patrolWaypointWaitTicks, "");
     }
 
     public FieldCommandRequestPayload {
@@ -88,6 +105,18 @@ public record FieldCommandRequestPayload(
         if (patrolWaypointWaitTicks < 0
                 || patrolWaypointWaitTicks > ArmyPatrolPlan.MAX_FIELD_COMMAND_WAIT_TICKS) {
             throw new IllegalArgumentException("field command patrol wait is outside the supported range");
+        }
+        optionId = Objects.requireNonNull(optionId, "optionId").trim().toLowerCase(java.util.Locale.ROOT);
+        if (optionId.chars().anyMatch(character -> !Character.isLetterOrDigit(character) && character != '_')
+                || optionId.getBytes(StandardCharsets.UTF_8).length > MAX_OPTION_ID_BYTES) {
+            throw new IllegalArgumentException("field command option is not a safe bounded identifier");
+        }
+        boolean optionRequired = action == FieldCommandAction.SET_FORMATION
+                || action == FieldCommandAction.SET_ENGAGEMENT
+                || action == FieldCommandAction.SET_TARGET_PRIORITY
+                || action == FieldCommandAction.SET_RANGED_FIRE;
+        if (optionRequired == optionId.isEmpty()) {
+            throw new IllegalArgumentException("field command action has an invalid option identifier");
         }
     }
 

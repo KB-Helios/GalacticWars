@@ -210,7 +210,7 @@ public final class VirtualArmyMovementPlannerTest {
                 "pause advances the virtual simulation timestamp");
 
         ArmyPatrolPlan resumedPlan = pausedAt160.effectivePatrolPlan().orElseThrow().resume();
-        ArmyGroupRecord resumed = pausedAt160.withPatrolPlanAndOrder(resumedPlan, pausedAt160.order());
+        ArmyGroupRecord resumed = pausedAt160.withPatrolProgressAndOrder(resumedPlan, pausedAt160.order());
         ArmyGroupRecord afterOneActiveInterval = VirtualArmyMovementPlanner.advance(
                 resumed, Optional.empty(), 0.28D, 180L);
         assertEquals(new ArmyPatrolState(1, 1, 20),

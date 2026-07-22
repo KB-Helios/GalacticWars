@@ -5,6 +5,7 @@
   "hire_cost": 25,
   "minimum_hiring_alignment": 10,
   "max_owned_recruits": 12,
+  "starter_unit": "galacticwars:clone_trooper",
   "allies": [
     "galacticwars:mandalorian"
   ],

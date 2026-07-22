@@ -33,7 +33,10 @@ public final class RecruitGeckoLibIntegrationTest {
         assertContains(entity, "implements GeoEntity", "GeoEntity implementation");
         assertContains(entity, "GeckoLibUtil.createInstanceCache(this)", "GeckoLib instance cache");
         assertContains(entity, "registerControllers", "controller registration method");
-        assertContains(entity, "DefaultAnimations.genericWalkRunIdleController()", "walk/run/idle controller");
+        assertContains(entity, "new AnimationController<>(\"recruit_gameplay\"", "gameplay state controller");
+        assertContains(entity, "RecruitVisualAction.byId", "authoritative gameplay animation state");
+        assertContains(entity, "VISUAL_WALK", "safe walk fallback");
+        assertContains(entity, "VISUAL_IDLE", "safe idle fallback");
         assertContains(entity, "DefaultAnimations.genericAttackAnimation(DefaultAnimations.ATTACK_SWING)",
                 "attack animation controller");
     }

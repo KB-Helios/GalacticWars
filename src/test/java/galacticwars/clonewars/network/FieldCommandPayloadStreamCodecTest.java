@@ -90,6 +90,7 @@ public final class FieldCommandPayloadStreamCodecTest {
             invalidPatrolWait.writeUtf("Landing Pad Sweep", FieldCommandRequestPayload.MAX_PATROL_ROUTE_NAME_BYTES);
             invalidPatrolWait.writeVarInt(0);
             invalidPatrolWait.writeVarInt(12_001);
+            invalidPatrolWait.writeUtf("", FieldCommandRequestPayload.MAX_OPTION_ID_BYTES);
             assertThrows(IllegalArgumentException.class,
                     () -> FieldCommandRequestPayload.STREAM_CODEC.decode(invalidPatrolWait),
                     "out-of-range patrol wait");
@@ -105,8 +106,9 @@ public final class FieldCommandPayloadStreamCodecTest {
                 List.of(new FieldCommandStatePayload.Squad(
                         UUID.fromString("00000000-0000-0000-0000-00000000e005"),
                         "501st Command", 7, "FOLLOW_OWNER", "MOVEMENT", "LIVE",
+                        "AGGRESSIVE", "LOWEST_HEALTH", "HOLD_FIRE", true, true,
                         Optional.of(new FieldCommandStatePayload.Squad.Patrol("Landing Pad Sweep", 4)))),
-                false, true);
+                false, true, List.of("formation_basic", "formation_advanced"));
         RegistryFriendlyByteBuf encoded = buffer();
         try {
             FieldCommandStatePayload.STREAM_CODEC.encode(encoded, expected);
@@ -122,6 +124,7 @@ public final class FieldCommandPayloadStreamCodecTest {
             oversized.writeVarInt(FieldCommandResult.ACCEPTED.wireId());
             oversized.writeBoolean(false);
             oversized.writeBoolean(false);
+            oversized.writeVarInt(0);
             oversized.writeVarInt(FieldCommandStatePayload.MAX_SQUADS + 1);
             assertThrows(IllegalArgumentException.class,
                     () -> FieldCommandStatePayload.STREAM_CODEC.decode(oversized),

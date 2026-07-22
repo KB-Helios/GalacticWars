@@ -14,6 +14,8 @@ import galacticwars.clonewars.army.ArmyGroupOrder;
 import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyGroupSimulation;
 import galacticwars.clonewars.army.ArmyLocation;
+import galacticwars.clonewars.army.ArmyMarchPhase;
+import galacticwars.clonewars.army.ArmyMarchState;
 import galacticwars.clonewars.army.ArmyMemberSnapshot;
 import galacticwars.clonewars.army.ArmyPatrolEnemyPolicy;
 import galacticwars.clonewars.army.ArmyPatrolMode;
@@ -28,6 +30,8 @@ import galacticwars.clonewars.army.ArmyEngagementStance;
 import galacticwars.clonewars.army.ArmyTargetPriority;
 import galacticwars.clonewars.recruitment.RecruitDuty;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
+import galacticwars.clonewars.settlement.StarterCampDeployment;
+import galacticwars.clonewars.settlement.StarterCampDeploymentPhase;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.workforce.CourierTransferAction;
 import galacticwars.clonewars.workforce.CourierRouteMode;
@@ -43,6 +47,29 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 final class KingdomCodecs {
+    static final Codec<StarterCampDeployment> STARTER_CAMP_DEPLOYMENT = RecordCodecBuilder.create(instance ->
+            instance.group(
+                    UUIDUtil.CODEC.fieldOf("kingdom_id").forGetter(StarterCampDeployment::kingdomId),
+                    Codec.STRING.fieldOf("dimension").forGetter(StarterCampDeployment::dimensionId),
+                    Codec.INT.fieldOf("origin_x").forGetter(StarterCampDeployment::originX),
+                    Codec.INT.fieldOf("origin_y").forGetter(StarterCampDeployment::originY),
+                    Codec.INT.fieldOf("origin_z").forGetter(StarterCampDeployment::originZ),
+                    Codec.intRange(0, 3).optionalFieldOf("rotation_steps", 0)
+                            .forGetter(StarterCampDeployment::rotationSteps),
+                    Codec.STRING.xmap(StarterCampDeploymentPhase::byId, StarterCampDeploymentPhase::id)
+                            .optionalFieldOf("phase", StarterCampDeploymentPhase.AWAITING_CONFIRMATION)
+                            .forGetter(StarterCampDeployment::phase),
+                    Codec.BOOL.optionalFieldOf("contract_granted", false)
+                            .forGetter(StarterCampDeployment::contractGranted),
+                    Codec.BOOL.optionalFieldOf("supplies_granted", false)
+                            .forGetter(StarterCampDeployment::suppliesGranted),
+                    UUIDUtil.CODEC.optionalFieldOf("builder_id").forGetter(StarterCampDeployment::builderId),
+                    UUIDUtil.CODEC.optionalFieldOf("project_id").forGetter(StarterCampDeployment::projectId),
+                    Codec.STRING.optionalFieldOf("blocker", "").forGetter(StarterCampDeployment::blocker),
+                    Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("revision", 0)
+                            .forGetter(StarterCampDeployment::revision)
+            ).apply(instance, StarterCampDeployment::new));
+
     static final Codec<KingdomNpcRecord> KINGDOM_NPC = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("recruit_id").forGetter(KingdomNpcRecord::recruitId),
             UUIDUtil.CODEC.fieldOf("settlement_id").forGetter(KingdomNpcRecord::settlementId),
@@ -225,6 +252,23 @@ final class KingdomCodecs {
     ) {
     }
 
+    static final Codec<ArmyMarchState> ARMY_MARCH_STATE = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.STRING.xmap(
+                            value -> ArmyMarchPhase.valueOf(value.toUpperCase()),
+                            value -> value.name().toLowerCase())
+                    .optionalFieldOf("phase", ArmyMarchPhase.HALTED).forGetter(ArmyMarchState::phase),
+            Codec.STRING.xmap(
+                            value -> ArmyFormation.valueOf(value.toUpperCase()),
+                            value -> value.name().toLowerCase())
+                    .optionalFieldOf("active_formation", ArmyFormation.LINE)
+                    .forGetter(ArmyMarchState::activeFormation),
+            Codec.intRange(0, 100).optionalFieldOf("cohesion_percent", 100)
+                    .forGetter(ArmyMarchState::cohesionPercent),
+            Codec.FLOAT.optionalFieldOf("yaw_degrees", 0.0F).forGetter(ArmyMarchState::yawDegrees),
+            Codec.LONG.optionalFieldOf("phase_since_game_time", 0L)
+                    .forGetter(ArmyMarchState::phaseSinceGameTime)
+    ).apply(instance, ArmyMarchState::new));
+
     static final Codec<ArmyGroupSimulation> ARMY_GROUP_SIMULATION = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.xmap(value -> ArmyGroupLifecycleState.valueOf(value.toUpperCase()), value -> value.name().toLowerCase())
                     .optionalFieldOf("state", ArmyGroupLifecycleState.LIVE).forGetter(ArmyGroupSimulation::lifecycleState),
@@ -232,7 +276,9 @@ final class KingdomCodecs {
             Codec.LONG.optionalFieldOf("last_simulation_game_time", 0L).forGetter(ArmyGroupSimulation::lastSimulationGameTime),
             Codec.LONG.optionalFieldOf("revision", 0L).forGetter(ArmyGroupSimulation::revision),
             Codec.LONG.optionalFieldOf("snapshot_generation", 0L).forGetter(ArmyGroupSimulation::snapshotGeneration),
-            Codec.STRING.optionalFieldOf("blocked_reason", "").forGetter(ArmyGroupSimulation::blockedReason)
+            Codec.STRING.optionalFieldOf("blocked_reason", "").forGetter(ArmyGroupSimulation::blockedReason),
+            ARMY_MARCH_STATE.optionalFieldOf("march", ArmyMarchState.halted(ArmyFormation.LINE))
+                    .forGetter(ArmyGroupSimulation::marchState)
     ).apply(instance, ArmyGroupSimulation::new));
 
     static final Codec<ArmyFormationSlotAssignment> ARMY_FORMATION_SLOT = RecordCodecBuilder.create(instance -> instance.group(

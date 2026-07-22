@@ -31,6 +31,7 @@ public record KingdomBaseBlueprint(
         int commanderSlotReward
 ) {
     public static final String DEFAULT_NAMESPACE = "galacticwars";
+    public static final String STARTER_CAMP_ID = DEFAULT_NAMESPACE + ":starter_camp";
     public static final String STARTER_KEEP_ID = DEFAULT_NAMESPACE + ":forward_base";
     private static final Pattern NAMESPACE = Pattern.compile("[a-z0-9_.-]+");
     private static final Pattern PATH = Pattern.compile("[a-z0-9/._-]+");
@@ -85,6 +86,7 @@ public record KingdomBaseBlueprint(
     }
 
     private static final List<KingdomBaseBlueprint> ALL_BLUEPRINTS = List.of(
+            starterCamp(),
             starterKeep(),
             barracks(),
             supply_depot(),
@@ -113,6 +115,29 @@ public record KingdomBaseBlueprint(
         placements.add(new BaseBlockPlacement(0, 1, 2, "minecraft:oak_planks", "minecraft:oak_planks"));
         placements.add(new BaseBlockPlacement(4, 1, 2, "minecraft:oak_planks", "minecraft:oak_planks"));
         return new KingdomBaseBlueprint(STARTER_KEEP_ID, "Forward Base", placements, 2, 0, "", 0, 1);
+    }
+
+    public static KingdomBaseBlueprint starterCamp() {
+        List<BaseBlockPlacement> placements = List.of(
+                new BaseBlockPlacement(-2, 0, -2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(2, 0, -2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(-2, 0, 2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(2, 0, 2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(-2, 1, -2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(2, 1, -2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(-2, 1, 2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(2, 1, 2, "minecraft:oak_log", "minecraft:oak_log"),
+                new BaseBlockPlacement(-1, 0, -2, "minecraft:oak_planks", "minecraft:oak_planks"),
+                new BaseBlockPlacement(0, 0, -2, "minecraft:oak_planks", "minecraft:oak_planks"),
+                new BaseBlockPlacement(1, 0, -2, "minecraft:oak_planks", "minecraft:oak_planks"),
+                new BaseBlockPlacement(-1, 0, 2, "minecraft:oak_planks", "minecraft:oak_planks"),
+                new BaseBlockPlacement(0, 0, 2, "minecraft:campfire", "minecraft:campfire"),
+                new BaseBlockPlacement(1, 0, 2, "minecraft:oak_planks", "minecraft:oak_planks"),
+                new BaseBlockPlacement(-2, 0, 0, "minecraft:crafting_table", "minecraft:crafting_table"),
+                new BaseBlockPlacement(2, 0, 0, "minecraft:chest", "minecraft:chest"));
+        return new KingdomBaseBlueprint(
+                STARTER_CAMP_ID, "Starter Camp", BlueprintAnchor.ORIGIN, ALL_ROTATIONS,
+                placements, 2, 27, "", 0, 1);
     }
 
     public static KingdomBaseBlueprint barracks() {

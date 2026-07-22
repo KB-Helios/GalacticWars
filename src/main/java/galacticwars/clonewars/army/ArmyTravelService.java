@@ -82,7 +82,8 @@ public final class ArmyTravelService {
                 destination.getGameTime(),
                 group.simulation().revision() + 1L,
                 generation,
-                "planet_transfer");
+                "planet_transfer",
+                group.simulation().marchState());
         ArmyGroupRecord transferred = group.withSimulation(
                 transferredSimulation, orderedSnapshots(group, snapshots));
         return TravelPlan.ready(data, group, transferred, liveMembers);
@@ -209,7 +210,7 @@ public final class ArmyTravelService {
                         previous.lifecycleState(), previous.anchor(),
                         Math.max(previous.lastSimulationGameTime(), gameTime),
                         transferred.simulation().revision() + 1L, previous.snapshotGeneration(),
-                        previous.blockedReason());
+                        previous.blockedReason(), previous.marchState());
                 ArmyGroupRecord restored = original.withSimulation(restoredSimulation, original.snapshots());
                 return data.replaceArmyGroup(restored, transferred.simulation().revision());
             });

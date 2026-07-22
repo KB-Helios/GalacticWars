@@ -10,6 +10,7 @@ import galacticwars.clonewars.menu.FactionSelectionMenu;
 import galacticwars.clonewars.menu.MerchantTradeMenu;
 import galacticwars.clonewars.menu.RecruitCommandMenu;
 import galacticwars.clonewars.menu.RecruitLoadoutMenu;
+import galacticwars.clonewars.menu.StarterCampSetupMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -37,6 +38,11 @@ public final class ModMenuTypes {
             MENU_TYPES.register("faction_selection",
                     () -> MenuRegistry.ofExtended((id, inventory, buffer) ->
                             new FactionSelectionMenu(
+                                    id, inventory, registryBuffer(buffer, inventory))));
+    public static final RegistrySupplier<MenuType<StarterCampSetupMenu>> STARTER_CAMP_SETUP =
+            MENU_TYPES.register("starter_camp_setup",
+                    () -> MenuRegistry.ofExtended((id, inventory, buffer) ->
+                            new StarterCampSetupMenu(
                                     id, inventory, registryBuffer(buffer, inventory))));
     public static final RegistrySupplier<MenuType<MerchantTradeMenu>> MERCHANT_TRADE =
             MENU_TYPES.register("merchant_trade",

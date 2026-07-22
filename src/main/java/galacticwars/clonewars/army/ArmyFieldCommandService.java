@@ -7,6 +7,7 @@ import galacticwars.clonewars.kingdom.KingdomRecord;
 import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.network.FieldCommandRequestPayload;
 import galacticwars.clonewars.network.FieldCommandStatePayload;
+import galacticwars.clonewars.progression.ProgressionSavedData;
 import galacticwars.clonewars.recruitment.NpcServiceBranch;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -112,9 +113,11 @@ public final class ArmyFieldCommandService {
             case CLEAR_TARGET -> applyOrders(data, player, groups, group -> order(
                     ArmyCommandType.CLEAR_TARGET, group, Optional.empty(), Optional.empty()));
             case CYCLE_FORMATION -> applyOrders(data, player, groups,
-                    group -> group.order().withFormation(next(group.order().formation(), ArmyFormation.values())));
-            case TOGGLE_HOLD_FORMATION -> applyTactics(data, player, groups,
-                    tactics -> tactics.withFormationControls(!tactics.holdFormation(), tactics.tightFormation()));
+                    group -> group.order().withFormation(nextUnlockedFormation(player, group.order().formation())));
+            case TOGGLE_HOLD_FORMATION -> hasUnlock(player, "formation_advanced")
+                    ? applyTactics(data, player, groups,
+                            tactics -> tactics.withFormationControls(!tactics.holdFormation(), tactics.tightFormation()))
+                    : FieldCommandResult.PROGRESSION_LOCKED;
             case TOGGLE_TIGHT_FORMATION -> applyTactics(data, player, groups,
                     tactics -> tactics.withFormationControls(tactics.holdFormation(), !tactics.tightFormation()));
             case CYCLE_ENGAGEMENT -> applyTactics(data, player, groups,
@@ -123,6 +126,18 @@ public final class ArmyFieldCommandService {
                     tactics -> tactics.withTargetPriority(next(tactics.targetPriority(), ArmyTargetPriority.values())));
             case CYCLE_RANGED_FIRE -> applyTactics(data, player, groups,
                     tactics -> tactics.withRangedFirePolicy(next(tactics.rangedFirePolicy(), ArmyRangedFirePolicy.values())));
+            case SET_FORMATION -> requestedEnum(request.optionId(), ArmyFormation.class)
+                    .map(formation -> formationUnlocked(player, formation)
+                            ? applyOrders(data, player, groups,
+                                    group -> group.order().withFormation(formation))
+                            : FieldCommandResult.PROGRESSION_LOCKED)
+                    .orElse(FieldCommandResult.INVALID_ACTION);
+            case SET_ENGAGEMENT -> applyTacticsOption(data, player, groups, request.optionId(),
+                    ArmyEngagementStance.class, ArmyGroupTactics::withEngagement);
+            case SET_TARGET_PRIORITY -> applyTacticsOption(data, player, groups, request.optionId(),
+                    ArmyTargetPriority.class, ArmyGroupTactics::withTargetPriority);
+            case SET_RANGED_FIRE -> applyTacticsOption(data, player, groups, request.optionId(),
+                    ArmyRangedFirePolicy.class, ArmyGroupTactics::withRangedFirePolicy);
             case PATROL_MARKER -> markedBlockLocation(player)
                     .map(center -> applyPatrols(data, player, groups, center,
                             patrolRouteNameOrDefault(request), request.patrolWaypointWaitTicks()))
@@ -312,8 +327,22 @@ public final class ArmyFieldCommandService {
             List<ArmyGroupRecord> groups,
             UnaryOperator<ArmyGroupTactics> mutation
     ) {
-        return applyUpdates(data, player, groups, group -> group.withOrder(group.order())
-                .withTactics(mutation.apply(group.effectiveTactics())));
+        return applyUpdates(data, player, groups,
+                group -> group.withTactics(mutation.apply(group.effectiveTactics())));
+    }
+
+    private static <T extends Enum<T>> FieldCommandResult applyTacticsOption(
+            KingdomSavedData data,
+            ServerPlayer player,
+            List<ArmyGroupRecord> groups,
+            String optionId,
+            Class<T> enumClass,
+            java.util.function.BiFunction<ArmyGroupTactics, T, ArmyGroupTactics> tacticsMutator
+    ) {
+        return requestedEnum(optionId, enumClass)
+                .map(value -> applyTactics(data, player, groups,
+                        tactics -> tacticsMutator.apply(tactics, value)))
+                .orElse(FieldCommandResult.INVALID_ACTION);
     }
 
     private static FieldCommandResult applyPatrols(
@@ -359,7 +388,7 @@ public final class ArmyFieldCommandService {
             UnaryOperator<ArmyPatrolPlan> mutation
     ) {
         try {
-            return Optional.of(group.withPatrolPlanAndOrder(mutation.apply(plan), group.order()));
+            return Optional.of(group.withPatrolProgressAndOrder(mutation.apply(plan), group.order()));
         } catch (IllegalArgumentException ignored) {
             return Optional.empty();
         }
@@ -454,6 +483,14 @@ public final class ArmyFieldCommandService {
         return values[(Math.max(index, 0) + 1) % values.length];
     }
 
+    private static <T extends Enum<T>> Optional<T> requestedEnum(String optionId, Class<T> type) {
+        try {
+            return Optional.of(Enum.valueOf(type, optionId.toUpperCase(java.util.Locale.ROOT)));
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
     private static FieldCommandStatePayload captureState(
             ServerPlayer player,
             UUID replayId,
@@ -471,7 +508,33 @@ public final class ArmyFieldCommandService {
                 result,
                 squads,
                 markedBlockLocation(player).isPresent(),
-                CommandTargetSelection.entityFromInventory(player).isPresent());
+                CommandTargetSelection.entityFromInventory(player).isPresent(),
+                ProgressionSavedData.get(player.level()).state(player.getUUID()).unlocks().stream()
+                        .sorted().toList());
+    }
+
+    private static boolean formationUnlocked(ServerPlayer player, ArmyFormation formation) {
+        return switch (formation) {
+            case LINE, COLUMN, MOVEMENT -> true;
+            case WEDGE, SQUARE, CIRCLE, HOLLOW_CIRCLE, HOLLOW_SQUARE ->
+                    hasUnlock(player, "formation_advanced");
+        };
+    }
+
+    private static ArmyFormation nextUnlockedFormation(ServerPlayer player, ArmyFormation current) {
+        ArmyFormation[] values = ArmyFormation.values();
+        int start = current.ordinal();
+        for (int offset = 1; offset <= values.length; offset++) {
+            ArmyFormation candidate = values[(start + offset) % values.length];
+            if (formationUnlocked(player, candidate)) {
+                return candidate;
+            }
+        }
+        return current;
+    }
+
+    private static boolean hasUnlock(ServerPlayer player, String unlock) {
+        return ProgressionSavedData.get(player.level()).state(player.getUUID()).unlocks().contains(unlock);
     }
 
 }

@@ -161,13 +161,19 @@ public final class GalacticProgressionCoordinator {
             case BUILDING_COMPLETED -> {
                 String buildingId = subjectPath(event.subjectId());
                 if (buildingId.equals("command_center")) {
-                    unlocks.addAll(Set.of("treasury", "recruitment", "workforce"));
+                    unlocks.addAll(Set.of("treasury", "recruitment"));
+                }
+                if (buildingId.equals("starter_camp")) {
+                    unlocks.addAll(Set.of("workforce", "army_command", "formation_basic"));
+                }
+                if (buildingId.equals("barracks")) {
+                    unlocks.addAll(Set.of("formation_advanced", "larger_squads"));
                 }
                 if (buildingId.equals("forward_base")) {
-                    unlocks.addAll(Set.of("commander", "planet_travel"));
+                    unlocks.addAll(Set.of("commander", "planet_travel", "simultaneous_orders"));
                 }
                 if (buildingId.equals("supply_depot")) {
-                    unlocks.add("vehicle_crafting");
+                    unlocks.addAll(Set.of("vehicle_crafting", "sustained_march", "field_resupply"));
                 }
             }
             case DELIVERY_COMPLETED -> {

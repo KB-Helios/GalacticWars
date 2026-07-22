@@ -87,6 +87,79 @@ public record ArmyFormationSlotAssignment(UUID memberId, int slotIndex) {
         return List.copyOf(reconciled);
     }
 
+    /**
+     * Preserves every surviving binding, then assigns reinforcements to the
+     * nearest vacant tactical depth for their role. Slot indices remain the
+     * durable identity even when the active geometry compresses to a column.
+     */
+    public static List<ArmyFormationSlotAssignment> reconcileRoleAware(
+            Collection<UUID> memberIds,
+            Map<UUID, ArmyFormationRole> roles,
+            Collection<ArmyFormationSlotAssignment> existingAssignments
+    ) {
+        Objects.requireNonNull(memberIds, "memberIds");
+        Objects.requireNonNull(roles, "roles");
+        Objects.requireNonNull(existingAssignments, "existingAssignments");
+        List<UUID> members = sortedDistinct(memberIds);
+        int memberCount = members.size();
+        Map<UUID, ArmyFormationSlotAssignment> existingByMember = new HashMap<>();
+        for (ArmyFormationSlotAssignment assignment : existingAssignments) {
+            if (assignment != null) {
+                existingByMember.putIfAbsent(assignment.memberId(), assignment);
+            }
+        }
+        ArrayList<ArmyFormationSlotAssignment> reconciled = new ArrayList<>(memberCount);
+        Set<Integer> used = new HashSet<>();
+        for (UUID member : members) {
+            ArmyFormationSlotAssignment existing = existingByMember.get(member);
+            if (existing != null && existing.slotIndex() < memberCount && used.add(existing.slotIndex())) {
+                reconciled.add(existing);
+            }
+        }
+        List<UUID> newcomers = members.stream()
+                .filter(member -> reconciled.stream().noneMatch(binding -> binding.memberId().equals(member)))
+                .sorted(Comparator.comparing((UUID member) -> roles.getOrDefault(
+                                member, ArmyFormationRole.FRONTLINE).preferredDepth())
+                        .thenComparing(UUID::compareTo))
+                .toList();
+        for (UUID newcomer : newcomers) {
+            ArmyFormationRole role = roles.getOrDefault(newcomer, ArmyFormationRole.FRONTLINE);
+            int slot = bestVacantSlot(memberCount, used, role.preferredDepth());
+            used.add(slot);
+            reconciled.add(new ArmyFormationSlotAssignment(newcomer, slot));
+        }
+        reconciled.sort(Comparator.comparingInt(ArmyFormationSlotAssignment::slotIndex)
+                .thenComparing(ArmyFormationSlotAssignment::memberId));
+        return List.copyOf(reconciled);
+    }
+
+    public static List<ArmyFormationSlotAssignment> assignRoleAware(
+            Collection<UUID> memberIds,
+            Map<UUID, ArmyFormationRole> roles
+    ) {
+        return reconcileRoleAware(memberIds, roles, List.of());
+    }
+
+    private static int bestVacantSlot(int memberCount, Set<Integer> used, double preferredDepth) {
+        int best = -1;
+        double bestDistance = Double.POSITIVE_INFINITY;
+        for (int slot = 0; slot < memberCount; slot++) {
+            if (used.contains(slot)) {
+                continue;
+            }
+            double depth = memberCount <= 1 ? 0.0D : slot / (double) (memberCount - 1);
+            double distance = Math.abs(depth - preferredDepth);
+            if (distance < bestDistance) {
+                best = slot;
+                bestDistance = distance;
+            }
+        }
+        if (best < 0) {
+            throw new IllegalStateException("no vacant formation slot");
+        }
+        return best;
+    }
+
     private static List<UUID> sortedDistinct(Collection<UUID> memberIds) {
         LinkedHashSet<UUID> uniqueMembers = new LinkedHashSet<>(memberIds);
         if (uniqueMembers.contains(null)) {

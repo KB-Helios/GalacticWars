@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
@@ -36,6 +37,20 @@ public final class ArmyFieldCommandKeyMappings {
         return MAPPINGS;
     }
 
+    public static boolean matchesCommandScreen(KeyEvent event) {
+        return COMMAND_SCREEN.matches(event);
+    }
+
+    /** Shared entry point for the key mapping and the Tactical Command Marker. */
+    public static void openCommandScreen() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null
+                && minecraft.gui.screen() == null
+                && minecraft.gui.overlay() == null) {
+            minecraft.setScreenAndShow(new ArmyFieldCommandScreen());
+        }
+    }
+
     public static void registerTickHandler() {
         if (TICK_HANDLER_REGISTERED.compareAndSet(false, true)) {
             ClientTickEvent.CLIENT_POST.register(ArmyFieldCommandKeyMappings::tick);
@@ -44,11 +59,7 @@ public final class ArmyFieldCommandKeyMappings {
 
     private static void tick(Minecraft minecraft) {
         while (COMMAND_SCREEN.consumeClick()) {
-            if (minecraft.player != null
-                    && minecraft.gui.screen() == null
-                    && minecraft.gui.overlay() == null) {
-                minecraft.setScreenAndShow(new ArmyFieldCommandScreen());
-            }
+            openCommandScreen();
         }
     }
 }

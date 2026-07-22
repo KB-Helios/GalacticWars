@@ -44,6 +44,7 @@ import galacticwars.clonewars.data.LaunchContentDefinitions;
 import galacticwars.clonewars.data.LaunchContentRuntime;
 import galacticwars.clonewars.entity.GalacticRecruitEntity;
 import galacticwars.clonewars.entity.ai.ArmyBrainMemoryTypes;
+import galacticwars.clonewars.entity.ai.ArmyMarchMemory;
 import galacticwars.clonewars.entity.ai.ArmyBrainState;
 import galacticwars.clonewars.vehicle.GalacticVehicleEntity;
 import galacticwars.clonewars.conquest.ConquestCaptureService;
@@ -90,6 +91,7 @@ import galacticwars.clonewars.menu.CommandCenterNavigationMenu;
 import galacticwars.clonewars.menu.FactionSelectionMenu;
 import galacticwars.clonewars.menu.MerchantTradeMenu;
 import galacticwars.clonewars.menu.MerchantTradeMenuProvider;
+import galacticwars.clonewars.menu.StarterCampSetupMenu;
 import galacticwars.clonewars.network.ClassActivatePayload;
 import galacticwars.clonewars.network.ClassHudPayload;
 import galacticwars.clonewars.network.ClassSelectPayload;
@@ -117,6 +119,9 @@ import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
 import galacticwars.clonewars.settlement.ConstructionPlan;
 import galacticwars.clonewars.settlement.ConstructionProjectService;
 import galacticwars.clonewars.settlement.KingdomBaseBlueprint;
+import galacticwars.clonewars.settlement.StarterCampDeployment;
+import galacticwars.clonewars.settlement.StarterCampDeploymentPhase;
+import galacticwars.clonewars.settlement.StarterCampDeploymentService;
 import galacticwars.clonewars.workforce.WorkerPhase;
 import galacticwars.clonewars.workforce.WorkerProfession;
 import galacticwars.clonewars.world.PlanetTravelService;
@@ -293,7 +298,7 @@ public final class ModGameTests {
                                     : testId.equals(id("chapter_three_campaign_runtime"))
                                             ? 260
                                     : testId.equals(id("planet_faction_outpost_runtime"))
-                                            ? 220
+                                            ? 420
                                     : testId.equals(id("planet_round_trip_home"))
                                             ? 360
                                     : testId.equals(id("natural_civilian_brain_runtime"))
@@ -305,6 +310,9 @@ public final class ModGameTests {
                                             id("faction_selection_transaction")).contains(testId)
                                             ? 360
                                             : 100;
+            if (testId.equals(id("faction_selection_transaction"))) {
+                timeoutTicks = 2_000;
+            }
             int runtimeTestIndex = smartBrainRuntimeTests.indexOf(testId);
             TestData<Holder<TestEnvironmentDefinition<?>>> data = new TestData<>(
                     isolatedEnvironments.getOrDefault(testId, environment),
@@ -714,6 +722,28 @@ public final class ModGameTests {
 
     private static void factionSelectionTransaction(GameTestHelper helper) {
         BlockPos hallPos = isolatedCapital(helper, 6);
+        List<ChunkPos> forcedCampChunks = new java.util.ArrayList<>();
+        int minCampChunkX = hallPos.getX() - 8 >> 4;
+        int maxCampChunkX = hallPos.getX() + 8 >> 4;
+        int minCampChunkZ = hallPos.getZ() - 8 >> 4;
+        int maxCampChunkZ = hallPos.getZ() + 8 >> 4;
+        for (int chunkX = minCampChunkX; chunkX <= maxCampChunkX; chunkX++) {
+            for (int chunkZ = minCampChunkZ; chunkZ <= maxCampChunkZ; chunkZ++) {
+                ChunkPos chunk = new ChunkPos(chunkX, chunkZ);
+                helper.getLevel().getChunkSource().updateChunkForced(chunk, true);
+                helper.getLevel().getChunk(chunkX, chunkZ);
+                forcedCampChunks.add(chunk);
+            }
+        }
+        for (int x = -4; x <= 4; x++) {
+            for (int z = -4; z <= 4; z++) {
+                BlockPos floor = hallPos.offset(x, -1, z);
+                helper.getLevel().setBlockAndUpdate(floor, Blocks.STONE.defaultBlockState());
+                helper.getLevel().setBlockAndUpdate(floor.above(), Blocks.AIR.defaultBlockState());
+                helper.getLevel().setBlockAndUpdate(floor.above(2), Blocks.AIR.defaultBlockState());
+                helper.getLevel().setBlockAndUpdate(floor.above(3), Blocks.AIR.defaultBlockState());
+            }
+        }
         CommandCenterBlockEntity hall = placeCommandCenter(helper, hallPos);
         ServerPlayer owner = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
         if (!owner.teleportTo(
@@ -780,25 +810,168 @@ public final class ModGameTests {
             helper.fail("Faction pledge did not preserve the Command Center objective or advanced too early");
             return;
         }
-        owner.getInventory().add(new ItemStack(ModItems.CREDIT_CHIP.get(), 64));
-        GalacticRecruitEntity firstRecruit = spawnRecruitAt(
-                helper, ModEntityTypes.B1_BATTLE_DROID.get(), hallPos.offset(2, 0, 0));
-        firstRecruit.setNoAi(true);
+        GalacticRecruitEntity reserveBuilder = ModEntityTypes.B1_BATTLE_DROID.get().create(
+                helper.getLevel(), EntitySpawnReason.EVENT);
+        if (reserveBuilder == null) {
+            helper.fail("Starter camp reassignment fixture could not create its reserve soldier");
+            return;
+        }
+        reserveBuilder.setPos(hallPos.getX() + 3.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        KingdomSavedData kingdomData = KingdomSavedData.get(helper.getLevel());
+        if (!reserveBuilder.initializeStarterContract(owner, kingdom)
+                || !helper.getLevel().addFreshEntity(reserveBuilder)
+                || !kingdomData.registerRecruit(owner.getUUID(), reserveBuilder.getUUID())) {
+            helper.fail("Starter camp reassignment fixture could not register its reserve soldier");
+            return;
+        }
+        GalacticRecruitEntity secondReserve = ModEntityTypes.B1_BATTLE_DROID.get().create(
+                helper.getLevel(), EntitySpawnReason.EVENT);
+        if (secondReserve == null) {
+            helper.fail("Starter camp reassignment fixture could not create its second reserve soldier");
+            return;
+        }
+        secondReserve.setPos(hallPos.getX() + 4.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        if (!secondReserve.initializeStarterContract(owner, kingdom)
+                || !helper.getLevel().addFreshEntity(secondReserve)
+                || !kingdomData.registerRecruit(owner.getUUID(), secondReserve.getUUID())) {
+            helper.fail("Starter camp reassignment fixture could not register its second reserve soldier");
+            return;
+        }
+        int recruitsBeforeStarterContract = kingdomData.kingdomForOwner(owner.getUUID()).orElseThrow()
+                .settlement().recruitIds().size();
+        StarterCampSetupMenu campSetup = new StarterCampSetupMenu(
+                2, owner.getInventory(), hall.getBlockPos());
+        if (!campSetup.clickMenuButton(owner, StarterCampSetupMenu.SET_ROTATION_FIRST + 1)
+                || !campSetup.clickMenuButton(owner, StarterCampSetupMenu.CONFIRM_DEPLOYMENT)) {
+            helper.fail("Guided camp setup could not preview and confirm the east-facing footprint");
+            return;
+        }
+        StarterCampDeployment deployment = kingdomData.starterCampDeployment(kingdom.id()).orElse(null);
+        if (deployment == null
+                || deployment.phase() != StarterCampDeploymentPhase.BUILDING
+                || !deployment.contractGranted()
+                || !deployment.suppliesGranted()
+                || deployment.builderId().isEmpty()
+                || deployment.projectId().isEmpty()
+                || kingdomData.kingdomForOwner(owner.getUUID()).orElseThrow()
+                        .settlement().recruitIds().size() != recruitsBeforeStarterContract + 1) {
+            helper.fail("Faction pledge did not start one sealed starter-camp deployment: " + deployment);
+            return;
+        }
+        int storedSupplies = countContainerItems(hall);
+        UUID initialBuilderId = deployment.builderId().orElseThrow();
+        UUID projectId = deployment.projectId().orElseThrow();
+        GalacticRecruitEntity[] firstRecruit = {null};
+        boolean[] replayChecked = {false};
         boolean[] scenarioRun = {false};
+        boolean[] chunksReleased = {false};
+        long startedAt = helper.getTick();
         helper.onEachTick(() -> {
             if (scenarioRun[0]) {
                 return;
             }
-            if (helper.getLevel().getEntity(firstRecruit.getUUID()) != firstRecruit) {
-                if (helper.getTick() >= 120L) {
+            if (!replayChecked[0]) {
+                if (!(helper.getLevel().getEntity(initialBuilderId) instanceof GalacticRecruitEntity indexedRecruit)) {
+                    if (helper.getTick() - startedAt >= 120L) {
+                        scenarioRun[0] = true;
+                        if (!chunksReleased[0]) {
+                            forcedCampChunks.forEach(chunk ->
+                                    helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                            chunksReleased[0] = true;
+                        }
+                        helper.fail("Starter builder was persisted but never indexed in the server level");
+                    }
+                    return;
+                }
+                if (indexedRecruit.getWorkerCarriedItemCount() == 0
+                        && !moveOneContainerItemToWorker(hall, indexedRecruit, Items.OAK_LOG)) {
                     scenarioRun[0] = true;
-                    helper.fail("Chapter-one recruit never entered the server index within 120 ticks");
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
+                    helper.fail("Starter builder could not stage a carried material for reassignment conservation");
+                    return;
+                }
+                int suppliesAcrossStorageAndBuilder = countContainerItems(hall)
+                        + indexedRecruit.getWorkerCarriedItemCount();
+                if (!campSetup.clickMenuButton(owner, StarterCampSetupMenu.REASSIGN_BUILDER)) {
+                    scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
+                    helper.fail("Starter camp did not permit an explicit loaded reserve-builder reassignment");
+                    return;
+                }
+                StarterCampDeployment reassigned = kingdomData.starterCampDeployment(kingdom.id()).orElse(null);
+                if (reassigned == null
+                        || reassigned.builderId().filter(id -> !id.equals(initialBuilderId)).isEmpty()
+                        || indexedRecruit.getWorkerProfession().isPresent()
+                        || indexedRecruit.getWorkerCarriedItemCount() != 0
+                        || countContainerItems(hall) != suppliesAcrossStorageAndBuilder) {
+                    scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
+                    helper.fail("Starter camp reassignment changed the contract, stranded materials, failed to release the prior builder, or did not select a different candidate, reassigned=" + reassigned);
+                    return;
+                }
+                firstRecruit[0] = reserveBuilder;
+                StarterCampDeploymentService.Result deploymentReplay = StarterCampDeploymentService.deploy(
+                        helper.getLevel(), owner, hall);
+                StarterCampDeployment replayed = deploymentReplay.deployment().orElse(null);
+                if (reserveBuilder.getType() != ModEntityTypes.B1_BATTLE_DROID.get()
+                        || !deploymentReplay.accepted()
+                        || replayed == null
+                        || replayed.builderId().filter(reserveBuilder.getUUID()::equals).isEmpty()
+                        || replayed.projectId().filter(projectId::equals).isEmpty()
+                        || kingdomData.kingdomForOwner(owner.getUUID()).orElseThrow()
+                                .settlement().recruitIds().size() != recruitsBeforeStarterContract + 1
+                        || countContainerItems(hall) != storedSupplies) {
+                    scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
+                    helper.fail("Starter contract or sealed supplies duplicated on deployment replay");
+                    return;
+                }
+                replayChecked[0] = true;
+            }
+            StarterCampDeployment current = kingdomData.starterCampDeployment(kingdom.id()).orElse(null);
+            if (current == null || current.phase() != StarterCampDeploymentPhase.COMPLETE) {
+                if (helper.getTick() - startedAt >= 1_800L) {
+                    scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
+                    BuildProject project = current == null || current.projectId().isEmpty()
+                            ? null
+                            : kingdomData.kingdomForOwner(owner.getUUID()).orElseThrow()
+                                    .settlement().buildProjects().stream()
+                                    .filter(candidate -> current.projectId().orElseThrow().equals(candidate.id()))
+                                    .findFirst().orElse(null);
+                    helper.fail("Starter builder did not physically finish camp: deployment=" + current
+                            + ", project=" + project
+                            + ", worker=" + firstRecruit[0].getWorkerStatus()
+                            + ", ticks=" + firstRecruit[0].tickCount);
                 }
                 return;
             }
             scenarioRun[0] = true;
-            owner.setPos(firstRecruit.getX(), firstRecruit.getY(), firstRecruit.getZ());
-            boolean hired = firstRecruit.handleMenuButton(owner, RecruitCommandMenu.BUTTON_HIRE);
+            if (!chunksReleased[0]) {
+                forcedCampChunks.forEach(chunk ->
+                        helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                chunksReleased[0] = true;
+            }
             ProgressionState completed = progression.state(owner.getUUID());
             owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
             CommandCenterOperationsMenu operations = (CommandCenterOperationsMenu)
@@ -813,24 +986,42 @@ public final class ModGameTests {
             int creditsAfterClaim = RecruitmentPaymentService.creditCount(owner);
             boolean duplicateRejected = !operations.handleReplayAction(
                     owner, UUID.randomUUID(), CommandCenterOperationsMenu.CLAIM_REWARDS);
-            if (!hired
-                    || !completed.hasSubject(
+            KingdomBaseBlueprint starterBlueprint = GameplayDataManager.snapshot()
+                    .blueprint(KingdomBaseBlueprint.STARTER_CAMP_ID).orElseThrow();
+            boolean worldComplete = java.util.stream.IntStream.range(
+                    0, starterBlueprint.placements().size()).allMatch(index -> {
+                        var placement = starterBlueprint.rotatedPlacement(index, current.rotationSteps());
+                        BlockPos target = hallPos.offset(placement.x(), placement.y(), placement.z());
+                        return BuiltInRegistries.BLOCK.getKey(helper.getLevel().getBlockState(target).getBlock())
+                                .toString().equals(placement.blockId());
+                    });
+            StarterCampDeploymentService.Result completedReplay = StarterCampDeploymentService.deploy(
+                    helper.getLevel(), owner, hall);
+            if (!completed.hasSubject(
                     ProgressionEventType.QUEST_ADVANCED, "separatist_chapter_1")
                     || completed.pendingCreditRewards() != 40
                     || !chapterVisible
                     || !rewardClaimed
                     || creditsAfterClaim != creditsBeforeClaim + 40
                     || progression.pendingCreditRewards(owner.getUUID()) != 0
-                    || !duplicateRejected) {
-                helper.fail("Fresh survival chapter one did not complete and pay exactly once: hired="
-                        + hired + ", completed=" + completed.hasSubject(
+                    || !duplicateRejected
+                    || !worldComplete
+                    || firstRecruit[0].getWorkerProfession().isPresent()
+                    || !completedReplay.accepted()
+                    || !completedReplay.reason().equals("already_complete")
+                    || kingdomData.kingdomForOwner(owner.getUUID()).orElseThrow()
+                            .settlement().recruitIds().size() != recruitsBeforeStarterContract + 1) {
+                helper.fail("Fresh survival chapter one did not build and pay exactly once: completed="
+                        + completed.hasSubject(
                         ProgressionEventType.QUEST_ADVANCED, "separatist_chapter_1")
                         + ", pending=" + completed.pendingCreditRewards()
                         + ", chapterVisible=" + chapterVisible
                         + ", rewardClaimed=" + rewardClaimed
                         + ", credits=" + creditsBeforeClaim + "->" + creditsAfterClaim
                         + ", remaining=" + progression.pendingCreditRewards(owner.getUUID())
-                        + ", duplicateRejected=" + duplicateRejected);
+                        + ", duplicateRejected=" + duplicateRejected
+                        + ", worldComplete=" + worldComplete
+                        + ", worker=" + firstRecruit[0].getWorkerStatus());
                 return;
             }
             helper.succeed();
@@ -1235,7 +1426,7 @@ public final class ModGameTests {
                 phase[0] = 1;
                 return;
             }
-            if (phase[0] == 1 && recruit.tickCount - phaseStartedRecruitTick[0] >= 140) {
+            if (phase[0] == 1 && recruit.tickCount - phaseStartedRecruitTick[0] >= 320) {
                 boolean approachedOwner = recruit.distanceToSqr(owner) < startingDistance[0] - 4.0D;
                 boolean followedAnchor = recruit.position().distanceToSqr(startingPosition[0]) > 4.0D
                         && BrainUtil.hasMemory(recruit,
@@ -1635,11 +1826,14 @@ public final class ModGameTests {
             boolean soldierIndexed = helper.getLevel().getEntity(soldier.getUUID()) == soldier;
             ArmyBrainState commanderState = BrainUtil.getMemory(commander, ArmyBrainMemoryTypes.ARMY_STATE);
             ArmyBrainState soldierState = BrainUtil.getMemory(soldier, ArmyBrainMemoryTypes.ARMY_STATE);
+            ArmyMarchMemory commanderMarch = BrainUtil.getMemory(commander, ArmyBrainMemoryTypes.MARCH_STATE);
+            ArmyMarchMemory soldierMarch = BrainUtil.getMemory(soldier, ArmyBrainMemoryTypes.MARCH_STATE);
             net.minecraft.world.entity.ai.memory.WalkTarget commanderWalkTarget = BrainUtil.getMemory(
                     commander, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
             net.minecraft.world.entity.ai.memory.WalkTarget soldierWalkTarget = BrainUtil.getMemory(
                     soldier, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
             if (!commanderIndexed || !soldierIndexed || commanderState == null || soldierState == null
+                    || commanderMarch == null || soldierMarch == null
                     || commanderWalkTarget == null || soldierWalkTarget == null) {
                 if (helper.getTick() - startedAt >= 180L) {
                     complete[0] = true;
@@ -1647,6 +1841,7 @@ public final class ModGameTests {
                             + commanderIndexed + "/" + soldierIndexed
                             + ", groupIds=" + commander.getArmyGroupId() + "/" + soldier.getArmyGroupId()
                             + ", states=" + (commanderState != null) + "/" + (soldierState != null)
+                            + ", marches=" + (commanderMarch != null) + "/" + (soldierMarch != null)
                             + ", walkTargets=" + (commanderWalkTarget != null) + "/"
                             + (soldierWalkTarget != null)
                             + ", commanderRunning=" + commander.getBrain().getRunningBehaviors());
@@ -1658,14 +1853,27 @@ public final class ModGameTests {
                     GalacticRecruitEntity.class.getDeclaredFields())
                     .anyMatch(field -> field.getType().getName().endsWith("ArmyRecruitRuntimeController"));
             BlockPos publishedCommanderTarget = commanderWalkTarget.getTarget().currentBlockPosition();
+            var persistedMarch = data.armyGroup(squad.id()).orElseThrow();
+            var persistedAnchor = persistedMarch.simulation().anchor().blockPosition();
             if (!squad.id().equals(commander.getArmyGroupId())
                     || !squad.id().equals(soldier.getArmyGroupId())
                     || !squad.id().equals(commanderState.group().id())
                     || !squad.id().equals(soldierState.group().id())
+                    || !squad.id().equals(commanderMarch.groupId())
+                    || !squad.id().equals(soldierMarch.groupId())
                     || commanderState.memberCommand().type() != ArmyCommandType.MOVE_TO_POSITION
                     || soldierState.memberCommand().type() != ArmyCommandType.MOVE_TO_POSITION
-                    || publishedCommanderTarget.getX() != moveTarget.getX()
-                    || publishedCommanderTarget.getZ() != moveTarget.getZ()
+                    || commanderMarch.orderType() != ArmyCommandType.MOVE_TO_POSITION
+                    || soldierMarch.orderType() != ArmyCommandType.MOVE_TO_POSITION
+                    || commanderMarch.memberSlot() != -1
+                    || soldierMarch.memberSlot() < 0
+                    || commanderMarch.targetPosition() == null
+                    || !commanderMarch.targetPosition().equals(moveLocation.blockPosition())
+                    || publishedCommanderTarget.getX() != persistedAnchor.x()
+                    || publishedCommanderTarget.getZ() != persistedAnchor.z()
+                    || !commanderMarch.movingAnchor().equals(persistedAnchor)
+                    || persistedMarch.simulation().marchState().phase()
+                            == galacticwars.clonewars.army.ArmyMarchPhase.HALTED
                     || commander.shouldMoveToCommandTarget()
                     || soldier.shouldMoveToCommandTarget()
                     || legacyRuntimeAttached) {
@@ -1675,6 +1883,8 @@ public final class ModGameTests {
                         + ", commands=" + commanderState.memberCommand().type() + "/"
                         + soldierState.memberCommand().type()
                         + ", commanderTarget=" + publishedCommanderTarget
+                        + ", movingAnchor=" + persistedAnchor
+                        + ", march=" + persistedMarch.simulation().marchState()
                         + ", localMove=" + commander.shouldMoveToCommandTarget() + "/"
                         + soldier.shouldMoveToCommandTarget()
                         + ", legacyRuntimeAttached=" + legacyRuntimeAttached);
@@ -1763,6 +1973,7 @@ public final class ModGameTests {
         long[] pausedAtTick = {-1L};
         long[] resumedAtTick = {-1L};
         ArmyPatrolState[] pausedState = {null};
+        Vec3[] pausedPosition = {null};
         boolean[] complete = {false};
         helper.onEachTick(() -> {
             if (complete[0]) {
@@ -1820,6 +2031,7 @@ public final class ModGameTests {
                     return;
                 }
                 pausedState[0] = currentPlan.state();
+                pausedPosition[0] = commander.position();
                 pausedAtTick[0] = helper.getTick();
                 return;
             }
@@ -1830,8 +2042,7 @@ public final class ModGameTests {
                 }
                 net.minecraft.world.entity.ai.memory.WalkTarget walkTarget = BrainUtil.getMemory(
                         commander, net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
-                boolean remainedStill = commander.distanceToSqr(
-                        firstWaypoint.x(), firstWaypoint.y(), firstWaypoint.z()) <= 1.0D;
+                boolean remainedStill = commander.position().distanceToSqr(pausedPosition[0]) <= 0.25D;
                 if (!pausedState[0].equals(currentPlan.state()) || walkTarget != null || !remainedStill) {
                     complete[0] = true;
                     helper.fail("Paused patrol leaked movement or consumed its dwell: expected=" + pausedState[0]
@@ -2971,6 +3182,8 @@ public final class ModGameTests {
             applyCampaignSetupEvent(
                     progression, player, ProgressionEventType.BUILDING_COMPLETED, "command_center");
             applyCampaignSetupEvent(
+                    progression, player, ProgressionEventType.BUILDING_COMPLETED, "starter_camp");
+            applyCampaignSetupEvent(
                     progression, player, ProgressionEventType.RECRUIT_HIRED, path.firstRecruit());
             for (int delivery = 1; delivery <= 3; delivery++) {
                 applyCampaignSetupEvent(progression, player, ProgressionEventType.DELIVERY_COMPLETED,
@@ -3035,6 +3248,8 @@ public final class ModGameTests {
         applyCampaignSetupEvent(progression, player, ProgressionEventType.FACTION_PLEDGED, faction);
         applyCampaignSetupEvent(
                 progression, player, ProgressionEventType.BUILDING_COMPLETED, "command_center");
+        applyCampaignSetupEvent(
+                progression, player, ProgressionEventType.BUILDING_COMPLETED, "starter_camp");
         applyCampaignSetupEvent(
                 progression, player, ProgressionEventType.RECRUIT_HIRED, firstRecruit);
         ProgressionState state = progression.state(player.getUUID());
@@ -3451,6 +3666,9 @@ public final class ModGameTests {
             helper.fail("Command marker recruit could not be hired");
             return;
         }
+        progression.apply(new ProgressionEvent(
+                UUID.randomUUID(), owner.getUUID(), ProgressionEventType.BUILDING_COMPLETED,
+                "starter_camp", 1));
 
         boolean[] scenarioRun = {false};
         long indexWaitStartedTick = helper.getTick();
@@ -3661,9 +3879,11 @@ public final class ModGameTests {
                 helper.getLevel().dimension().identifier().toString(), hallPos);
         ProgressionSavedData progression = ProgressionSavedData.get(helper.getLevel());
         applyCampaignSetupEvent(
+                progression, owner, ProgressionEventType.FACTION_PLEDGED, "galacticwars:republic");
+        applyCampaignSetupEvent(
                 progression, owner, ProgressionEventType.BUILDING_COMPLETED, "command_center");
         applyCampaignSetupEvent(
-                progression, owner, ProgressionEventType.FACTION_PLEDGED, "galacticwars:republic");
+                progression, owner, ProgressionEventType.BUILDING_COMPLETED, "starter_camp");
         FactionAlignmentSavedData.get(helper.getLevel()).setScore(
                 owner.getUUID(), FactionId.of("republic"), 100);
         applyCampaignSetupEvent(
@@ -4531,6 +4751,12 @@ public final class ModGameTests {
                 civilian.setPos(center.getX() + 0.5D, center.getY(), center.getZ() + 0.5D);
                 civilian.getNavigation().stop();
             }
+            // The dedicated natural_civilian_brain_runtime scenario proves daylight scheduling.
+            // This combined lifecycle scenario can run beside tests that change the shared world
+            // time, so drive the already-authorized physical production transaction directly.
+            if (workerPrepared[0]) {
+                civilian.tryProduceNaturalSettlementSupplies();
+            }
             int storedDuracrete = planet.getBlockEntity(center.offset(1, 0, 0))
                     instanceof Container container
                     ? container.countItem(ModItems.DURACRETE.get()) : 0;
@@ -4549,7 +4775,7 @@ public final class ModGameTests {
                 helper.succeed();
                 return;
             }
-            if (helper.getTick() - startedAt >= 180L) {
+            if (helper.getTick() - startedAt >= 360L) {
                 complete[0] = true;
                 String diagnostics = "site=" + outposts.siteGenerated(outpostId)
                         + ", engaged=" + engaged[0]
@@ -4739,6 +4965,12 @@ public final class ModGameTests {
         ProgressionDecision captured = progression.apply(new ProgressionEvent(
                 UUID.randomUUID(), huttPlayer.getUUID(), ProgressionEventType.REGION_CAPTURED,
                 "tatooine_spaceport", 1));
+        // Fund the quote before checking its regional gate so insufficient funds cannot
+        // mask the conquest-control reason this assertion is intended to validate.
+        huttPlayer.getInventory().add(new ItemStack(ModItems.CREDIT_CHIP.get(), 68));
+        ConquestSavedData.get(helper.getLevel()).put(new ConquestControlState(
+                "tatooine_spaceport", helper.getLevel().dimension().identifier().toString(),
+                0, 1, 0, "galacticwars:republic", "", "", 0, 2L));
         PhysicalTradeService.TradePreview controlRequired = PhysicalTradeService.preview(
                 huttPlayer, "tatooine_hutt_salvage");
         if (!captured.accepted() || !captured.state().unlocks().contains("veteran_trades")
@@ -5893,6 +6125,28 @@ public final class ModGameTests {
         throw new IllegalStateException("Test container has no empty slot");
     }
 
+    private static boolean moveOneContainerItemToWorker(
+            Container container,
+            GalacticRecruitEntity recruit,
+            net.minecraft.world.item.Item item
+    ) {
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack stored = container.getItem(slot);
+            if (!stored.is(item) || stored.isEmpty()) {
+                continue;
+            }
+            stored.shrink(1);
+            if (stored.isEmpty()) {
+                container.setItem(slot, ItemStack.EMPTY);
+            } else {
+                container.setChanged();
+            }
+            setWorkerInventory(recruit, new ItemStack(item));
+            return true;
+        }
+        return false;
+    }
+
     private static int countContainerItem(Container container, net.minecraft.world.item.Item item) {
         int count = 0;
         for (int slot = 0; slot < container.getContainerSize(); slot++) {
@@ -6526,8 +6780,12 @@ public final class ModGameTests {
                     && victory.unlocks().contains("veteran_operations");
             ConquestCaptureService.CaptureResult replay = ConquestCaptureService.tick(
                     this.helper.getLevel(), this.region, this.beacon);
+            ConquestControlState replayedControl = ConquestSavedData.get(this.helper.getLevel())
+                    .state(this.region.id()).orElseThrow();
             if (!chapterComplete || !campaignComplete || !victoryUnlocks
-                    || control.revision() != 1L
+                    || replayedControl.revision() != control.revision()
+                    || !replayedControl.controllingFaction().equals(control.controllingFaction())
+                    || !replayedControl.controllingKingdom().equals(control.controllingKingdom())
                     || !control.controllingKingdom().equals(this.kingdom.id().toString())
                     || victory.total(ProgressionEventType.VEHICLE_ACQUIRED) != 1
                     || victory.total(ProgressionEventType.TRADE_COMPLETED) != 1

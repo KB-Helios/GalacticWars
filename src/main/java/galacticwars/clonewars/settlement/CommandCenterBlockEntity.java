@@ -18,15 +18,18 @@ import galacticwars.clonewars.kingdom.KingdomSavedData;
 import galacticwars.clonewars.registry.ModBlockEntityTypes;
 import galacticwars.clonewars.progression.ProgressionEventType;
 import galacticwars.clonewars.progression.ProgressionSavedData;
+import galacticwars.clonewars.workforce.ResourceInventory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.player.Inventory;
@@ -142,6 +145,45 @@ public final class CommandCenterBlockEntity extends BaseContainerBlockEntity {
 
     public int treasuryCredits() {
         return CreditTransactionService.containerBalance(this);
+    }
+
+    /** Atomically seals the exact starter-camp reservation into physical Hall storage. */
+    public boolean depositStarterSupplies(ResourceInventory reservation) {
+        Objects.requireNonNull(reservation, "reservation");
+        NonNullList<ItemStack> simulated = NonNullList.withSize(this.items.size(), ItemStack.EMPTY);
+        for (int slot = 0; slot < this.items.size(); slot++) {
+            simulated.set(slot, this.items.get(slot).copy());
+        }
+        for (var entry : reservation.resources().entrySet()) {
+            var item = BuiltInRegistries.ITEM.getValue(Identifier.parse(entry.getKey()));
+            if (item == null || item == Items.AIR
+                    || !insertAll(simulated, new ItemStack(item, entry.getValue()))) {
+                return false;
+            }
+        }
+        this.items = simulated;
+        this.setChangedAndSync();
+        return true;
+    }
+
+    private static boolean insertAll(NonNullList<ItemStack> inventory, ItemStack incoming) {
+        ItemStack remaining = incoming.copy();
+        for (ItemStack existing : inventory) {
+            if (!remaining.isEmpty() && ItemStack.isSameItemSameComponents(existing, remaining)
+                    && existing.getCount() < existing.getMaxStackSize()) {
+                int moved = Math.min(remaining.getCount(), existing.getMaxStackSize() - existing.getCount());
+                existing.grow(moved);
+                remaining.shrink(moved);
+            }
+        }
+        for (int slot = 0; slot < inventory.size() && !remaining.isEmpty(); slot++) {
+            if (inventory.get(slot).isEmpty()) {
+                int moved = Math.min(remaining.getCount(), remaining.getMaxStackSize());
+                inventory.set(slot, remaining.copyWithCount(moved));
+                remaining.shrink(moved);
+            }
+        }
+        return remaining.isEmpty();
     }
 
     public boolean upkeepPaid() {

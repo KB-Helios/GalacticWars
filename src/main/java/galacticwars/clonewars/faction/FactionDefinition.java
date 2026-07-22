@@ -2,6 +2,7 @@ package galacticwars.clonewars.faction;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -18,7 +19,8 @@ public record FactionDefinition(
         int pledgeDirectDelta,
         int pledgeAllyDelta,
         int pledgeEnemyDelta,
-        FactionStrategyDefinition strategy
+        FactionStrategyDefinition strategy,
+        String starterUnitId
 ) {
     public FactionDefinition(
             FactionId id,
@@ -30,7 +32,7 @@ public record FactionDefinition(
             Set<FactionId> enemies
     ) {
         this(id, displayName, hireCost, minimumHiringAlignment, maxOwnedRecruits, allies, enemies,
-                0, "", 10, 2, -5, FactionStrategyDefinition.shared());
+                0, "", 10, 2, -5, FactionStrategyDefinition.shared(), "");
     }
 
     public FactionDefinition(
@@ -49,7 +51,27 @@ public record FactionDefinition(
     ) {
         this(id, displayName, hireCost, minimumHiringAlignment, maxOwnedRecruits, allies, enemies,
                 selectionOrder, pledgeTokenItemId, pledgeDirectDelta, pledgeAllyDelta, pledgeEnemyDelta,
-                FactionStrategyDefinition.shared());
+                FactionStrategyDefinition.shared(), "");
+    }
+
+    public FactionDefinition(
+            FactionId id,
+            String displayName,
+            int hireCost,
+            int minimumHiringAlignment,
+            int maxOwnedRecruits,
+            Set<FactionId> allies,
+            Set<FactionId> enemies,
+            int selectionOrder,
+            String pledgeTokenItemId,
+            int pledgeDirectDelta,
+            int pledgeAllyDelta,
+            int pledgeEnemyDelta,
+            FactionStrategyDefinition strategy
+    ) {
+        this(id, displayName, hireCost, minimumHiringAlignment, maxOwnedRecruits, allies, enemies,
+                selectionOrder, pledgeTokenItemId, pledgeDirectDelta, pledgeAllyDelta, pledgeEnemyDelta,
+                strategy, "");
     }
 
     public FactionDefinition {
@@ -64,8 +86,9 @@ public record FactionDefinition(
         allies = immutableCopy(allies, "allies");
         enemies = immutableCopy(enemies, "enemies");
         validateRelationSets(id.toString(), id, allies, enemies);
-        pledgeTokenItemId = pledgeTokenItemId == null ? "" : pledgeTokenItemId.trim().toLowerCase();
+        pledgeTokenItemId = pledgeTokenItemId == null ? "" : pledgeTokenItemId.trim().toLowerCase(Locale.ROOT);
         Objects.requireNonNull(strategy, "strategy");
+        starterUnitId = starterUnitId == null ? "" : starterUnitId.trim().toLowerCase(Locale.ROOT);
     }
 
     public static void validateRelationSets(

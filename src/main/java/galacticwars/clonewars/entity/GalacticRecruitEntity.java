@@ -4,6 +4,8 @@ import dev.architectury.registry.menu.MenuRegistry;
 import com.geckolib.animatable.GeoEntity;
 import com.geckolib.animatable.instance.AnimatableInstanceCache;
 import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.animation.AnimationController;
+import com.geckolib.animation.RawAnimation;
 import com.geckolib.constant.DefaultAnimations;
 import com.geckolib.util.GeckoLibUtil;
 import galacticwars.clonewars.Config;
@@ -17,9 +19,11 @@ import galacticwars.clonewars.army.ArmyGroupOrderAssignment;
 import galacticwars.clonewars.army.ArmyGroupOrderPlanner;
 import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyLocation;
+import galacticwars.clonewars.army.ArmyPosition;
 import galacticwars.clonewars.army.ArmyMemberSnapshot;
 import galacticwars.clonewars.army.ArmySnapshotEquipment;
 import galacticwars.clonewars.army.ArmyUnitDefinition;
+import galacticwars.clonewars.army.ArmyFormationRole;
 import galacticwars.clonewars.army.RecruitVitals;
 import galacticwars.clonewars.classes.ClassAbilityRuntimeService;
 import galacticwars.clonewars.classes.ClassAbilityEffectRegistry;
@@ -167,6 +171,7 @@ import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.BlockHitResult;
@@ -225,6 +230,11 @@ public class GalacticRecruitEntity extends TamableAnimal
             SynchedEntityData.defineId(GalacticRecruitEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
     private static final EntityDataAccessor<String> DATA_SELECTED_BLUEPRINT =
             SynchedEntityData.defineId(GalacticRecruitEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> DATA_VISUAL_ACTION =
+            SynchedEntityData.defineId(GalacticRecruitEntity.class, EntityDataSerializers.STRING);
+    private static final RawAnimation VISUAL_IDLE = RawAnimation.begin().thenLoop("misc.idle");
+    private static final RawAnimation VISUAL_WALK = RawAnimation.begin().thenLoop("move.walk");
+    private static final RawAnimation VISUAL_BUILD = RawAnimation.begin().thenLoop("attack.swing");
 
     private final AnimatableInstanceCache geoCache = GeckoLibUtil.createInstanceCache(this);
     private @Nullable BlockPos moveTarget;
@@ -236,6 +246,7 @@ public class GalacticRecruitEntity extends TamableAnimal
     private @Nullable UUID activeBuildProjectId;
     private String selectedBlueprintId = KingdomBaseBlueprint.STARTER_KEEP_ID;
     private int workRadius = DEFAULT_WORK_RADIUS;
+    private int acknowledgeOrderTicks;
     private @Nullable UUID kingdomId;
     private @Nullable UUID settlementId;
     private @Nullable UUID factionOutpostId;
@@ -321,11 +332,23 @@ public class GalacticRecruitEntity extends TamableAnimal
         entityData.define(DATA_WORKER_REASON, "ready");
         entityData.define(DATA_ACTIVE_WORK_TARGET, Optional.empty());
         entityData.define(DATA_SELECTED_BLUEPRINT, KingdomBaseBlueprint.STARTER_KEEP_ID);
+        entityData.define(DATA_VISUAL_ACTION, RecruitVisualAction.IDLE.id());
     }
 
     @Override
     public void registerControllers(final AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(DefaultAnimations.genericWalkRunIdleController());
+        controllers.add(new AnimationController<>("recruit_gameplay", 4, state -> {
+            RecruitVisualAction action = RecruitVisualAction.byId(this.entityData.get(DATA_VISUAL_ACTION));
+            if (action == RecruitVisualAction.BUILD && !state.isMoving()) {
+                return state.setAndContinue(VISUAL_BUILD);
+            }
+            boolean locomotion = state.isMoving() && switch (action) {
+                case FORM_UP, MARCH, RETREAT, BUILD, RANGED_COMBAT, MELEE_COMBAT,
+                     ACKNOWLEDGE_ORDER, INJURED, LOW_MORALE -> true;
+                default -> false;
+            };
+            return state.setAndContinue(locomotion ? VISUAL_WALK : VISUAL_IDLE);
+        }));
         controllers.add(DefaultAnimations.genericAttackAnimation(DefaultAnimations.ATTACK_SWING));
     }
 
@@ -567,6 +590,10 @@ public class GalacticRecruitEntity extends TamableAnimal
                 NpcForceRuntimeService.tick(serverLevel, this);
             }
             this.tickCommanderCampaign();
+            this.syncRecruitStatusState();
+        }
+        if (!this.level().isClientSide() && this.acknowledgeOrderTicks > 0) {
+            this.acknowledgeOrderTicks--;
         }
         if (!this.level().isClientSide() && this.tickCount % 100 == 0
                 && this.level() instanceof ServerLevel serverLevel) {
@@ -3112,8 +3139,16 @@ public class GalacticRecruitEntity extends TamableAnimal
                     ? "kingdom_link_missing" : "progression_reconciliation_required");
             return;
         }
-        KingdomSavedData.get(serverLevel).reserveWorksite(
-                this.getOwnerReference().getUUID(), this.getUUID(), WorkerProfession.BUILDER);
+        if (KingdomBaseBlueprint.STARTER_CAMP_ID.equals(blueprint.id())) {
+            this.clearWorkerProfession();
+            KingdomSavedData data = KingdomSavedData.get(serverLevel);
+            data.addRecruitToArmy(ownerId, this.getUUID());
+            this.armyGroupId = data.armyGroupForRecruit(this.getUUID())
+                    .map(ArmyGroupRecord::id).orElse(null);
+        } else {
+            KingdomSavedData.get(serverLevel).reserveWorksite(
+                    this.getOwnerReference().getUUID(), this.getUUID(), WorkerProfession.BUILDER);
+        }
         this.workerCooldownTicks = this.factionProductionCooldownTicks(100);
         this.setBaseTarget(null);
         this.setWorkTarget(null);
@@ -3166,7 +3201,7 @@ public class GalacticRecruitEntity extends TamableAnimal
             this.blockWorker("blueprint_position_blocked");
             return;
         }
-        if (!this.level().setBlock(expected, block.get().defaultBlockState(), 3)) {
+        if (!this.level().setBlock(expected, safeConstructionState(block.get()), 3)) {
             this.blockWorker("world_change_rejected");
             return;
         }
@@ -3178,6 +3213,17 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.starterBaseCompletedBlocks++;
         this.workerCooldownTicks = this.factionProductionCooldownTicks(20);
         this.transitionWorker(WorkerPhase.COOLDOWN, "placement_complete", null);
+    }
+
+    /**
+     * A builder must be able to leave a newly placed work block safely. Campfires are therefore
+     * installed unlit; the player can light the completed camp once no worker is pathing across it.
+     */
+    private static BlockState safeConstructionState(Block block) {
+        BlockState state = block.defaultBlockState();
+        return state.hasProperty(BlockStateProperties.LIT)
+                ? state.setValue(BlockStateProperties.LIT, false)
+                : state;
     }
 
     private boolean withdrawCurrentBuildMaterial() {
@@ -3968,6 +4014,55 @@ public class GalacticRecruitEntity extends TamableAnimal
             BuildProject project,
             KingdomBaseBlueprint blueprint
     ) {
+        return assignConstructionProjectInternal(actor, project, blueprint, false);
+    }
+
+    /** Assigns the one onboarding build without charging or requiring the later workforce unlock. */
+    public boolean assignStarterConstructionProject(
+            ServerPlayer actor,
+            BuildProject project,
+            KingdomBaseBlueprint blueprint
+    ) {
+        if (!KingdomBaseBlueprint.STARTER_CAMP_ID.equals(blueprint.id())) {
+            return false;
+        }
+        return assignConstructionProjectInternal(actor, project, blueprint, true);
+    }
+
+    public boolean packUpStarterConstruction() {
+        if (!(this.level() instanceof ServerLevel serverLevel) || this.getOwnerReference() == null) {
+            return false;
+        }
+        UUID ownerId = this.getOwnerReference().getUUID();
+        if (!this.workerInventoryIsEmpty()) {
+            KingdomSavedData data = KingdomSavedData.get(serverLevel);
+            boolean returned = this.availableRegisteredStorage(serverLevel, data, ownerId).stream()
+                    .anyMatch(this::insertWorkerInventory);
+            if (!returned) {
+                this.blockWorker("starter_material_return_failed");
+                return false;
+            }
+        }
+        this.pauseWorkerNavigation();
+        this.releaseCurrentWorkOrder(true);
+        this.activeBuildProjectId = null;
+        this.setBaseTarget(null);
+        this.setWorkTarget(null);
+        this.clearWorkerProfession();
+        KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        data.addRecruitToArmy(ownerId, this.getUUID());
+        this.armyGroupId = data.armyGroupForRecruit(this.getUUID()).map(ArmyGroupRecord::id).orElse(null);
+        this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
+        this.syncRecruitStatusState();
+        return true;
+    }
+
+    private boolean assignConstructionProjectInternal(
+            ServerPlayer actor,
+            BuildProject project,
+            KingdomBaseBlueprint blueprint,
+            boolean starterContract
+    ) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(project, "project");
         Objects.requireNonNull(blueprint, "blueprint");
@@ -4009,7 +4104,10 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.starterBaseCompletedBlocks = project.completedPlacements().size();
         this.setBaseTarget(origin);
         this.setWorkTarget(origin);
-        if (!this.tryAssignWorkerProfession(actor, WorkerProfession.BUILDER)) {
+        boolean assigned = starterContract
+                ? this.assignStarterBuilderDuty(actor, project)
+                : this.tryAssignWorkerProfession(actor, WorkerProfession.BUILDER);
+        if (!assigned) {
             this.activeBuildProjectId = previousProjectId;
             this.selectedBlueprintId = previousBlueprintId;
             this.buildRotationSteps = previousRotation;
@@ -4022,6 +4120,26 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.setRecruitCommand(RecruitmentAction.WORK_AT_SITE);
         this.transitionWorker(WorkerPhase.ACQUIRE_ORDER, "blueprint_queued", null);
         this.syncRecruitStatusState();
+        return true;
+    }
+
+    private boolean assignStarterBuilderDuty(ServerPlayer actor, BuildProject project) {
+        if (!(this.level() instanceof ServerLevel serverLevel)
+                || this.getRecruitDuty() == RecruitDuty.COMMANDER
+                || this.getOwnerReference() == null
+                || !this.getOwnerReference().getUUID().equals(actor.getUUID())) {
+            return false;
+        }
+        KingdomSavedData data = KingdomSavedData.get(serverLevel);
+        this.setWorkerProfession(WorkerProfession.BUILDER);
+        if (!data.reserveWorksite(
+                actor.getUUID(), this.getUUID(), WorkerProfession.BUILDER, Optional.of(project.id()))) {
+            this.clearWorkerProfession();
+            data.addRecruitToArmy(actor.getUUID(), this.getUUID());
+            return false;
+        }
+        this.reconcileWorkerAuthority(serverLevel);
+        this.resumeWorkAfterProfessionAssignment();
         return true;
     }
 
@@ -4764,6 +4882,39 @@ public class GalacticRecruitEntity extends TamableAnimal
         }
     }
 
+    public boolean initializeStarterContract(ServerPlayer owner, KingdomRecord kingdom) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(kingdom, "kingdom");
+        if (!(this.level() instanceof ServerLevel serverLevel)
+                || owner.level() != serverLevel
+                || !owner.getUUID().equals(kingdom.ownerId())
+                || !this.recruitFactionId().equals(kingdom.factionId())) {
+            return false;
+        }
+        this.setOwnerReference(EntityReference.of(owner));
+        this.setTame(true, true);
+        this.kingdomId = kingdom.id();
+        this.settlementId = kingdom.settlement().id();
+        this.factionOutpostId = null;
+        this.armyGroupId = null;
+        this.serviceBranch = NpcServiceBranch.MILITARY;
+        this.setRecruitDuty(RecruitDuty.SOLDIER);
+        this.setRecruitCommand(RecruitmentAction.FOLLOW_OWNER);
+        this.applyUnitDefinition();
+        this.syncRecruitStatusState();
+        return true;
+    }
+
+    public ArmyFormationRole armyFormationRole() {
+        if (this.getRecruitDuty() == RecruitDuty.COMMANDER) {
+            return ArmyFormationRole.LEADER;
+        }
+        return GameplayDataManager.snapshot().unit(this.recruitUnitId())
+                .map(ArmyUnitDefinition::role)
+                .map(ArmyFormationRole::fromUnitRole)
+                .orElse(ArmyFormationRole.FRONTLINE);
+    }
+
     private void restoreArmyEquipment(EquipmentSlot slot, ItemStack stack) {
         this.setItemSlot(slot, stack.copy());
         this.setDropChance(slot, 0.0F);
@@ -5198,9 +5349,9 @@ public class GalacticRecruitEntity extends TamableAnimal
                         .orElse(null)
                 : null;
         if (this.getRecruitDuty() == RecruitDuty.COMMANDER) {
-            this.moveTarget = commandPosition.map(location -> location.blockPosition())
-                    .map(position -> new BlockPos(position.x(), position.y(), position.z()))
-                    .orElse(null);
+            ArmyPosition executionPosition = ArmyGroupOrderPlanner.executionPosition(group);
+            this.moveTarget = executionPosition == null ? null : new BlockPos(
+                    executionPosition.x(), executionPosition.y(), executionPosition.z());
             this.setRecruitCommand(action);
             if (action == RecruitmentAction.ATTACK_TARGET) {
                 this.setTarget(persistedTarget);
@@ -5268,7 +5419,11 @@ public class GalacticRecruitEntity extends TamableAnimal
     }
 
     private void setRecruitCommand(RecruitmentAction command) {
+        RecruitmentAction previous = this.getRecruitCommand();
         this.entityData.set(DATA_COMMAND, command.ordinal());
+        if (previous != command) {
+            this.acknowledgeOrderTicks = 10;
+        }
         this.setOrderedToSit(this.isTame() && command == RecruitmentAction.HOLD_POSITION);
         if (command != RecruitmentAction.MOVE_TO_POSITION
                 && command != RecruitmentAction.WORK_AT_SITE
@@ -5334,6 +5489,45 @@ public class GalacticRecruitEntity extends TamableAnimal
         this.entityData.set(DATA_SELECTED_BLUEPRINT, this.selectedBlueprintId);
         this.entityData.set(DATA_RESOURCE_ACTION, this.getWorkerProfession().isPresent() ? this.workerPhase.id() : "");
         this.entityData.set(DATA_RESOURCE_ITEM, this.getWorkerProfession().isPresent() ? this.workerReason : "");
+        this.entityData.set(DATA_VISUAL_ACTION, this.resolveVisualAction().id());
+    }
+
+    private RecruitVisualAction resolveVisualAction() {
+        if (this.acknowledgeOrderTicks > 0) {
+            return RecruitVisualAction.ACKNOWLEDGE_ORDER;
+        }
+        if (this.getHealth() <= this.getMaxHealth() * 0.35F) {
+            return RecruitVisualAction.INJURED;
+        }
+        if (this.morale < 25) {
+            return RecruitVisualAction.LOW_MORALE;
+        }
+        if (this.getTarget() != null) {
+            return FactionRangedWeaponService.supportsRecruitRangedCombat(this.getMainHandItem())
+                    ? RecruitVisualAction.RANGED_COMBAT
+                    : RecruitVisualAction.MELEE_COMBAT;
+        }
+        if (this.getWorkerProfession().filter(profession -> profession == WorkerProfession.BUILDER).isPresent()
+                && this.activeBuildProjectId != null) {
+            return RecruitVisualAction.BUILD;
+        }
+        if (this.level() instanceof ServerLevel serverLevel && this.armyGroupId != null) {
+            ArmyGroupRecord group = KingdomSavedData.get(serverLevel).armyGroup(this.armyGroupId).orElse(null);
+            if (group != null) {
+                if (group.order().type() == ArmyCommandType.RETURN_TO_RALLY) {
+                    return RecruitVisualAction.RETREAT;
+                }
+                return switch (group.simulation().marchState().phase()) {
+                    case FORMING, REFORMING -> RecruitVisualAction.FORM_UP;
+                    case MARCHING, COMPRESSED -> RecruitVisualAction.MARCH;
+                    case HALTED -> RecruitVisualAction.HALT;
+                    case ENGAGED -> FactionRangedWeaponService.supportsRecruitRangedCombat(this.getMainHandItem())
+                            ? RecruitVisualAction.RANGED_COMBAT : RecruitVisualAction.MELEE_COMBAT;
+                };
+            }
+        }
+        return this.getRecruitCommand() == RecruitmentAction.HOLD_POSITION
+                ? RecruitVisualAction.HALT : RecruitVisualAction.IDLE;
     }
 
     private @Nullable BlockPos displayedTarget(
@@ -5522,6 +5716,8 @@ public class GalacticRecruitEntity extends TamableAnimal
             case "minecraft:oak_log" -> Optional.of(Blocks.OAK_LOG);
             case "minecraft:dirt" -> Optional.of(Blocks.DIRT);
             case "minecraft:chest" -> Optional.of(Blocks.CHEST);
+            case "minecraft:campfire" -> Optional.of(Blocks.CAMPFIRE);
+            case "minecraft:crafting_table" -> Optional.of(Blocks.CRAFTING_TABLE);
             default -> Optional.empty();
         };
     }

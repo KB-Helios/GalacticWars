@@ -151,6 +151,15 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                 }
                 requireRegistered(BuiltInRegistries.ITEM, faction.pledgeTokenItemId(),
                         "pledge token for " + faction.id());
+                ArmyUnitDefinition starterUnit = units.stream()
+                        .filter(unit -> unit.id().toString().equals(faction.starterUnitId()))
+                        .findFirst().orElseThrow(() -> new IllegalArgumentException(
+                                "Faction " + faction.id() + " has unknown starter_unit "
+                                        + faction.starterUnitId()));
+                if (!starterUnit.factionId().equals(faction.id())) {
+                    throw new IllegalArgumentException("Faction " + faction.id()
+                            + " starter_unit belongs to " + starterUnit.factionId());
+                }
             }
             for (LaunchContentDefinitions.TradeDefinition trade : launchContent.trades().values()) {
                 requireRegistered(BuiltInRegistries.ITEM, trade.itemId(),
@@ -292,7 +301,8 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
                             integer(strategy, "production_percent", 100),
                             integer(strategy, "morale_bonus", 0),
                             string(strategy, "strength", "combined_arms"),
-                            string(strategy, "weakness", "none")));
+                            string(strategy, "weakness", "none")),
+                    requiredString(json, "starter_unit", resource.id()));
             if (definitions.putIfAbsent(id, definition) != null) {
                 throw new IllegalArgumentException("Duplicate faction id " + id + " in " + resource.id());
             }
@@ -495,6 +505,9 @@ public final class GameplayDataManager extends SimplePreparableReloadListener<Ga
         }
         if (!blueprints.containsKey(KingdomBaseBlueprint.STARTER_KEEP_ID)) {
             throw new IllegalArgumentException("Missing required forward_base blueprint");
+        }
+        if (!blueprints.containsKey(KingdomBaseBlueprint.STARTER_CAMP_ID)) {
+            throw new IllegalArgumentException("Missing required starter_camp blueprint");
         }
         return blueprints;
     }

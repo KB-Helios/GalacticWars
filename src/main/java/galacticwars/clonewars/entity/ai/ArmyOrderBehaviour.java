@@ -126,7 +126,7 @@ public final class ArmyOrderBehaviour extends ExtendedBehaviour<GalacticRecruitE
 
         switch (behavior.intent()) {
             case MOVE_TO_POSITION, FOLLOW_OWNER, PROTECT_OWNER -> {
-                publishMoveTarget(recruit, behavior.moveTarget(), patrolMovementSpeed(state),
+                publishMoveTarget(recruit, behavior.moveTarget(), movementSpeed(recruit, state),
                         formationCloseEnough(state));
                 recruit.setTarget(null);
                 recruit.setAggressive(false);
@@ -254,7 +254,7 @@ public final class ArmyOrderBehaviour extends ExtendedBehaviour<GalacticRecruitE
     }
 
     private static void maintainFormation(GalacticRecruitEntity recruit, ArmyBrainState state) {
-        publishMoveTarget(recruit, ArmyBrainSupport.formationAnchor(state), patrolMovementSpeed(state),
+        publishMoveTarget(recruit, ArmyBrainSupport.formationAnchor(state), movementSpeed(recruit, state),
                 formationCloseEnough(state));
         recruit.setTarget(null);
         recruit.setAggressive(false);
@@ -264,13 +264,20 @@ public final class ArmyOrderBehaviour extends ExtendedBehaviour<GalacticRecruitE
         return state.group().effectiveTactics().tightFormation() ? 1 : 2;
     }
 
-    private static float patrolMovementSpeed(ArmyBrainState state) {
-        if (state.group().order().type() != ArmyCommandType.PATROL_ROUTE) {
-            return 1.0F;
-        }
-        return state.group().effectivePatrolPlan()
+    private static float movementSpeed(GalacticRecruitEntity recruit, ArmyBrainState state) {
+        float base = state.group().order().type() == ArmyCommandType.PATROL_ROUTE
+                ? state.group().effectivePatrolPlan()
                 .map(ArmyPatrolPlan::loadedMovementSpeed)
-                .orElse(1.0F);
+                .orElse(1.0F)
+                : 1.0F;
+        ArmyMarchMemory march = BrainUtil.getMemory(recruit, ArmyBrainMemoryTypes.MARCH_STATE);
+        if (march == null || march.cohesionPercent() >= 70
+                || march.phase() == galacticwars.clonewars.army.ArmyMarchPhase.ENGAGED) {
+            return base;
+        }
+        return march.memberSlot() < 0
+                ? Math.min(base, 0.8F)
+                : Math.min(1.15F, base + 0.15F);
     }
 
     /**

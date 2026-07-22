@@ -81,6 +81,74 @@ public final class ConstructionProjectService {
         return StartResult.accepted(project);
     }
 
+    public static ActionResult preflight(
+            ServerLevel level,
+            ServerPlayer actor,
+            java.util.UUID kingdomId,
+            KingdomBaseBlueprint blueprint,
+            BlockPos origin,
+            int rotationSteps
+    ) {
+        Objects.requireNonNull(level, "level");
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(kingdomId, "kingdomId");
+        Objects.requireNonNull(blueprint, "blueprint");
+        Objects.requireNonNull(origin, "origin");
+        KingdomSavedData data = KingdomSavedData.get(level);
+        KingdomRecord kingdom = data.kingdomForPlayer(actor.getUUID()).orElse(null);
+        if (kingdom == null || !kingdom.id().equals(kingdomId)) {
+            return ActionResult.rejected("kingdom_changed");
+        }
+        if (!kingdom.allows(actor.getUUID(), KingdomPermission.BUILD)
+                || !kingdom.allows(actor.getUUID(), KingdomPermission.MANAGE_WORKSITES)) {
+            return ActionResult.rejected("permission_denied");
+        }
+        KingdomBaseBlueprint authoritative = GameplayDataManager.snapshot()
+                .blueprint(blueprint.id()).orElse(null);
+        if (authoritative == null
+                || !authoritative.definitionHash().equals(blueprint.definitionHash())
+                || !authoritative.supportsRotationSteps(rotationSteps)) {
+            return ActionResult.rejected("blueprint_changed");
+        }
+        String dimensionId = level.dimension().identifier().toString();
+        String invalid = validatePlacements(
+                level, data, kingdom, authoritative, origin, rotationSteps, dimensionId);
+        return invalid.isEmpty() ? ActionResult.acceptedResult() : ActionResult.rejected(invalid);
+    }
+
+    public static StartResult startStarter(
+            ServerLevel level,
+            ServerPlayer actor,
+            GalacticRecruitEntity builder,
+            KingdomBaseBlueprint blueprint,
+            BlockPos origin,
+            int rotationSteps
+    ) {
+        KingdomSavedData data = KingdomSavedData.get(level);
+        KingdomRecord kingdom = data.kingdomForPlayer(actor.getUUID()).orElse(null);
+        if (kingdom == null || builder == null || !builder.isAlive()
+                || !kingdom.id().equals(builder.getKingdomId())
+                || kingdom.npc(builder.getUUID()).isEmpty()) {
+            return StartResult.rejected("builder_unavailable");
+        }
+        ActionResult preflight = preflight(
+                level, actor, kingdom.id(), blueprint, origin, rotationSteps);
+        if (!preflight.accepted()) {
+            return StartResult.rejected(preflight.reason());
+        }
+        Optional<BuildProject> started = data.startBuildProject(
+                kingdom.ownerId(), blueprint, level.dimension().identifier().toString(), origin, rotationSteps);
+        if (started.isEmpty()) {
+            return StartResult.rejected("project_conflict");
+        }
+        BuildProject project = started.orElseThrow();
+        if (!builder.assignStarterConstructionProject(actor, project, blueprint)) {
+            data.replaceBuildProject(kingdom.ownerId(), project.cancel());
+            return StartResult.rejected("builder_assignment_failed");
+        }
+        return StartResult.accepted(project);
+    }
+
     public static ActionResult cancel(
             ServerLevel level,
             ServerPlayer actor,

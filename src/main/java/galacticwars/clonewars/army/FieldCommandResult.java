@@ -13,7 +13,8 @@ public enum FieldCommandResult {
     TARGET_UNAVAILABLE,
     INVALID_ACTION,
     ATOMIC_APPLY_FAILED,
-    REPLAY_REJECTED;
+    REPLAY_REJECTED,
+    PROGRESSION_LOCKED;
 
     public int wireId() {
         return ordinal();

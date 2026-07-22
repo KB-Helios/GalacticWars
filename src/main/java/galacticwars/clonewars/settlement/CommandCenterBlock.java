@@ -13,6 +13,7 @@ import galacticwars.clonewars.menu.CommandCenterNavigationMenuProvider;
 import galacticwars.clonewars.menu.FactionSelectionMenuProvider;
 import galacticwars.clonewars.menu.CommandCenterOperationsMenuProvider;
 import galacticwars.clonewars.menu.CommandCenterOperationsMenu;
+import galacticwars.clonewars.menu.StarterCampSetupMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -100,6 +101,9 @@ public final class CommandCenterBlock extends BaseEntityBlock {
         if (existing.isEmpty()
                 || ProgressionSavedData.get(serverLevel).state(player.getUUID()).factionId().isEmpty()) {
             MenuRegistry.openExtendedMenu(player, new FactionSelectionMenuProvider(pos));
+        } else if (data.starterCampDeployment(existing.orElseThrow().id())
+                .map(deployment -> !deployment.terminal()).orElse(true)) {
+            MenuRegistry.openExtendedMenu(player, new StarterCampSetupMenuProvider(pos));
         }
     }
 
@@ -153,6 +157,15 @@ public final class CommandCenterBlock extends BaseEntityBlock {
         }
         if (!hall.factionId().equals(activated.orElseThrow().factionId())) {
             hall.setFaction(activated.orElseThrow().factionId());
+        }
+        if (hall.isOwner(player) && player instanceof ServerPlayer owner) {
+            boolean starterCampPending = data.starterCampDeployment(activated.orElseThrow().id())
+                    .map(deployment -> !deployment.terminal())
+                    .orElse(true);
+            if (starterCampPending) {
+                MenuRegistry.openExtendedMenu(owner, new StarterCampSetupMenuProvider(pos));
+                return InteractionResult.SUCCESS;
+            }
         }
         if (player.isShiftKeyDown()) {
             if (!hall.canUse(player, KingdomPermission.TRAVEL)) {

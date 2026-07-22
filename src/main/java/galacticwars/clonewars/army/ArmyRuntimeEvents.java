@@ -63,6 +63,7 @@ public final class ArmyRuntimeEvents {
                     rematerialize(data, level, group);
                 }
             } else if (group.simulation().lifecycleState() == ArmyGroupLifecycleState.LIVE) {
+                group = advanceLiveMarch(data, level, group);
                 group = refreshAttackTarget(data, level, group);
                 maybeHibernate(data, level, group);
             }
@@ -129,7 +130,8 @@ public final class ArmyRuntimeEvents {
                 level.getGameTime(),
                 group.simulation().revision() + 1,
                 generation,
-                "");
+                "",
+                group.simulation().marchState());
         ArmyGroupRecord virtual = group.withSimulation(simulation, orderedSnapshots(group, snapshots));
         if (!data.replaceArmyGroup(virtual, group.simulation().revision())) {
             return;
@@ -138,6 +140,146 @@ public final class ArmyRuntimeEvents {
             recruit.discard();
         }
         idleTicks.remove(group.id());
+    }
+
+    private static ArmyGroupRecord advanceLiveMarch(
+            KingdomSavedData data,
+            ServerLevel level,
+            ArmyGroupRecord group
+    ) {
+        List<GalacticRecruitEntity> participants = liveMembers(level, group);
+        GalacticRecruitEntity commander = group.commanderId()
+                .flatMap(id -> participants.stream().filter(recruit -> recruit.getUUID().equals(id)).findFirst())
+                .orElse(null);
+        if (commander == null) {
+            return group;
+        }
+        Map<UUID, ArmyFormationRole> formationRoles = new LinkedHashMap<>();
+        for (GalacticRecruitEntity participant : participants) {
+            if (group.memberIds().contains(participant.getUUID())) {
+                formationRoles.put(participant.getUUID(), participant.armyFormationRole());
+            }
+        }
+        List<ArmyFormationSlotAssignment> roleAwareAssignments =
+                ArmyFormationSlotAssignment.reconcileRoleAware(
+                        group.memberIds(), formationRoles, group.effectiveFormationSlotAssignments());
+        ArmyGroupRecord marchingGroup = group;
+        if (!roleAwareAssignments.equals(group.effectiveFormationSlotAssignments())) {
+            ArmyGroupRecord replacement = group.withFormationSlotAssignments(roleAwareAssignments);
+            if (data.replaceArmyGroup(replacement, group.simulation().revision())) {
+                marchingGroup = replacement;
+            }
+        }
+        ArmyLocation liveAnchor = location(commander);
+        List<ArmyPosition> memberPositions = participants.stream()
+                .filter(recruit -> group.memberIds().contains(recruit.getUUID()))
+                .map(recruit -> new ArmyPosition(recruit.getBlockX(), recruit.getBlockY(), recruit.getBlockZ()))
+                .toList();
+        Optional<ArmyLocation> destination = liveDestination(level, marchingGroup);
+        if (destination.isEmpty()) {
+            ArmyMarchState previous = marchingGroup.simulation().marchState();
+            int cohesion = ArmyMarchCoordinator.cohesionPercent(
+                    liveAnchor.blockPosition(), memberPositions,
+                    marchingGroup.order().spacing(), marchingGroup.memberIds().size());
+            ArmyMarchState halted = previous.transition(
+                    ArmyMarchPhase.HALTED, marchingGroup.order().formation(), cohesion,
+                    previous.yawDegrees(), level.getGameTime());
+            return replaceMarch(data, marchingGroup, liveAnchor, halted, level.getGameTime());
+        }
+        OptionalDouble movementSpeed = slowestMovementSpeed(marchingGroup);
+        if (movementSpeed.isEmpty()) {
+            return marchingGroup;
+        }
+        boolean engaged = participants.stream().anyMatch(recruit ->
+                recruit.getTarget() != null || recruit.hurtTime > 0 || recruit.isAggressive());
+        boolean footprintClear = formationFootprintClear(
+                level, liveAnchor.blockPosition(), marchingGroup.order().formation(),
+                marchingGroup.memberIds().size(), marchingGroup.order().spacing(),
+                marchingGroup.simulation().marchState().yawDegrees());
+        ArmyMarchCoordinator.Decision decision = ArmyMarchCoordinator.advance(
+                marchingGroup, liveAnchor, destination.orElseThrow(), memberPositions,
+                footprintClear, engaged, movementSpeed.orElseThrow(),
+                readinessMultiplier(marchingGroup), level.getGameTime());
+        return replaceMarch(data, marchingGroup, decision.anchor(), decision.marchState(), level.getGameTime());
+    }
+
+    private static ArmyGroupRecord replaceMarch(
+            KingdomSavedData data,
+            ArmyGroupRecord group,
+            ArmyLocation anchor,
+            ArmyMarchState march,
+            long gameTime
+    ) {
+        ArmyGroupSimulation nextSimulation = group.simulation().withMarch(anchor, march, gameTime);
+        if (nextSimulation == group.simulation()) {
+            return group;
+        }
+        ArmyGroupRecord replacement = group.withSimulation(nextSimulation, group.snapshots());
+        return data.replaceArmyGroup(replacement, group.simulation().revision()) ? replacement : group;
+    }
+
+    private static Optional<ArmyLocation> liveDestination(ServerLevel level, ArmyGroupRecord group) {
+        if (group.order().type() == ArmyCommandType.PATROL_ROUTE
+                && group.effectivePatrolPlan().map(ArmyPatrolPlan::state)
+                        .map(ArmyPatrolState::status)
+                        .filter(status -> status != ArmyPatrolStatus.ACTIVE).isPresent()) {
+            return Optional.empty();
+        }
+        return switch (group.order().type()) {
+            case MOVE_TO_POSITION, PATROL_ROUTE, ATTACK_TARGET -> group.order().targetPosition();
+            case FOLLOW_OWNER, PROTECT_OWNER -> Optional.ofNullable(level.getEntity(group.ownerId()))
+                    .filter(Entity::isAlive).map(ArmyRuntimeEvents::location);
+            case PROTECT_ENTITY -> group.order().targetEntityId().map(level::getEntity)
+                    .filter(Entity::isAlive).map(ArmyRuntimeEvents::location);
+            case RETURN_TO_RALLY -> group.rallyPoint();
+            case HOLD_POSITION, CLEAR_TARGET -> Optional.empty();
+        };
+    }
+
+    private static boolean formationFootprintClear(
+            ServerLevel level,
+            ArmyPosition anchor,
+            ArmyFormation formation,
+            int memberCount,
+            int spacing,
+            float yaw
+    ) {
+        if (memberCount == 0) {
+            return true;
+        }
+        List<ArmyPosition> positions = FormationPlanner.planPositions(
+                anchor, formation, memberCount, spacing, yaw);
+        int standable = 0;
+        for (ArmyPosition position : positions) {
+            BlockPos block = new BlockPos(position.x(), position.y(), position.z());
+            if (!level.isLoaded(block)) {
+                continue;
+            }
+            int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    block.getX(), block.getZ());
+            BlockPos surface = new BlockPos(block.getX(), y, block.getZ());
+            if (level.getBlockState(surface).isAir()
+                    && level.getBlockState(surface.above()).isAir()
+                    && level.getBlockState(surface.below()).blocksMotion()) {
+                standable++;
+            }
+        }
+        return standable * 4 >= positions.size() * 3;
+    }
+
+    private static double readinessMultiplier(ArmyGroupRecord group) {
+        double supply = group.supplyUnits() > 0 ? 1.0D : 0.8D;
+        double averageMorale = group.snapshots().stream()
+                .filter(snapshot -> group.contains(snapshot.recruitId()))
+                .mapToInt(ArmyMemberSnapshot::morale)
+                .average().orElse(100.0D);
+        double morale = 0.7D + Math.max(0.0D, Math.min(100.0D, averageMorale)) / 333.333D;
+        return Math.max(0.5D, Math.min(1.15D, supply * morale));
+    }
+
+    private static ArmyLocation location(Entity entity) {
+        return new ArmyLocation(entity.level().dimension().identifier().toString(),
+                entity.getX(), entity.getY(), entity.getZ());
     }
 
     private static ArmyGroupRecord refreshAttackTarget(

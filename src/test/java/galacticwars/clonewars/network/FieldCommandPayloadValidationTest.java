@@ -26,6 +26,11 @@ public final class FieldCommandPayloadValidationTest {
                 || patrolEdit.patrolWaypointWaitTicks() != 140) {
             throw new AssertionError("bounded patrol edit fields did not retain their values");
         }
+        FieldCommandRequestPayload explicitFormation = new FieldCommandRequestPayload(
+                replayId, FieldCommandAction.SET_FORMATION, List.of(groupId), "", 0, 0, "hollow_square");
+        if (!explicitFormation.optionId().equals("hollow_square")) {
+            throw new AssertionError("explicit formation option was not retained");
+        }
         expectFailure(() -> new FieldCommandRequestPayload(
                         UUID.randomUUID(), FieldCommandAction.FOLLOW, List.of()),
                 "command without a squad");
@@ -51,13 +56,24 @@ public final class FieldCommandPayloadValidationTest {
                         UUID.randomUUID(), FieldCommandAction.SET_PATROL_WAYPOINT_WAIT, List.of(groupId),
                         "Route", 0, 12_001),
                 "out-of-range patrol wait");
+        expectFailure(() -> new FieldCommandRequestPayload(
+                        UUID.randomUUID(), FieldCommandAction.SET_FORMATION, List.of(groupId)),
+                "formation without explicit option");
+        expectFailure(() -> new FieldCommandRequestPayload(
+                        UUID.randomUUID(), FieldCommandAction.FOLLOW, List.of(groupId), "", 0, 0, "line"),
+                "option on an unrelated command");
 
         FieldCommandStatePayload.Squad squad = new FieldCommandStatePayload.Squad(
                 groupId, "Alpha Squad", 3, "FOLLOW_OWNER", "LINE", "LIVE");
         FieldCommandStatePayload state = new FieldCommandStatePayload(
-                replayId, FieldCommandResult.ACCEPTED, List.of(squad), true, false);
+                replayId, FieldCommandResult.ACCEPTED, List.of(squad), true, false,
+                List.of("formation_basic"));
         if (!state.markedBlockAvailable() || state.markedEntityAvailable()
-                || !state.squads().getFirst().name().equals("Alpha Squad")) {
+                || !state.squads().getFirst().name().equals("Alpha Squad")
+                || !state.squads().getFirst().engagement().equals("DEFENSIVE")
+                || !state.squads().getFirst().targetPriority().equals("COMMAND_TARGET")
+                || !state.squads().getFirst().rangedFirePolicy().equals("FREE_FIRE")
+                || !state.unlocks().equals(List.of("formation_basic"))) {
             throw new AssertionError("valid field command state did not retain its projection");
         }
         expectFailure(() -> new FieldCommandStatePayload(

@@ -5,6 +5,7 @@
   "hire_cost": 28,
   "minimum_hiring_alignment": 10,
   "max_owned_recruits": 10,
+  "starter_unit": "galacticwars:nightsister_acolyte",
   "allies": [],
   "enemies": [
     "galacticwars:separatist"

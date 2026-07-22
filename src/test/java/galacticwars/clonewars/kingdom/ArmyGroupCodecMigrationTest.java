@@ -13,6 +13,7 @@ import galacticwars.clonewars.army.ArmyGroupRecord;
 import galacticwars.clonewars.army.ArmyGroupSimulation;
 import galacticwars.clonewars.army.ArmyGroupTactics;
 import galacticwars.clonewars.army.ArmyLocation;
+import galacticwars.clonewars.army.ArmyMarchPhase;
 import galacticwars.clonewars.army.ArmyPatrolEnemyPolicy;
 import galacticwars.clonewars.army.ArmyPatrolMode;
 import galacticwars.clonewars.army.ArmyPatrolPlan;
@@ -59,6 +60,7 @@ public final class ArmyGroupCodecMigrationTest {
         assertFalse(encoded.has("formation_slots"), "legacy formation slots stay absent");
         assertFalse(encoded.has("patrol_plan"), "legacy patrol plan stays absent");
         assertFalse(encoded.has("tactics"), "legacy tactics stay absent");
+        assertFalse(encoded.getAsJsonObject("simulation").has("march"), "legacy march state stays absent");
 
         ArmyGroupRecord decoded = KingdomCodecs.ARMY_GROUP.parse(JsonOps.INSTANCE, encoded).getOrThrow();
         assertTrue(decoded.formationSlotAssignments().isEmpty(), "legacy slots remain optional after decode");
@@ -68,6 +70,8 @@ public final class ArmyGroupCodecMigrationTest {
         assertEquals(ArmyPatrolMode.LOOP, decoded.effectivePatrolPlan().orElseThrow().mode(),
                 "derived legacy patrol mode");
         assertEquals(ArmyGroupTactics.DEFAULT, decoded.effectiveTactics(), "derived legacy doctrine");
+        assertEquals(ArmyMarchPhase.HALTED, decoded.simulation().marchState().phase(),
+                "legacy groups receive a safe halted march default");
 
         JsonObject reencoded = encode(decoded);
         assertFalse(reencoded.has("formation_slots"), "read-only legacy load does not materialize slots");
@@ -129,6 +133,7 @@ public final class ArmyGroupCodecMigrationTest {
         assertTrue(encoded.has("formation_slots"), "new group persists deterministic slots");
         assertTrue(encoded.has("patrol_plan"), "new plan persists");
         assertTrue(encoded.has("tactics"), "new tactics persist");
+        assertTrue(encoded.getAsJsonObject("simulation").has("march"), "preferred formation march state persists");
         assertEquals("Forward Route", encoded.getAsJsonObject("patrol_plan").get("name").getAsString(),
                 "named route persists");
 

@@ -16,6 +16,7 @@ import galacticwars.clonewars.client.gui.FactionSelectionScreen;
 import galacticwars.clonewars.client.gui.MerchantTradeScreen;
 import galacticwars.clonewars.client.gui.RecruitCommandScreen;
 import galacticwars.clonewars.client.gui.RecruitLoadoutScreen;
+import galacticwars.clonewars.client.gui.StarterCampSetupScreen;
 import galacticwars.clonewars.client.render.GalacticRecruitRenderer;
 import galacticwars.clonewars.client.render.GalacticVehicleRenderer;
 import galacticwars.clonewars.combat.BlasterBoltEntity;
@@ -72,6 +73,8 @@ public final class GalacticWarsClient {
         MenuScreenRegistry.registerScreenFactory(
                 ModMenuTypes.FACTION_SELECTION.get(), FactionSelectionScreen::new);
         MenuScreenRegistry.registerScreenFactory(
+                ModMenuTypes.STARTER_CAMP_SETUP.get(), StarterCampSetupScreen::new);
+        MenuScreenRegistry.registerScreenFactory(
                 ModMenuTypes.MERCHANT_TRADE.get(), MerchantTradeScreen::new);
         MenuScreenRegistry.registerScreenFactory(
                 ModMenuTypes.COMMAND_CENTER_OPERATIONS.get(), CommandCenterOperationsScreen::new);
@@ -93,6 +96,7 @@ public final class GalacticWarsClient {
         ClientPacketBridge.installClassHudHandler(ClassClientState::update);
         ClientPacketBridge.installGameplayCatalogHandler(ClientGameplayCatalog::replace);
         ClientPacketBridge.installFieldCommandStateHandler(FieldCommandClientState::update);
+        ClientPacketBridge.installFieldCommandOpenHandler(ArmyFieldCommandKeyMappings::openCommandScreen);
         ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> {
             ClientGameplayCatalog.clear();
             FieldCommandClientState.clear();

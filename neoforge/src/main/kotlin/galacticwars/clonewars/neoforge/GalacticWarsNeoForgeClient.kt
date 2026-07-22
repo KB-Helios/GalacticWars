@@ -17,6 +17,7 @@ import galacticwars.clonewars.client.gui.GalacticWarsConfigScreen
 import galacticwars.clonewars.client.gui.MerchantTradeScreen
 import galacticwars.clonewars.client.gui.RecruitCommandScreen
 import galacticwars.clonewars.client.gui.RecruitLoadoutScreen
+import galacticwars.clonewars.client.gui.StarterCampSetupScreen
 import galacticwars.clonewars.client.gui.VehicleHud
 import galacticwars.clonewars.client.render.BlasterClientExtensions
 import galacticwars.clonewars.client.render.LightsaberClientExtensions
@@ -53,6 +54,7 @@ object GalacticWarsNeoForgeClient {
             ::CommandCenterNavigationScreen,
         )
         event.register(ModMenuTypes.FACTION_SELECTION.get(), ::FactionSelectionScreen)
+        event.register(ModMenuTypes.STARTER_CAMP_SETUP.get(), ::StarterCampSetupScreen)
         event.register(ModMenuTypes.MERCHANT_TRADE.get(), ::MerchantTradeScreen)
         event.register(
             ModMenuTypes.COMMAND_CENTER_OPERATIONS.get(),

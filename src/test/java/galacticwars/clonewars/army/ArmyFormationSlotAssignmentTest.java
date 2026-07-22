@@ -16,8 +16,28 @@ public final class ArmyFormationSlotAssignmentTest {
         assignsSlotsByUuidRegardlessOfIncomingOrder();
         reconciliationKeepsValidMemberSlotsAndFillsVacanciesDeterministically();
         reconciliationDropsStaleAndOutOfRangeBindings();
+        roleAwareReinforcementsFillTheirNearestTacticalDepth();
 
         System.out.println("ArmyFormationSlotAssignmentTest passed");
+    }
+
+    private static void roleAwareReinforcementsFillTheirNearestTacticalDepth() {
+        List<ArmyFormationSlotAssignment> reconciled = ArmyFormationSlotAssignment.reconcileRoleAware(
+                List.of(FIRST, SECOND, THIRD, FOURTH),
+                java.util.Map.of(
+                        FIRST, ArmyFormationRole.HEAVY,
+                        SECOND, ArmyFormationRole.RANGED,
+                        THIRD, ArmyFormationRole.SUPPORT,
+                        FOURTH, ArmyFormationRole.FRONTLINE),
+                List.of(
+                        new ArmyFormationSlotAssignment(FIRST, 0),
+                        new ArmyFormationSlotAssignment(THIRD, 2)));
+        assertEquals(List.of(
+                new ArmyFormationSlotAssignment(FIRST, 0),
+                new ArmyFormationSlotAssignment(FOURTH, 1),
+                new ArmyFormationSlotAssignment(THIRD, 2),
+                new ArmyFormationSlotAssignment(SECOND, 3)), reconciled,
+                "role-aware reinforcement depths preserve survivors");
     }
 
     private static void assignsSlotsByUuidRegardlessOfIncomingOrder() {

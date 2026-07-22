@@ -75,6 +75,8 @@ public final class FactionSelectionMenu extends AbstractContainerMenu {
         serverPlayer.sendSystemMessage(Component.translatable(
                 "message.galacticwars.faction_selection.confirmed",
                 Component.translatable(factionTranslation(factionId))));
+        serverPlayer.sendSystemMessage(Component.translatable(
+                "message.galacticwars.starter_camp.open_command_center"));
         serverPlayer.closeContainer();
         return true;
     }

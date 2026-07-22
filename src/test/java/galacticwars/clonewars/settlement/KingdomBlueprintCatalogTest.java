@@ -1,5 +1,6 @@
 package galacticwars.clonewars.settlement;
 
+import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,7 +17,7 @@ public final class KingdomBlueprintCatalogTest {
 
     public static void main(String[] args) throws IOException {
         List<KingdomBaseBlueprint> blueprints = KingdomBaseBlueprint.all();
-        assertEquals(6, blueprints.size(), "initial blueprint count");
+        assertEquals(7, blueprints.size(), "initial blueprint count");
         assertTrue(blueprints == KingdomBaseBlueprint.all(), "static blueprint catalog is cached");
         Set<String> ids = new HashSet<>();
         for (KingdomBaseBlueprint blueprint : blueprints) {
@@ -31,6 +32,8 @@ public final class KingdomBlueprintCatalogTest {
                 "canonical barracks lookup");
         assertEquals("galacticwars:forward_base", KingdomBaseBlueprint.STARTER_KEEP_ID,
                 "shared forward base id");
+        assertEquals("galacticwars:starter_camp", KingdomBaseBlueprint.STARTER_CAMP_ID,
+                "dedicated onboarding camp id");
         assertTrue(KingdomBaseBlueprint.byId("unknown").isEmpty(), "unknown lookup");
         loaderConsumesAuthorityFields();
         System.out.println("KingdomBlueprintCatalogTest passed");
@@ -54,8 +57,9 @@ public final class KingdomBlueprintCatalogTest {
         assertContains(json, "\"allowed_rotations\"", "rotation list");
         assertContains(json, "\"placements\"", "placements");
         assertContains(json, "\"rewards\"", "completion rewards");
-        long placementCount = json.lines().filter(line -> line.trim().startsWith("\"block\":" )).count();
-        assertEquals(blueprint.placements().size(), (int) placementCount,
+        int placementCount = JsonParser.parseString(json).getAsJsonObject()
+                .getAsJsonArray("placements").size();
+        assertEquals(blueprint.placements().size(), placementCount,
                 "resource placement count for " + blueprint.id());
     }
 

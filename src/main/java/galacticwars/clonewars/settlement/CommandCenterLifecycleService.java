@@ -31,6 +31,7 @@ public final class CommandCenterLifecycleService {
             return false;
         }
         data.cancelActiveCampaigns(ownerId, "hall_removed");
+        StarterCampDeploymentService.packUp(level, ownerId);
         data.applyPendingCampaignRefunds(ownerId, amount -> {
             int inserted = hall.refundCredits(amount);
             int overflow = amount - inserted;

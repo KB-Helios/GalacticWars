@@ -92,6 +92,7 @@ final class ArmyBrainSupport {
         BrainUtil.clearMemories(recruit,
                 ArmyBrainMemoryTypes.ARMY_STATE,
                 ArmyBrainMemoryTypes.PATH_STATUS,
+                ArmyBrainMemoryTypes.MARCH_STATE,
                 net.minecraft.world.entity.ai.memory.MemoryModuleType.ATTACK_TARGET,
                 net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET,
                 net.minecraft.world.entity.ai.memory.MemoryModuleType.LOOK_TARGET,
@@ -374,6 +375,14 @@ final class ArmyBrainSupport {
                 ArmyPosition rally = group.rallyPoint().orElseThrow().blockPosition();
                 return new MemberOrder(
                         ArmyCommand.moveToPosition(group.ownerId(), group.id(), rally), rally);
+            }
+            ArmyPosition executionPosition = ArmyGroupOrderPlanner.executionPosition(group);
+            if (executionPosition != null
+                    && group.simulation().marchState().phase()
+                            != galacticwars.clonewars.army.ArmyMarchPhase.HALTED) {
+                return new MemberOrder(
+                        ArmyCommand.moveToPosition(group.ownerId(), group.id(), executionPosition),
+                        executionPosition);
             }
             return new MemberOrder(group.order().toCommand(group.ownerId(), group.id()), ownerPosition);
         }

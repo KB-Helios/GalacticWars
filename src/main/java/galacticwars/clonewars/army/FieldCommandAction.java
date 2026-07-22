@@ -28,7 +28,11 @@ public enum FieldCommandAction {
     CYCLE_PATROL_SPEED,
     CYCLE_PATROL_ENEMY_POLICY,
     RENAME_PATROL_ROUTE,
-    SET_PATROL_WAYPOINT_WAIT;
+    SET_PATROL_WAYPOINT_WAIT,
+    SET_FORMATION,
+    SET_ENGAGEMENT,
+    SET_TARGET_PRIORITY,
+    SET_RANGED_FIRE;
 
     public int wireId() {
         return ordinal();
