@@ -26,17 +26,17 @@ public final class ArmyFormationSlotAssignmentTest {
                 List.of(FIRST, SECOND, THIRD, FOURTH),
                 java.util.Map.of(
                         FIRST, ArmyFormationRole.HEAVY,
-                        SECOND, ArmyFormationRole.FRONTLINE,
+                        SECOND, ArmyFormationRole.RANGED,
                         THIRD, ArmyFormationRole.SUPPORT,
-                        FOURTH, ArmyFormationRole.RANGED),
+                        FOURTH, ArmyFormationRole.FRONTLINE),
                 List.of(
                         new ArmyFormationSlotAssignment(FIRST, 0),
                         new ArmyFormationSlotAssignment(THIRD, 2)));
         assertEquals(List.of(
                 new ArmyFormationSlotAssignment(FIRST, 0),
-                new ArmyFormationSlotAssignment(SECOND, 1),
+                new ArmyFormationSlotAssignment(FOURTH, 1),
                 new ArmyFormationSlotAssignment(THIRD, 2),
-                new ArmyFormationSlotAssignment(FOURTH, 3)), reconciled,
+                new ArmyFormationSlotAssignment(SECOND, 3)), reconciled,
                 "role-aware reinforcement depths preserve survivors");
     }
 

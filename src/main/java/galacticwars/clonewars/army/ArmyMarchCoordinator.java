@@ -43,7 +43,7 @@ public final class ArmyMarchCoordinator {
                 : group.simulation().anchor();
         int cohesion = cohesionPercent(current.blockPosition(), memberPositions,
                 group.order().spacing(), group.memberIds().size());
-        float yaw = yawToward(current, destination, previous.yawDegrees());
+        float yaw = ArmyLocation.yawToward(current, destination, previous.yawDegrees());
 
         if (engaged) {
             return decision(liveAnchor, previous, ArmyMarchPhase.ENGAGED,
@@ -130,14 +130,6 @@ public final class ArmyMarchCoordinator {
         long y = (long)first.y() - second.y();
         long z = (long)first.z() - second.z();
         return x * x + y * y + z * z;
-    }
-
-    private static float yawToward(ArmyLocation first, ArmyLocation second, float fallback) {
-        double x = second.x() - first.x();
-        double z = second.z() - first.z();
-        return x * x + z * z < 0.0001D
-                ? fallback
-                : (float)Math.toDegrees(Math.atan2(-x, z));
     }
 
     public record Decision(ArmyLocation anchor, ArmyMarchState marchState) {

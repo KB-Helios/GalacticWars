@@ -18,4 +18,12 @@ public record ArmyLocation(String dimensionId, double x, double y, double z) {
     public ArmyPosition blockPosition() {
         return new ArmyPosition((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z));
     }
+
+    public static float yawToward(ArmyLocation first, ArmyLocation second, float fallback) {
+        double x = second.x() - first.x();
+        double z = second.z() - first.z();
+        return x * x + z * z < 0.0001D
+                ? fallback
+                : (float)Math.toDegrees(Math.atan2(-x, z));
+    }
 }

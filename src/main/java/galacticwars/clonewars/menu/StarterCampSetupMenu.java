@@ -112,7 +112,7 @@ public final class StarterCampSetupMenu extends AbstractContainerMenu {
         KingdomRecord kingdom = savedData.kingdomForOwner(serverPlayer.getUUID()).orElse(null);
         StarterCampDeployment deployment = kingdom == null
                 ? null : savedData.starterCampDeployment(kingdom.id()).orElse(null);
-        if (deployment != null) {
+        if (deployment != null && deployment.phase().ordinal() >= 2) {
             selectedRotation = deployment.rotationSteps();
         }
         data.set(0, selectedRotation);

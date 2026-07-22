@@ -188,7 +188,7 @@ public final class ArmyRuntimeEvents {
         }
         OptionalDouble movementSpeed = slowestMovementSpeed(marchingGroup);
         if (movementSpeed.isEmpty()) {
-            return group;
+            return marchingGroup;
         }
         boolean engaged = participants.stream().anyMatch(recruit ->
                 recruit.getTarget() != null || recruit.hurtTime > 0 || recruit.isAggressive());

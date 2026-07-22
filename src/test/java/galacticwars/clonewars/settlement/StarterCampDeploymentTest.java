@@ -16,6 +16,8 @@ public final class StarterCampDeploymentTest {
         assertTrue(building.contractGranted() && building.suppliesGranted(), "one-time grants recorded");
         assertEquals(StarterCampDeploymentPhase.BUILDING, building.phase(), "building phase");
         assertEquals(3, building.revision(), "every durable transition increments revision");
+        assertTrue(building.projectId().isPresent() && building.projectId().get().equals(project),
+                "building deployment retains project ID");
 
         StarterCampDeployment packed = building.packedUp();
         StarterCampDeployment relocated = packed.relocate("galacticwars:tatooine", 20, 70, -4, 3);

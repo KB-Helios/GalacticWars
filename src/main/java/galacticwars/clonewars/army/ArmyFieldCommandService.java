@@ -132,18 +132,12 @@ public final class ArmyFieldCommandService {
                                     group -> group.order().withFormation(formation))
                             : FieldCommandResult.PROGRESSION_LOCKED)
                     .orElse(FieldCommandResult.INVALID_ACTION);
-            case SET_ENGAGEMENT -> requestedEnum(request.optionId(), ArmyEngagementStance.class)
-                    .map(engagement -> applyTactics(data, player, groups,
-                            tactics -> tactics.withEngagement(engagement)))
-                    .orElse(FieldCommandResult.INVALID_ACTION);
-            case SET_TARGET_PRIORITY -> requestedEnum(request.optionId(), ArmyTargetPriority.class)
-                    .map(priority -> applyTactics(data, player, groups,
-                            tactics -> tactics.withTargetPriority(priority)))
-                    .orElse(FieldCommandResult.INVALID_ACTION);
-            case SET_RANGED_FIRE -> requestedEnum(request.optionId(), ArmyRangedFirePolicy.class)
-                    .map(policy -> applyTactics(data, player, groups,
-                            tactics -> tactics.withRangedFirePolicy(policy)))
-                    .orElse(FieldCommandResult.INVALID_ACTION);
+            case SET_ENGAGEMENT -> applyTacticsOption(data, player, groups, request.optionId(),
+                    ArmyEngagementStance.class, ArmyGroupTactics::withEngagement);
+            case SET_TARGET_PRIORITY -> applyTacticsOption(data, player, groups, request.optionId(),
+                    ArmyTargetPriority.class, ArmyGroupTactics::withTargetPriority);
+            case SET_RANGED_FIRE -> applyTacticsOption(data, player, groups, request.optionId(),
+                    ArmyRangedFirePolicy.class, ArmyGroupTactics::withRangedFirePolicy);
             case PATROL_MARKER -> markedBlockLocation(player)
                     .map(center -> applyPatrols(data, player, groups, center,
                             patrolRouteNameOrDefault(request), request.patrolWaypointWaitTicks()))
@@ -335,6 +329,20 @@ public final class ArmyFieldCommandService {
     ) {
         return applyUpdates(data, player, groups, group -> group.withOrder(group.order())
                 .withTactics(mutation.apply(group.effectiveTactics())));
+    }
+
+    private static <T extends Enum<T>> FieldCommandResult applyTacticsOption(
+            KingdomSavedData data,
+            ServerPlayer player,
+            List<ArmyGroupRecord> groups,
+            String optionId,
+            Class<T> enumClass,
+            java.util.function.BiFunction<ArmyGroupTactics, T, ArmyGroupTactics> tacticsMutator
+    ) {
+        return requestedEnum(optionId, enumClass)
+                .map(value -> applyTactics(data, player, groups,
+                        tactics -> tacticsMutator.apply(tactics, value)))
+                .orElse(FieldCommandResult.INVALID_ACTION);
     }
 
     private static FieldCommandResult applyPatrols(

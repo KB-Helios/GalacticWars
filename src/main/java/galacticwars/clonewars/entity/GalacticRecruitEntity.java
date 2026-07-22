@@ -339,7 +339,8 @@ public class GalacticRecruitEntity extends TamableAnimal
                 return state.setAndContinue(VISUAL_BUILD);
             }
             boolean locomotion = state.isMoving() && switch (action) {
-                case FORM_UP, MARCH, RETREAT, BUILD, RANGED_COMBAT, MELEE_COMBAT -> true;
+                case FORM_UP, MARCH, RETREAT, BUILD, RANGED_COMBAT, MELEE_COMBAT,
+                     ACKNOWLEDGE_ORDER, INJURED, LOW_MORALE -> true;
                 default -> false;
             };
             return state.setAndContinue(locomotion ? VISUAL_WALK : VISUAL_IDLE);

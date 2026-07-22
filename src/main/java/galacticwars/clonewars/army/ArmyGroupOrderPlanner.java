@@ -85,13 +85,14 @@ public final class ArmyGroupOrderPlanner {
 
     public static ArmyPosition executionPosition(ArmyGroupRecord group) {
         Objects.requireNonNull(group, "group");
+        if (group.order().type() == ArmyCommandType.RETURN_TO_RALLY && group.rallyPoint().isPresent()) {
+            return group.rallyPoint().orElseThrow().blockPosition();
+        }
         ArmyMarchState march = group.simulation().marchState();
         if (movementOrder(group.order().type()) && march.phase() != ArmyMarchPhase.HALTED) {
             return group.simulation().anchor().blockPosition();
         }
-        return group.order().type() == ArmyCommandType.RETURN_TO_RALLY
-                ? group.rallyPoint().map(ArmyLocation::blockPosition).orElse(null)
-                : group.order().targetPosition().map(ArmyLocation::blockPosition).orElse(null);
+        return group.order().targetPosition().map(ArmyLocation::blockPosition).orElse(null);
     }
 
     private static boolean movementOrder(ArmyCommandType type) {
@@ -126,6 +127,13 @@ public final class ArmyGroupOrderPlanner {
                 .filter(candidate -> candidate.memberId().equals(recruitId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("member is missing a formation slot"));
+        if (group.order().type() == ArmyCommandType.RETURN_TO_RALLY && group.rallyPoint().isPresent()) {
+            FormationSlot slot = FormationPlanner.planSlots(
+                    group.order().formation(), group.memberIds().size(), group.order().spacing())
+                    .get(assignment.slotIndex());
+            float yaw = group.effectiveTactics().effectiveFormationYawDegrees();
+            return FormationPlanner.positionFor(anchor, slot, yaw);
+        }
         ArmyMarchState march = group.simulation().marchState();
         ArmyFormation formation = march.phase() == ArmyMarchPhase.HALTED
                 ? group.order().formation()

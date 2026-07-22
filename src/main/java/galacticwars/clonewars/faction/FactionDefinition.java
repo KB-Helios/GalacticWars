@@ -2,6 +2,7 @@ package galacticwars.clonewars.faction;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -85,9 +86,9 @@ public record FactionDefinition(
         allies = immutableCopy(allies, "allies");
         enemies = immutableCopy(enemies, "enemies");
         validateRelationSets(id.toString(), id, allies, enemies);
-        pledgeTokenItemId = pledgeTokenItemId == null ? "" : pledgeTokenItemId.trim().toLowerCase();
+        pledgeTokenItemId = pledgeTokenItemId == null ? "" : pledgeTokenItemId.trim().toLowerCase(Locale.ROOT);
         Objects.requireNonNull(strategy, "strategy");
-        starterUnitId = starterUnitId == null ? "" : starterUnitId.trim().toLowerCase();
+        starterUnitId = starterUnitId == null ? "" : starterUnitId.trim().toLowerCase(Locale.ROOT);
     }
 
     public static void validateRelationSets(

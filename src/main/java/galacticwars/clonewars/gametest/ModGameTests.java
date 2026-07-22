@@ -820,6 +820,19 @@ public final class ModGameTests {
             helper.fail("Starter camp reassignment fixture could not register its reserve soldier");
             return;
         }
+        GalacticRecruitEntity secondReserve = ModEntityTypes.B1_BATTLE_DROID.get().create(
+                helper.getLevel(), EntitySpawnReason.EVENT);
+        if (secondReserve == null) {
+            helper.fail("Starter camp reassignment fixture could not create its second reserve soldier");
+            return;
+        }
+        secondReserve.setPos(hallPos.getX() + 4.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
+        if (!secondReserve.initializeStarterContract(owner, kingdom)
+                || !helper.getLevel().addFreshEntity(secondReserve)
+                || !kingdomData.registerRecruit(owner.getUUID(), secondReserve.getUUID())) {
+            helper.fail("Starter camp reassignment fixture could not register its second reserve soldier");
+            return;
+        }
         int recruitsBeforeStarterContract = kingdomData.kingdomForOwner(owner.getUUID()).orElseThrow()
                 .settlement().recruitIds().size();
         StarterCampSetupMenu campSetup = new StarterCampSetupMenu(
@@ -847,6 +860,7 @@ public final class ModGameTests {
         GalacticRecruitEntity[] firstRecruit = {null};
         boolean[] replayChecked = {false};
         boolean[] scenarioRun = {false};
+        boolean[] chunksReleased = {false};
         long startedAt = helper.getTick();
         helper.onEachTick(() -> {
             if (scenarioRun[0]) {
@@ -856,21 +870,36 @@ public final class ModGameTests {
                 if (!(helper.getLevel().getEntity(initialBuilderId) instanceof GalacticRecruitEntity indexedRecruit)) {
                     if (helper.getTick() - startedAt >= 120L) {
                         scenarioRun[0] = true;
+                        if (!chunksReleased[0]) {
+                            forcedCampChunks.forEach(chunk ->
+                                    helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                            chunksReleased[0] = true;
+                        }
                         helper.fail("Starter builder was persisted but never indexed in the server level");
                     }
                     return;
                 }
                 if (!campSetup.clickMenuButton(owner, StarterCampSetupMenu.REASSIGN_BUILDER)) {
                     scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
                     helper.fail("Starter camp did not permit an explicit loaded reserve-builder reassignment");
                     return;
                 }
                 StarterCampDeployment reassigned = kingdomData.starterCampDeployment(kingdom.id()).orElse(null);
                 if (reassigned == null
-                        || reassigned.builderId().filter(reserveBuilder.getUUID()::equals).isEmpty()
+                        || reassigned.builderId().filter(id -> !id.equals(initialBuilderId)).isEmpty()
                         || indexedRecruit.getWorkerProfession().isPresent()) {
                     scenarioRun[0] = true;
-                    helper.fail("Starter camp reassignment changed the contract or failed to release the prior builder");
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
+                    helper.fail("Starter camp reassignment changed the contract or failed to release the prior builder or did not select a different candidate, reassigned=" + reassigned);
                     return;
                 }
                 firstRecruit[0] = reserveBuilder;
@@ -886,6 +915,11 @@ public final class ModGameTests {
                                 .settlement().recruitIds().size() != recruitsBeforeStarterContract + 1
                         || countContainerItems(hall) != storedSupplies) {
                     scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
                     helper.fail("Starter contract or sealed supplies duplicated on deployment replay");
                     return;
                 }
@@ -895,6 +929,11 @@ public final class ModGameTests {
             if (current == null || current.phase() != StarterCampDeploymentPhase.COMPLETE) {
                 if (helper.getTick() - startedAt >= 1_800L) {
                     scenarioRun[0] = true;
+                    if (!chunksReleased[0]) {
+                        forcedCampChunks.forEach(chunk ->
+                                helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                        chunksReleased[0] = true;
+                    }
                     BuildProject project = current == null || current.projectId().isEmpty()
                             ? null
                             : kingdomData.kingdomForOwner(owner.getUUID()).orElseThrow()
@@ -909,8 +948,11 @@ public final class ModGameTests {
                 return;
             }
             scenarioRun[0] = true;
-            forcedCampChunks.forEach(chunk ->
-                    helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+            if (!chunksReleased[0]) {
+                forcedCampChunks.forEach(chunk ->
+                        helper.getLevel().getChunkSource().updateChunkForced(chunk, false));
+                chunksReleased[0] = true;
+            }
             ProgressionState completed = progression.state(owner.getUUID());
             owner.setPos(hallPos.getX() + 0.5D, hallPos.getY(), hallPos.getZ() + 0.5D);
             CommandCenterOperationsMenu operations = (CommandCenterOperationsMenu)

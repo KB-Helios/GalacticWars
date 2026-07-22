@@ -19,12 +19,14 @@ public final class StarterCampSetupScreen extends Screen implements MenuAccess<S
     private static final int ACCENT = 0xFFFFE082;
     private final StarterCampSetupMenu menu;
     private int selectedRotation;
+    private int lastPhaseCode;
     private Component status = Component.translatable("screen.galacticwars.starter_camp.choose_orientation");
 
     public StarterCampSetupScreen(StarterCampSetupMenu menu, Inventory inventory, Component title) {
         super(title);
         this.menu = menu;
         this.selectedRotation = menu.rotationSteps();
+        this.lastPhaseCode = menu.phaseCode();
     }
 
     @Override
@@ -97,8 +99,10 @@ public final class StarterCampSetupScreen extends Screen implements MenuAccess<S
     public void tick() {
         super.tick();
         int serverRotation = menu.rotationSteps();
-        if (serverRotation != selectedRotation && menu.phaseCode() >= 3) {
+        int currentPhase = menu.phaseCode();
+        if ((serverRotation != selectedRotation && currentPhase >= 3) || currentPhase != lastPhaseCode) {
             selectedRotation = serverRotation;
+            lastPhaseCode = currentPhase;
             rebuildWidgets();
         }
     }
