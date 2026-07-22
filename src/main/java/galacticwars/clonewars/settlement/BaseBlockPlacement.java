@@ -34,10 +34,8 @@ public record BaseBlockPlacement(
     }
 
     public BlockState blockState() {
-        var block = BuiltInRegistries.BLOCK.getValue(Identifier.parse(blockId));
-        if (block == null) {
-            throw new IllegalStateException("unknown blueprint block " + blockId);
-        }
+        var block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId))
+                .orElseThrow(() -> new IllegalStateException("unknown blueprint block " + blockId));
         BlockState state = block.defaultBlockState();
         for (Map.Entry<String, String> entry : properties.entrySet()) {
             Property<?> property = block.getStateDefinition().getProperty(entry.getKey());

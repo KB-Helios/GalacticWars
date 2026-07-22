@@ -117,6 +117,7 @@ import galacticwars.clonewars.registry.ModBlocks;
 import galacticwars.clonewars.registry.ModEntityTypes;
 import galacticwars.clonewars.registry.ModItems;
 import galacticwars.clonewars.registry.ModDataComponents;
+import galacticwars.clonewars.settlement.BaseBlockPlacement;
 import galacticwars.clonewars.settlement.CommandCenterBlockEntity;
 import galacticwars.clonewars.settlement.ConstructionPlan;
 import galacticwars.clonewars.settlement.ConstructionProjectService;
@@ -354,9 +355,8 @@ public final class ModGameTests {
         tests.put(id("kingdom_multiplayer_runtime"), ModGameTests::kingdomMultiplayerRuntime);
         tests.put(id("overworld_faction_outpost_runtime"), ModGameTests::blueprintSiteRuntime);
         tests.put(id("blueprint_site_content_hash_mismatch"), ModGameTests::blueprintSiteContentHashMismatch);
+        tests.put(id("blueprint_unknown_block_rejection"), ModGameTests::blueprintUnknownBlockRejection);
         tests.put(id("chunk_generation_rejection_serialization"),
-                ModGameTests::chunkGenerationRejectionSerialization);
-        tests.put(id("chunk_generation_initialization_serialization"),
                 ModGameTests::chunkGenerationRejectionSerialization);
         tests.put(id("natural_rejection_serialization"),
                 ModGameTests::naturalRejectionSerialization);
@@ -461,71 +461,6 @@ public final class ModGameTests {
         pending.tick();
         if (!pending.isRemoved()) {
             helper.fail("Persisted rejected recruit survived its first server tick");
-            return;
-        }
-        helper.succeed();
-    }
-
-    private static void chunkGenerationInitializationSerialization(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        BlockPos position = helper.absolutePos(new BlockPos(3, 1, 1));
-        FactionOutpostSavedData outposts = FactionOutpostSavedData.get(level);
-        GalacticRecruitEntity generated = ModEntityTypes.PHASE_I_ARC_TROOPER.get().create(
-                level, EntitySpawnReason.NATURAL);
-        if (generated == null) {
-            helper.fail("Could not create the accepted chunk-generation recruit fixture");
-            return;
-        }
-        generated.setPos(position.getX() + 0.5D, position.getY(), position.getZ() + 0.5D);
-        UUID recruitId = generated.getUUID();
-        generated.finalizeSpawn(
-                level,
-                level.getCurrentDifficultyAt(position),
-                EntitySpawnReason.CHUNK_GENERATION,
-                null);
-        if (generated.isRemoved()
-                || !generated.isPendingNaturalSpawnInitialization()
-                || outposts.outpostForNpc(recruitId).isPresent()) {
-            helper.fail("Accepted chunk-generation recruit mutated faction state during worldgen");
-            return;
-        }
-
-        TagValueOutput output = TagValueOutput.createWithContext(
-                ProblemReporter.DISCARDING, level.registryAccess());
-        if (!generated.save(output)) {
-            helper.fail("Accepted chunk-generation recruit did not remain serializable");
-            return;
-        }
-        CompoundTag serialized = output.buildResult();
-        if (!serialized.getString("id").orElse("").equals("galacticwars:phase_i_arc_trooper")) {
-            helper.fail("Accepted chunk-generation recruit serialized without its type id: "
-                    + serialized);
-            return;
-        }
-
-        Entity loaded = EntityType.loadEntityRecursive(
-                serialized,
-                level,
-                new EntitySpawnRequest(EntitySpawnReason.LOAD, false),
-                entity -> entity);
-        if (!(loaded instanceof GalacticRecruitEntity pending)
-                || !pending.isPendingNaturalSpawnInitialization()
-                || outposts.outpostForNpc(recruitId).isPresent()) {
-            helper.fail("Accepted recruit initialized before its first live server tick");
-            return;
-        }
-        if (!level.addFreshEntity(pending)) {
-            helper.fail("Could not add the persisted accepted recruit for live initialization");
-            return;
-        }
-        pending.tick();
-        FactionOutpostRecord assigned = outposts.outpostForNpc(recruitId).orElse(null);
-        if (pending.isRemoved()
-                || pending.isPendingNaturalSpawnInitialization()
-                || assigned == null
-                || pending.getFactionOutpostId() == null
-                || !pending.getFactionOutpostId().equals(assigned.id())) {
-            helper.fail("Accepted recruit was not assigned on its first live server tick");
             return;
         }
         helper.succeed();
@@ -4558,145 +4493,18 @@ public final class ModGameTests {
         helper.succeed();
     }
 
-    private static void overworldFactionOutpostRuntime(GameTestHelper helper) {
-        OverworldFactionSpawnProfile profile = GameplayDataManager.snapshot().overworldSpawnProfiles()
-                .get("galacticwars:hutt_cartel");
-        if (profile == null
-                || profile.branchFor("galacticwars:hutt_enforcer") != NpcServiceBranch.MILITARY
-                || profile.branchFor("galacticwars:hutt_civilian") != NpcServiceBranch.CIVILIAN) {
-            helper.fail("Datapack Overworld faction spawn profiles were not loaded atomically");
-            return;
-        }
-        BlockPos requestedCenter = helper.absolutePos(new BlockPos(1, 1, 1))
-                .offset(0, 0, 2_000_000);
-        BlockPos center = new BlockPos(
-                (requestedCenter.getX() & ~15) + 8,
-                requestedCenter.getY(),
-                (requestedCenter.getZ() & ~15) + 8);
-        ChunkPos siteChunk = new ChunkPos(center.getX() >> 4, center.getZ() >> 4);
-        helper.getLevel().setChunkForced(siteChunk.x(), siteChunk.z(), true);
-        helper.getLevel().getChunk(siteChunk.x(), siteChunk.z());
-        ServerPlayer observer = makeConnectedMockPlayer(helper, GameType.SPECTATOR);
-        if (!observer.teleportTo(
-                helper.getLevel(),
-                center.getX() + 0.5D,
-                center.getY() + 1.0D,
-                center.getZ() + 0.5D,
-                Set.of(),
-                0.0F,
-                0.0F,
-                true)) {
-            helper.getLevel().setChunkForced(siteChunk.x(), siteChunk.z(), false);
-            helper.fail("Could not place an observer in the isolated Overworld faction chunk");
-            return;
-        }
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                helper.getLevel().setBlock(center.offset(dx, -1, dz), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
-                helper.getLevel().setBlock(center.offset(dx, 0, dz), Blocks.AIR.defaultBlockState(), 3);
-                helper.getLevel().setBlock(center.offset(dx, 1, dz), Blocks.AIR.defaultBlockState(), 3);
-                helper.getLevel().setBlock(center.offset(dx, 2, dz), Blocks.AIR.defaultBlockState(), 3);
+    private static void blueprintUnknownBlockRejection(GameTestHelper helper) {
+        try {
+            new BaseBlockPlacement(0, 0, 0, "galacticwars:not_registered", "minecraft:stone")
+                    .blockState();
+            helper.fail("Unknown blueprint block resolved through the defaulted registry");
+        } catch (IllegalStateException expected) {
+            if (!expected.getMessage().equals("unknown blueprint block galacticwars:not_registered")) {
+                helper.fail("Unknown blueprint block error changed: " + expected.getMessage());
+                return;
             }
+            helper.succeed();
         }
-        if (!FactionNaturalSpawnRules.check(
-                ModEntityTypes.HUTT_ENFORCER.get(), helper.getLevel(),
-                net.minecraft.world.entity.EntitySpawnReason.NATURAL, center,
-                helper.getLevel().getRandom())) {
-            helper.getLevel().setChunkForced(siteChunk.x(), siteChunk.z(), false);
-            helper.fail("Valid Overworld faction ground was rejected by natural spawn placement");
-            return;
-        }
-        GalacticRecruitEntity guard = spawnNaturalRecruitAt(
-                helper, ModEntityTypes.HUTT_ENFORCER.get(), center);
-        GalacticRecruitEntity civilian = spawnNaturalRecruitAt(
-                helper,
-                ModEntityTypes.HUTT_CIVILIAN.get(),
-                center.offset(1, 0, 0),
-                new UUID(0L, 2L));
-        civilian.setWorkerProfession(WorkerProfession.COOK);
-        helper.runAfterDelay(24, () -> verifyOverworldFactionOutpostRuntime(
-                helper, center, siteChunk, guard, civilian));
-    }
-
-    private static void verifyOverworldFactionOutpostRuntime(
-            GameTestHelper helper,
-            BlockPos center,
-            ChunkPos siteChunk,
-            GalacticRecruitEntity guard,
-            GalacticRecruitEntity civilian
-    ) {
-        FactionOutpostSavedData data = FactionOutpostSavedData.get(helper.getLevel());
-        FactionOutpostRecord outpost = data.outpostForNpc(guard.getUUID()).orElse(null);
-        FactionOutpostRecord shared = data.outpostForNpc(civilian.getUUID()).orElse(null);
-        if (guard.isRemoved() || civilian.isRemoved()
-                || outpost == null || shared == null || !outpost.id().equals(shared.id())
-                || !data.siteGenerated(shared.id())) {
-            String diagnostics = "Natural faction NPCs did not share a persisted visible Overworld outpost: guardRemoved="
-                    + guard.isRemoved() + ", civilianRemoved=" + civilian.isRemoved()
-                    + ", guardOutpost=" + outpost + ", civilianOutpost=" + shared
-                    + ", site=" + (shared != null && data.siteGenerated(shared.id()))
-                    + ", siteAreaLoaded=" + (shared != null
-                    && FactionOutpostMarkerService.siteAreaLoaded(helper.getLevel(), shared))
-                    + ", guardTicks=" + guard.tickCount
-                    + ", siteResolved=" + getRecruitField(
-                    guard, "factionOutpostSiteGenerationResolved")
-                    + ", ground=" + helper.getLevel().getBlockState(center.offset(0, -1, 0))
-                    + ", volume=" + helper.getLevel().getBlockState(center.offset(0, 2, 0));
-            helper.getLevel().setChunkForced(siteChunk.x(), siteChunk.z(), false);
-            helper.fail(diagnostics);
-            return;
-        }
-        helper.getLevel().setChunkForced(siteChunk.x(), siteChunk.z(), false);
-        boolean producedSupplies = civilian.tryProduceNaturalSettlementSupplies();
-        civilian.tick();
-        int storedBread = helper.getLevel().getBlockEntity(center.offset(1, 0, 0))
-                instanceof net.minecraft.world.Container container ? container.countItem(Items.BREAD) : 0;
-        if (!helper.getLevel().getBlockState(center.offset(1, 0, 0)).is(Blocks.BARREL)
-                || !helper.getLevel().getBlockState(center.offset(0, 2, 0)).is(Blocks.SANDSTONE)
-                || !civilian.hasHome()
-                || civilian.getServiceBranch() != NpcServiceBranch.CIVILIAN
-                || !civilian.getRecruitFactionId().equals("galacticwars:hutt_cartel")
-                || Math.round(civilian.getMaxHealth()) != 18
-                || storedBread != 1) {
-            helper.fail("Generated Hutt shelter, civilian archetype, or physical production was incomplete: "
-                    + "barrel=" + helper.getLevel().getBlockState(center.offset(1, 0, 0))
-                    + ", roof=" + helper.getLevel().getBlockState(center.offset(0, 2, 0))
-                    + ", hasHome=" + civilian.hasHome()
-                    + ", branch=" + civilian.getServiceBranch()
-                    + ", faction=" + civilian.getRecruitFactionId()
-                    + ", maxHealth=" + civilian.getMaxHealth()
-                    + ", directProduction=" + producedSupplies
-                    + ", bread=" + storedBread
-                    + ", profession=" + civilian.getWorkerProfession());
-            return;
-        }
-
-        GalacticRecruitEntity republic = helper.spawn(ModEntityTypes.CLONE_TROOPER.get(), new BlockPos(4, 1, 1));
-        GalacticRecruitEntity separatist = helper.spawn(ModEntityTypes.B1_BATTLE_DROID.get(), new BlockPos(5, 1, 1));
-        republic.setPos(center.getX() + 4.5, center.getY(), center.getZ() + 0.5);
-        separatist.setPos(center.getX() + 5.5, center.getY(), center.getZ() + 0.5);
-        republic.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
-        separatist.initializeNaturalFactionNpc(UUID.randomUUID(), NpcServiceBranch.MILITARY);
-        ServerPlayer enemyPlayer = makeConnectedMockPlayer(helper, GameType.SURVIVAL);
-        ProgressionSavedData.get(helper.getLevel()).apply(new ProgressionEvent(
-                UUID.randomUUID(), enemyPlayer.getUUID(), ProgressionEventType.FACTION_PLEDGED,
-                "galacticwars:separatist", 1));
-        if (!republic.canNaturallyEngage(separatist)
-                || !republic.canNaturallyEngagePlayer(enemyPlayer)
-                || civilian.canNaturallyEngage(republic)
-                || civilian.canNaturallyEngagePlayer(enemyPlayer)
-                || civilian.getServiceBranch() != NpcServiceBranch.CIVILIAN) {
-            helper.fail("Natural military hostility or civilian noncombatant behavior was incorrect");
-            return;
-        }
-        Tag encoded = FactionOutpostSavedData.CODEC.encodeStart(NbtOps.INSTANCE, data).getOrThrow();
-        FactionOutpostSavedData restored = FactionOutpostSavedData.CODEC.parse(NbtOps.INSTANCE, encoded).getOrThrow();
-        if (restored.outpost(shared.id()).isEmpty() || !restored.siteGenerated(shared.id())
-                || restored.outpostForNpc(civilian.getUUID()).isEmpty()) {
-            helper.fail("Overworld faction outpost population did not survive SavedData round trip");
-            return;
-        }
-        helper.succeed();
     }
 
     private static void playerClassEmbodiedRuntime(GameTestHelper helper) {
