@@ -187,9 +187,7 @@ public final class ArmyRuntimeEvents {
             return replaceMarch(data, marchingGroup, liveAnchor, halted, level.getGameTime());
         }
         OptionalDouble movementSpeed = slowestMovementSpeed(marchingGroup);
-        if (movementSpeed.isEmpty()) {
             return marchingGroup;
-        }
         boolean engaged = participants.stream().anyMatch(recruit ->
                 recruit.getTarget() != null || recruit.hurtTime > 0 || recruit.isAggressive());
         boolean footprintClear = formationFootprintClear(
