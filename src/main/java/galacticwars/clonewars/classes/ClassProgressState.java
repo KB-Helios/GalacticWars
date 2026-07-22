@@ -101,7 +101,7 @@ public record ClassProgressState(
     }
 
     public ClassProgressState creditCompletedMissions(int completedMissions) {
-        int bounded = Math.max(0, completedMissions);
+        int bounded = Math.min(1_000_000, Math.max(0, completedMissions));
         if (classId.isEmpty() || bounded <= creditedMissions) {
             return this;
         }
